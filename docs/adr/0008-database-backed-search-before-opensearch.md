@@ -18,8 +18,8 @@ Phase 5 implements search through PostgreSQL-backed records:
 - filters for document type, issuer, organization, tags, and dates
 - saved and recent searches
 
-OpenSearch indexing remains the production search target for a later hardening step.
+OpenSearch indexing remains the production search target for a later hardening step. Phase 8 starts that transition by indexing document projections into OpenSearch while retaining database-backed query execution.
 
 ## Consequences
 
-The application has useful search behavior without requiring a search cluster to be healthy. The trade-off is that this is not intended for large libraries; OpenSearch indexing is still needed before PaperVault scales to heavy personal archives.
+The application has useful search behavior without requiring a search cluster to be healthy. The trade-off is that database-backed scoring is not intended for large libraries; OpenSearch-backed query execution is still needed before PaperVault scales to heavy personal archives.

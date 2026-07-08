@@ -43,8 +43,10 @@ Additional document endpoints:
 - `POST /search/saved`: save a search
 - `GET /search/saved`: list saved searches
 - `GET /search/recent`: list recent searches
+- `POST /search/index/documents/{document_id}`: reindex one owned document
+- `POST /search/index/rebuild?limit=500`: rebuild the current user's document index projection
 
-Phase 5 search is database-backed. OpenSearch indexing is deferred until the search contracts settle.
+Phase 5 search is database-backed. Phase 8 adds OpenSearch indexing and reindex endpoints, while user-facing query execution continues to use the database-backed implementation until OpenSearch query semantics are hardened.
 
 ## Tags
 

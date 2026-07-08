@@ -21,6 +21,14 @@ config:
   authAllowDevHeaders: "false"
   localAuthEnabled: "true"
   localRegistrationEnabled: "false"
+  ocrProvider: tesseract
+  ocrLanguages: eng
+  ocrTimeoutSeconds: "120"
+  ocrPdfDpi: "200"
+  ocrMaxPdfPages: "50"
+  searchIndexEnabled: "true"
+  opensearchDocumentsIndex: papervault-documents-v1
+  opensearchTimeoutSeconds: "5"
 
 external:
   postgres:

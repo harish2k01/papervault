@@ -43,6 +43,26 @@ PAPERVAULT_EMBEDDING_DIMENSIONS=64
 
 These providers require no external credentials. Model-backed providers can be added behind the same interfaces.
 
+OCR is enabled by default through local Tesseract and Poppler commands:
+
+```env
+PAPERVAULT_OCR_PROVIDER=tesseract
+PAPERVAULT_OCR_LANGUAGES=eng
+PAPERVAULT_OCR_MAX_PDF_PAGES=50
+```
+
+The worker container installs `tesseract-ocr` and `poppler-utils`. For non-container development, install those binaries locally or set `PAPERVAULT_OCR_PROVIDER=unavailable` to keep scanned-document processing as an explicit failure.
+
+OpenSearch indexing is enabled by default:
+
+```env
+PAPERVAULT_SEARCH_INDEX_ENABLED=true
+OPENSEARCH_DOCUMENTS_INDEX=papervault-documents-v1
+OPENSEARCH_TIMEOUT_SECONDS=5
+```
+
+The worker indexes documents after text extraction, AI processing, and notification generation. User-facing search still uses the database-backed service in this phase. Use `POST /search/index/rebuild` to rebuild the current user's index projection after changing mappings or adapter behavior.
+
 The frontend uses the same temporary development identity headers as the API. A generated development user id is stored in browser `localStorage` under `papervault.devUserId`.
 
 Phase 6 adds local JWT authentication. The frontend stores the current bearer token in browser `localStorage` under `papervault.accessToken`. Development headers remain available only when:

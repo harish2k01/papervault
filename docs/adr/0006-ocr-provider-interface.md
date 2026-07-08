@@ -16,6 +16,8 @@ Represent OCR as a `TextExtractor` implementation. Phase 3 includes:
 - `UnavailableOcrTextExtractor` as an explicit fallback when OCR is not configured.
 - `CompositeTextExtractor` that attempts embedded PDF text first and then falls back to OCR.
 
+Phase 7 adds `TesseractCliTextExtractor`, which uses Poppler `pdftoppm` for scanned PDF page rendering and Tesseract for image OCR.
+
 ## Consequences
 
-Scanned PDFs and images enter the same processing pipeline, but OCR currently records a clear failure unless an OCR adapter is added. This avoids false "processed" states and keeps the integration point ready for a Tesseract/OCRmyPDF adapter.
+Scanned PDFs and images enter the same processing pipeline. Deployments can use the built-in Tesseract adapter, disable OCR explicitly, or add a remote OCR adapter behind the same interface.

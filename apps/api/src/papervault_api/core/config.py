@@ -31,6 +31,18 @@ class Settings(BaseSettings):
         default=0.55,
         alias="PAPERVAULT_AI_CLASSIFICATION_THRESHOLD",
     )
+    ocr_provider: str = Field(default="tesseract", alias="PAPERVAULT_OCR_PROVIDER")
+    ocr_languages: str = Field(default="eng", alias="PAPERVAULT_OCR_LANGUAGES")
+    ocr_timeout_seconds: int = Field(default=120, ge=1, alias="PAPERVAULT_OCR_TIMEOUT_SECONDS")
+    ocr_pdf_dpi: int = Field(default=200, ge=72, le=600, alias="PAPERVAULT_OCR_PDF_DPI")
+    ocr_max_pdf_pages: int | None = Field(
+        default=50,
+        ge=1,
+        alias="PAPERVAULT_OCR_MAX_PDF_PAGES",
+    )
+    ocr_tesseract_command: str = Field(default="tesseract", alias="PAPERVAULT_TESSERACT_CMD")
+    ocr_pdftoppm_command: str = Field(default="pdftoppm", alias="PAPERVAULT_PDFTOPPM_CMD")
+    ocr_tesseract_psm: int = Field(default=6, ge=0, le=13, alias="PAPERVAULT_TESSERACT_PSM")
 
     database_url: str = Field(
         default="postgresql+asyncpg://papervault:papervault@localhost:5432/papervault",
@@ -47,6 +59,16 @@ class Settings(BaseSettings):
     opensearch_url: str = Field(default="http://localhost:9200", alias="OPENSEARCH_URL")
     opensearch_username: str | None = Field(default=None, alias="OPENSEARCH_USERNAME")
     opensearch_password: str | None = Field(default=None, alias="OPENSEARCH_PASSWORD")
+    search_index_enabled: bool = Field(default=True, alias="PAPERVAULT_SEARCH_INDEX_ENABLED")
+    opensearch_documents_index: str = Field(
+        default="papervault-documents-v1",
+        alias="OPENSEARCH_DOCUMENTS_INDEX",
+    )
+    opensearch_timeout_seconds: float = Field(
+        default=5.0,
+        gt=0,
+        alias="OPENSEARCH_TIMEOUT_SECONDS",
+    )
 
     oidc_issuer_url: str | None = Field(default=None, alias="OIDC_ISSUER_URL")
     oidc_client_id: str | None = Field(default=None, alias="OIDC_CLIENT_ID")
@@ -80,6 +102,7 @@ class Settings(BaseSettings):
         "oidc_client_id",
         "oidc_client_secret",
         "otel_exporter_otlp_endpoint",
+        "ocr_max_pdf_pages",
         mode="before",
     )
     @classmethod

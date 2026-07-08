@@ -62,3 +62,13 @@ class RecentSearchResponse(BaseModel):
     mode: SearchMode
     filters: dict[str, Any]
     searched_at: datetime
+
+
+class SearchIndexDocumentResponse(BaseModel):
+    document_id: UUID
+    indexed: bool
+
+
+class SearchIndexRebuildResponse(BaseModel):
+    requested_limit: int
+    indexed_count: int

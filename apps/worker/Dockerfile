@@ -6,6 +6,10 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends poppler-utils tesseract-ocr \
+    && rm -rf /var/lib/apt/lists/*
+
 RUN addgroup --system papervault && adduser --system --ingroup papervault papervault
 
 COPY apps/api/pyproject.toml apps/api/README.md ./

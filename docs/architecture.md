@@ -2,7 +2,7 @@
 
 ## System Context
 
-PaperVault stores personal documents as immutable binary objects and keeps metadata, timelines, tags, extraction results, search history, notifications, and user state in PostgreSQL. Searchable text and vector-ready documents are initially queried through application services and will be indexed in OpenSearch once index contracts are hardened. Long-running work runs outside the request path through Celery workers.
+PaperVault stores personal documents as immutable binary objects and keeps metadata, timelines, tags, extraction results, search history, notifications, and user state in PostgreSQL. Searchable text and vector-ready document projections are indexed in OpenSearch while the API retains a database-backed query fallback. Long-running work runs outside the request path through Celery workers.
 
 ```mermaid
 flowchart LR
@@ -70,7 +70,7 @@ sequenceDiagram
   Worker->>DB: Store AI outputs and embedding
 ```
 
-OCR is an adapter behind the text extraction interface. The default Phase 3 OCR adapter records a clear failure when OCR is not configured.
+OCR is an adapter behind the text extraction interface. Phase 7 adds a local Tesseract adapter for scanned PDFs and images. PDFs without embedded text are rendered to page images with Poppler before OCR. The unavailable OCR adapter remains available for deployments that intentionally disable OCR.
 
 ## AI Processing
 
@@ -80,6 +80,16 @@ Phase 4 adds provider interfaces for AI analysis and embeddings. The default pro
 - Hashing-based embeddings for a self-hosted baseline.
 
 Provider outputs are stored in PostgreSQL. Phase 5 uses those records for database-backed keyword, semantic, and hybrid search while leaving OpenSearch indexing as a later hardening step.
+
+## Search Indexing
+
+Phase 8 adds OpenSearch indexing behind a provider boundary:
+
+- The worker projects document metadata, current text extraction, current AI analysis, tags, metadata, and embeddings into a search document.
+- The OpenSearch adapter creates `papervault-documents-v1` with keyword, text, object, date, and `knn_vector` fields.
+- Indexing failures are logged and do not mark document processing as failed.
+- `/search/index/documents/{document_id}` and `/search/index/rebuild` allow owner-scoped reindexing.
+- Query execution remains database-backed until OpenSearch query scoring and fallback behavior are hardened.
 
 ## Identity and Access
 
@@ -108,4 +118,4 @@ Document files are never stored in PostgreSQL. The database stores metadata and 
 
 ## Provider Strategy
 
-OCR, embeddings, LLM summaries, object storage, and search providers will be implemented behind interfaces. The default self-hosted path should work without proprietary services; hosted AI providers can be added as optional adapters.
+OCR, embeddings, LLM summaries, object storage, and search providers are implemented behind interfaces. The default self-hosted path works without proprietary services; hosted AI providers and remote OCR providers can be added as optional adapters.

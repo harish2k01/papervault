@@ -1,6 +1,8 @@
 import asyncio
 from uuid import UUID
 
+import structlog
+
 from papervault_api.core.config import get_settings
 from papervault_api.db.session import AsyncSessionFactory
 from papervault_api.documents.application.ai import DocumentAIProcessingService
@@ -12,7 +14,11 @@ from papervault_api.documents.infrastructure.ai import (
 from papervault_api.documents.infrastructure.storage import S3ObjectStorage
 from papervault_api.documents.infrastructure.text_extractors import build_default_text_extractor
 from papervault_api.notifications.application.service import NotificationService
+from papervault_api.search.application.indexing import SearchIndexingService
+from papervault_api.search.infrastructure.opensearch import build_search_document_index
 from papervault_api.worker.celery_app import celery_app
+
+logger = structlog.get_logger(__name__)
 
 
 @celery_app.task(name="papervault.documents.process_document")  # type: ignore[untyped-decorator]
@@ -33,25 +39,44 @@ async def _process_document(document_id: UUID) -> None:
         document_processing_service = DocumentProcessingService(
             session=session,
             storage=storage,
-            text_extractor=build_default_text_extractor(),
+            text_extractor=build_default_text_extractor(settings),
         )
         await document_processing_service.process_document(document_id)
 
-    if not settings.ai_enabled:
-        return
-
-    async with AsyncSessionFactory() as session:
-        ai_processing_service = DocumentAIProcessingService(
-            session=session,
-            ai_provider=build_document_ai_provider(settings.ai_provider),
-            embedding_provider=build_embedding_provider(
-                settings.embedding_provider,
-                settings.embedding_dimensions,
-            ),
-            classification_threshold=settings.ai_classification_threshold,
-        )
-        await ai_processing_service.process_document(document_id)
+    if settings.ai_enabled:
+        async with AsyncSessionFactory() as session:
+            ai_processing_service = DocumentAIProcessingService(
+                session=session,
+                ai_provider=build_document_ai_provider(settings.ai_provider),
+                embedding_provider=build_embedding_provider(
+                    settings.embedding_provider,
+                    settings.embedding_dimensions,
+                ),
+                classification_threshold=settings.ai_classification_threshold,
+            )
+            await ai_processing_service.process_document(document_id)
 
     async with AsyncSessionFactory() as session:
         notification_service = NotificationService(session)
         await notification_service.generate_for_document(document_id)
+
+    await _index_document(document_id)
+
+
+async def _index_document(document_id: UUID) -> None:
+    settings = get_settings()
+    if not settings.search_index_enabled:
+        return
+
+    try:
+        async with AsyncSessionFactory() as session:
+            search_indexing_service = SearchIndexingService(
+                session=session,
+                search_index=build_search_document_index(settings),
+            )
+            await search_indexing_service.index_document(document_id)
+    except Exception:
+        logger.exception(
+            "document_search_indexing_failed",
+            document_id=str(document_id),
+        )

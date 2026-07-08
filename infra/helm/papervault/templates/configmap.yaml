@@ -11,3 +11,11 @@ data:
   PAPERVAULT_AUTH_ALLOW_DEV_HEADERS: {{ .Values.config.authAllowDevHeaders | quote }}
   PAPERVAULT_LOCAL_AUTH_ENABLED: {{ .Values.config.localAuthEnabled | quote }}
   PAPERVAULT_LOCAL_REGISTRATION_ENABLED: {{ .Values.config.localRegistrationEnabled | quote }}
+  PAPERVAULT_OCR_PROVIDER: {{ .Values.config.ocrProvider | quote }}
+  PAPERVAULT_OCR_LANGUAGES: {{ .Values.config.ocrLanguages | quote }}
+  PAPERVAULT_OCR_TIMEOUT_SECONDS: {{ .Values.config.ocrTimeoutSeconds | quote }}
+  PAPERVAULT_OCR_PDF_DPI: {{ .Values.config.ocrPdfDpi | quote }}
+  PAPERVAULT_OCR_MAX_PDF_PAGES: {{ .Values.config.ocrMaxPdfPages | quote }}
+  PAPERVAULT_SEARCH_INDEX_ENABLED: {{ .Values.config.searchIndexEnabled | quote }}
+  OPENSEARCH_DOCUMENTS_INDEX: {{ .Values.config.opensearchDocumentsIndex | quote }}
+  OPENSEARCH_TIMEOUT_SECONDS: {{ .Values.config.opensearchTimeoutSeconds | quote }}

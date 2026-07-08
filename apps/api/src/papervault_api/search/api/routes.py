@@ -1,10 +1,12 @@
 from typing import Annotated
+from uuid import UUID
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from papervault_api.core.config import Settings, get_settings
 from papervault_api.db.session import get_session
+from papervault_api.documents.infrastructure.models import Document
 from papervault_api.identity.api.dependencies import get_current_user
 from papervault_api.identity.application.current_user import CurrentUser
 from papervault_api.search.api.schemas import (
@@ -12,16 +14,23 @@ from papervault_api.search.api.schemas import (
     SavedSearchResponse,
     SaveSearchRequest,
     SearchFiltersRequest,
+    SearchIndexDocumentResponse,
+    SearchIndexRebuildResponse,
     SearchRequestBody,
     SearchResponse,
     SearchResultResponse,
 )
+from papervault_api.search.application.indexing import SearchIndexingService
 from papervault_api.search.application.service import (
     DocumentSearchService,
     SearchFilters,
     SearchRequest,
 )
 from papervault_api.search.domain.enums import SearchMode
+from papervault_api.search.infrastructure.opensearch import (
+    OpenSearchError,
+    build_search_document_index,
+)
 
 router = APIRouter(prefix="/search", tags=["search"])
 
@@ -142,6 +151,63 @@ async def list_recent_searches(
         )
         for recent_search in recent_searches
     ]
+
+
+@router.post("/index/documents/{document_id}", response_model=SearchIndexDocumentResponse)
+async def reindex_document(
+    document_id: UUID,
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    session: Annotated[AsyncSession, Depends(get_session)],
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> SearchIndexDocumentResponse:
+    document = await session.get(Document, document_id)
+    if document is None or document.owner_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
+
+    service = SearchIndexingService(
+        session=session,
+        search_index=build_search_document_index(settings),
+    )
+    try:
+        indexed = await service.index_document(document.id)
+    except OpenSearchError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=str(exc),
+        ) from exc
+
+    return SearchIndexDocumentResponse(document_id=document.id, indexed=indexed)
+
+
+@router.post("/index/rebuild", response_model=SearchIndexRebuildResponse)
+async def rebuild_search_index(
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    session: Annotated[AsyncSession, Depends(get_session)],
+    settings: Annotated[Settings, Depends(get_settings)],
+    limit: int = 500,
+) -> SearchIndexRebuildResponse:
+    if limit < 1 or limit > 1000:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="limit must be between 1 and 1000",
+        )
+
+    service = SearchIndexingService(
+        session=session,
+        search_index=build_search_document_index(settings),
+    )
+    try:
+        indexed_count = await service.index_owner_documents(current_user.id, limit=limit)
+    except OpenSearchError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=str(exc),
+        ) from exc
+
+    return SearchIndexRebuildResponse(
+        requested_limit=limit,
+        indexed_count=indexed_count,
+    )
 
 
 def filters_from_request(request: SearchFiltersRequest) -> SearchFilters:
