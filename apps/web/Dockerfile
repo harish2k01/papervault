@@ -15,4 +15,10 @@ FROM nginx:1.27-alpine
 COPY apps/web/nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /app/dist /usr/share/nginx/html
 
-EXPOSE 80
+RUN addgroup -S -g 10001 papervault \
+    && adduser -S -D -H -u 10001 -G papervault papervault \
+    && chown -R 10001:10001 /var/cache/nginx /var/log/nginx /var/run /etc/nginx/conf.d /usr/share/nginx/html
+
+USER 10001:10001
+
+EXPOSE 8080

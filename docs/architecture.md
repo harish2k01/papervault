@@ -119,3 +119,13 @@ Document files are never stored in PostgreSQL. The database stores metadata and 
 ## Provider Strategy
 
 OCR, embeddings, LLM summaries, object storage, and search providers are implemented behind interfaces. The default self-hosted path works without proprietary services; hosted AI providers and remote OCR providers can be added as optional adapters.
+
+## Deployment Model
+
+Phase 9 adds a Kubernetes deployment boundary:
+
+- GitHub Actions builds API, worker, and web images and pushes them to GHCR.
+- The Helm chart deploys API, worker, web, services, config, secrets, and an Alembic migration hook.
+- PostgreSQL, Redis, S3-compatible object storage, and OpenSearch remain external services.
+- Runtime secrets can be chart-managed for local labs or supplied through an existing Kubernetes Secret for production.
+- API and worker pods run with non-root, restricted-style security contexts. The web image now listens on port 8080 so it can run as non-root.

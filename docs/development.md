@@ -104,3 +104,15 @@ npm run dev
 cp .env.example .env
 docker compose up --build
 ```
+
+## Helm Validation
+
+The Helm chart can be rendered and validated against a Kubernetes API without installing workloads:
+
+```bash
+kubectl create namespace papervault --dry-run=client -o yaml | kubectl apply -f -
+helm lint infra/helm/papervault
+helm template papervault infra/helm/papervault --namespace papervault > rendered.yaml
+kubectl apply --dry-run=server -f rendered.yaml --namespace papervault
+helm upgrade --install papervault infra/helm/papervault --namespace papervault --dry-run=server
+```

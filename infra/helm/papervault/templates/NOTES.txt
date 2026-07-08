@@ -1,0 +1,12 @@
+PaperVault has been rendered for namespace {{ .Release.Namespace }}.
+
+Web service:
+  {{ include "papervault.fullname" . }}-web:{{ .Values.service.web.port }}
+
+API service:
+  {{ include "papervault.fullname" . }}-api:{{ .Values.service.api.port }}
+
+Before production use:
+  - Replace all values under secret.values or set secret.existingSecret.
+  - Set image repositories to your GHCR package paths.
+  - Disable local registration after bootstrapping the first administrator.

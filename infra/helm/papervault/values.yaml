@@ -1,6 +1,11 @@
 nameOverride: ""
 fullnameOverride: ""
 
+replicaCount:
+  api: 1
+  worker: 1
+  web: 1
+
 image:
   api:
     repository: ghcr.io/example/papervault-api
@@ -15,20 +20,122 @@ image:
     tag: "0.1.0"
     pullPolicy: IfNotPresent
 
+imagePullSecrets: []
+
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+podAnnotations: {}
+
+podSecurityContext:
+  api:
+    runAsNonRoot: true
+    seccompProfile:
+      type: RuntimeDefault
+  worker:
+    runAsNonRoot: true
+    seccompProfile:
+      type: RuntimeDefault
+  web:
+    runAsNonRoot: true
+    seccompProfile:
+      type: RuntimeDefault
+
+containerSecurityContext:
+  api:
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+        - ALL
+  worker:
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+        - ALL
+  web:
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+        - ALL
+
 config:
   environment: production
   logLevel: INFO
+  corsOrigins: https://papervault.example.com
+  maxUploadSizeBytes: "104857600"
+  aiEnabled: "true"
+  aiProvider: local
+  embeddingProvider: local
+  embeddingDimensions: "64"
+  aiClassificationThreshold: "0.55"
   authAllowDevHeaders: "false"
   localAuthEnabled: "true"
   localRegistrationEnabled: "false"
+  jwtIssuer: papervault
+  jwtAudience: papervault-web
+  jwtAccessTokenMinutes: "60"
   ocrProvider: tesseract
   ocrLanguages: eng
   ocrTimeoutSeconds: "120"
   ocrPdfDpi: "200"
   ocrMaxPdfPages: "50"
   searchIndexEnabled: "true"
+  s3EndpointUrl: http://minio:9000
+  s3BucketDocuments: documents
+  s3Region: us-east-1
+  opensearchUrl: http://opensearch:9200
   opensearchDocumentsIndex: papervault-documents-v1
   opensearchTimeoutSeconds: "5"
+  oidcIssuerUrl: ""
+  oidcClientId: ""
+  otelServiceName: papervault-api
+  otelExporterOtlpEndpoint: ""
+
+secret:
+  create: true
+  existingSecret: ""
+  values:
+    databaseUrl: postgresql+asyncpg://papervault:papervault@postgres:5432/papervault
+    redisUrl: redis://redis:6379/0
+    s3AccessKeyId: papervault
+    s3SecretAccessKey: papervault-secret
+    jwtSigningKey: change-me-in-production
+    opensearchUsername: ""
+    opensearchPassword: ""
+    oidcClientSecret: ""
+
+service:
+  api:
+    type: ClusterIP
+    port: 8000
+  web:
+    type: ClusterIP
+    port: 80
+
+ingress:
+  api:
+    enabled: false
+    className: ""
+    annotations: {}
+    host: api.papervault.example.com
+    tls: []
+  web:
+    enabled: false
+    className: ""
+    annotations: {}
+    host: papervault.example.com
+    tls: []
+
+migrations:
+  enabled: true
+  backoffLimit: 3
+
+resources:
+  api: {}
+  worker: {}
+  web: {}
 
 external:
   postgres:

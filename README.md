@@ -2,7 +2,7 @@
 
 PaperVault is a production-oriented, self-hostable personal document management system. It turns PDFs, scanned PDFs, and images into a searchable knowledge base with OCR, metadata extraction, AI summaries, semantic search, timelines, duplicate detection, and notifications.
 
-This repository is being built iteratively. Phase 1 established the foundation. Phase 2 added the core domain registry, relational schema, migrations, and persistence boundaries. Phase 3 added uploads, object storage, processing jobs, and text-extraction records. Phase 4 added AI analysis and embedding provider boundaries. Phase 5 added the first usable knowledge-base layer. Phase 6 added local JWT authentication, password hashing, RBAC dependencies, admin user management, and a frontend auth gate. Phase 7 added a self-hosted OCR adapter for scanned PDFs and images. Phase 8 adds OpenSearch indexing and reindexing infrastructure.
+This repository is being built iteratively. Phase 1 established the foundation. Phase 2 added the core domain registry, relational schema, migrations, and persistence boundaries. Phase 3 added uploads, object storage, processing jobs, and text-extraction records. Phase 4 added AI analysis and embedding provider boundaries. Phase 5 added the first usable knowledge-base layer. Phase 6 added local JWT authentication, password hashing, RBAC dependencies, admin user management, and a frontend auth gate. Phase 7 added a self-hosted OCR adapter for scanned PDFs and images. Phase 8 added OpenSearch indexing and reindexing infrastructure. Phase 9 adds GHCR image publishing and a deployable Helm chart.
 
 ## Architecture
 
@@ -40,7 +40,7 @@ Expected local services:
 
 ## Current Status
 
-Phase 8 includes an OpenSearch document index adapter, search projection service, worker-side indexing after processing, owner-scoped reindex endpoints, and operational configuration for index names and timeouts. OIDC login, OpenSearch-backed query execution, richer OCR language packs, and deployment hardening are planned for later phases after approval.
+Phase 9 includes GitHub Actions image publishing to GHCR, Helm chart workload resources, migration hooks, services, secrets/config wiring, Kubernetes server-side validation, and hardened non-root container defaults. OIDC login, OpenSearch-backed query execution, richer OCR language packs, and dependency subcharts are planned for later phases after approval.
 
 ## License
 

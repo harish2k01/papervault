@@ -6,7 +6,8 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-RUN addgroup --system papervault && adduser --system --ingroup papervault papervault
+RUN addgroup --system --gid 10001 papervault \
+    && adduser --system --uid 10001 --ingroup papervault --no-create-home papervault
 
 COPY apps/api/pyproject.toml apps/api/README.md ./
 COPY apps/api/src ./src
@@ -15,7 +16,7 @@ COPY apps/api/migrations ./migrations
 
 RUN pip install --upgrade pip && pip install .
 
-USER papervault
+USER 10001:10001
 
 EXPOSE 8000
 

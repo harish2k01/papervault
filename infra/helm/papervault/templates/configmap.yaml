@@ -1,21 +1,38 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: {{ include "papervault.fullname" . }}-config
+  name: {{ include "papervault.configMapName" . }}
   labels:
-    app.kubernetes.io/name: {{ include "papervault.name" . }}
-    app.kubernetes.io/instance: {{ .Release.Name }}
+    {{- include "papervault.labels" . | nindent 4 }}
 data:
   PAPERVAULT_ENV: {{ .Values.config.environment | quote }}
   PAPERVAULT_LOG_LEVEL: {{ .Values.config.logLevel | quote }}
+  PAPERVAULT_API_CORS_ORIGINS: {{ .Values.config.corsOrigins | quote }}
+  PAPERVAULT_MAX_UPLOAD_SIZE_BYTES: {{ .Values.config.maxUploadSizeBytes | quote }}
+  PAPERVAULT_AI_ENABLED: {{ .Values.config.aiEnabled | quote }}
+  PAPERVAULT_AI_PROVIDER: {{ .Values.config.aiProvider | quote }}
+  PAPERVAULT_EMBEDDING_PROVIDER: {{ .Values.config.embeddingProvider | quote }}
+  PAPERVAULT_EMBEDDING_DIMENSIONS: {{ .Values.config.embeddingDimensions | quote }}
+  PAPERVAULT_AI_CLASSIFICATION_THRESHOLD: {{ .Values.config.aiClassificationThreshold | quote }}
   PAPERVAULT_AUTH_ALLOW_DEV_HEADERS: {{ .Values.config.authAllowDevHeaders | quote }}
   PAPERVAULT_LOCAL_AUTH_ENABLED: {{ .Values.config.localAuthEnabled | quote }}
   PAPERVAULT_LOCAL_REGISTRATION_ENABLED: {{ .Values.config.localRegistrationEnabled | quote }}
+  JWT_ISSUER: {{ .Values.config.jwtIssuer | quote }}
+  JWT_AUDIENCE: {{ .Values.config.jwtAudience | quote }}
+  JWT_ACCESS_TOKEN_MINUTES: {{ .Values.config.jwtAccessTokenMinutes | quote }}
   PAPERVAULT_OCR_PROVIDER: {{ .Values.config.ocrProvider | quote }}
   PAPERVAULT_OCR_LANGUAGES: {{ .Values.config.ocrLanguages | quote }}
   PAPERVAULT_OCR_TIMEOUT_SECONDS: {{ .Values.config.ocrTimeoutSeconds | quote }}
   PAPERVAULT_OCR_PDF_DPI: {{ .Values.config.ocrPdfDpi | quote }}
   PAPERVAULT_OCR_MAX_PDF_PAGES: {{ .Values.config.ocrMaxPdfPages | quote }}
   PAPERVAULT_SEARCH_INDEX_ENABLED: {{ .Values.config.searchIndexEnabled | quote }}
+  S3_ENDPOINT_URL: {{ .Values.config.s3EndpointUrl | quote }}
+  S3_BUCKET_DOCUMENTS: {{ .Values.config.s3BucketDocuments | quote }}
+  S3_REGION: {{ .Values.config.s3Region | quote }}
+  OPENSEARCH_URL: {{ .Values.config.opensearchUrl | quote }}
   OPENSEARCH_DOCUMENTS_INDEX: {{ .Values.config.opensearchDocumentsIndex | quote }}
   OPENSEARCH_TIMEOUT_SECONDS: {{ .Values.config.opensearchTimeoutSeconds | quote }}
+  OIDC_ISSUER_URL: {{ .Values.config.oidcIssuerUrl | quote }}
+  OIDC_CLIENT_ID: {{ .Values.config.oidcClientId | quote }}
+  OTEL_SERVICE_NAME: {{ .Values.config.otelServiceName | quote }}
+  OTEL_EXPORTER_OTLP_ENDPOINT: {{ .Values.config.otelExporterOtlpEndpoint | quote }}

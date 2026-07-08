@@ -1,0 +1,42 @@
+{{- if .Values.migrations.enabled }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "papervault.fullname" . }}-migrate
+  labels:
+    {{- include "papervault.labels" . | nindent 4 }}
+    app.kubernetes.io/component: migration
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: {{ .Values.migrations.backoffLimit }}
+  template:
+    metadata:
+      labels:
+        {{- include "papervault.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: migration
+    spec:
+      restartPolicy: OnFailure
+      serviceAccountName: {{ include "papervault.serviceAccountName" . }}
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext.api | nindent 8 }}
+      containers:
+        - name: migrate
+          image: "{{ .Values.image.api.repository }}:{{ .Values.image.api.tag }}"
+          imagePullPolicy: {{ .Values.image.api.pullPolicy }}
+          command: ["alembic", "upgrade", "head"]
+          securityContext:
+            {{- toYaml .Values.containerSecurityContext.api | nindent 12 }}
+          envFrom:
+            - configMapRef:
+                name: {{ include "papervault.configMapName" . }}
+            - secretRef:
+                name: {{ include "papervault.secretName" . }}
+          resources:
+            {{- toYaml .Values.resources.api | nindent 12 }}
+{{- end }}
