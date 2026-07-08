@@ -25,8 +25,12 @@ def upgrade() -> None:
         sa.Column("mode", sa.String(length=32), nullable=False),
         sa.Column("filters", sa.JSON(), nullable=False),
         sa.Column("id", sa.Uuid(), nullable=False),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column(
+            "created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
+        ),
+        sa.Column(
+            "updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
+        ),
         sa.CheckConstraint(
             "mode IN ('hybrid', 'keyword', 'semantic')",
             name="ck_saved_searches_saved_search_mode_valid",
@@ -51,7 +55,9 @@ def upgrade() -> None:
         sa.Column("query", sa.Text(), nullable=False),
         sa.Column("mode", sa.String(length=32), nullable=False),
         sa.Column("filters", sa.JSON(), nullable=False),
-        sa.Column("searched_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column(
+            "searched_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
+        ),
         sa.Column("id", sa.Uuid(), nullable=False),
         sa.CheckConstraint(
             "mode IN ('hybrid', 'keyword', 'semantic')",
@@ -82,8 +88,12 @@ def upgrade() -> None:
         sa.Column("due_date", sa.Date(), nullable=False),
         sa.Column("payload", sa.JSON(), nullable=False),
         sa.Column("id", sa.Uuid(), nullable=False),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column(
+            "created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
+        ),
+        sa.Column(
+            "updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
+        ),
         sa.CheckConstraint(
             "kind IN ('due_date', 'expiry', 'policy_renewal', 'warranty_expiry')",
             name="ck_notifications_notification_kind_valid",

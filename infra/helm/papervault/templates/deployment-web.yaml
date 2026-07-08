@@ -49,5 +49,15 @@ spec:
               port: http
             initialDelaySeconds: 10
             periodSeconds: 20
+          volumeMounts:
+            - name: nginx-run
+              mountPath: /run
+            - name: nginx-cache
+              mountPath: /var/cache/nginx
           resources:
             {{- toYaml .Values.resources.web | nindent 12 }}
+      volumes:
+        - name: nginx-run
+          emptyDir: {}
+        - name: nginx-cache
+          emptyDir: {}

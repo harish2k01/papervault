@@ -76,3 +76,31 @@ helm upgrade --install papervault infra/helm/papervault \
   --set secret.create=false \
   --set secret.existingSecret=papervault-runtime
 ```
+
+## Gateway API
+
+The chart can publish a Gateway API `HTTPRoute` when the cluster already provides a
+Gateway controller such as Traefik:
+
+```bash
+helm upgrade --install papervault infra/helm/papervault \
+  --namespace papervault \
+  --set gateway.httpRoute.enabled=true \
+  --set gateway.httpRoute.gatewayName=traefik-gateway \
+  --set gateway.httpRoute.gatewayNamespace=traefik \
+  --set gateway.httpRoute.sectionName=websecure \
+  --set gateway.httpRoute.hostnames[0]=papervault.example.com
+```
+
+The route sends `/api/*` to the API service and rewrites the prefix before it
+reaches FastAPI. All other paths go to the web service.
+
+## Lab Dependencies
+
+For single-node homelab testing, `labDependencies.enabled=true` deploys chart-managed
+PostgreSQL, Redis, and MinIO resources. This profile is intended for smoke tests and
+developer clusters, not long-lived production data. Production deployments should use
+operator-managed or external dependencies with explicit backup and restore procedures.
+
+The repository includes `infra/helm/papervault/values-cluster-test.yaml` as an example
+profile for GHCR images, Traefik Gateway API routing, and chart-managed lab services.

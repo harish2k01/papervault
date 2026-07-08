@@ -41,6 +41,9 @@ dev = [
 [tool.setuptools.packages.find]
 where = ["src"]
 
+[tool.setuptools.package-data]
+papervault_api = ["py.typed"]
+
 [tool.pytest.ini_options]
 addopts = "-ra"
 asyncio_mode = "auto"

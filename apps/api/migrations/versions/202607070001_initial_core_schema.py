@@ -27,8 +27,12 @@ def upgrade() -> None:
         sa.Column("is_active", sa.Boolean(), server_default=sa.text("true"), nullable=False),
         sa.Column("disabled_by_id", sa.Uuid(), nullable=True),
         sa.Column("id", sa.Uuid(), nullable=False),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column(
+            "created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
+        ),
+        sa.Column(
+            "updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
+        ),
         sa.CheckConstraint(
             "auth_provider IN ('local', 'oidc')",
             name="ck_users_user_auth_provider_valid",
@@ -67,9 +71,15 @@ def upgrade() -> None:
         sa.Column("summary", sa.Text(), nullable=True),
         sa.Column("archived_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("id", sa.Uuid(), nullable=False),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
-        sa.CheckConstraint("file_size_bytes >= 0", name="ck_documents_document_file_size_non_negative"),
+        sa.Column(
+            "created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
+        ),
+        sa.Column(
+            "updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
+        ),
+        sa.CheckConstraint(
+            "file_size_bytes >= 0", name="ck_documents_document_file_size_non_negative"
+        ),
         sa.CheckConstraint(
             "page_count IS NULL OR page_count >= 0",
             name="ck_documents_document_page_count_valid",
@@ -79,7 +89,9 @@ def upgrade() -> None:
             name="ck_documents_document_source_kind_valid",
         ),
         sa.CheckConstraint(
-            "status IN ('archived', 'failed', 'pending_processing', 'processing', 'ready', 'uploaded')",
+            "status IN ("
+            "'archived', 'failed', 'pending_processing', 'processing', 'ready', 'uploaded'"
+            ")",
             name="ck_documents_document_status_valid",
         ),
         sa.ForeignKeyConstraint(
@@ -107,7 +119,9 @@ def upgrade() -> None:
         sa.Column("file_size_bytes", sa.BigInteger(), nullable=False),
         sa.Column("created_by_id", sa.Uuid(), nullable=True),
         sa.Column("change_reason", sa.String(length=255), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column(
+            "created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
+        ),
         sa.Column("id", sa.Uuid(), nullable=False),
         sa.CheckConstraint(
             "file_size_bytes >= 0",
@@ -145,8 +159,12 @@ def upgrade() -> None:
         sa.Column("extracted_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("is_current", sa.Boolean(), server_default=sa.text("true"), nullable=False),
         sa.Column("id", sa.Uuid(), nullable=False),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column(
+            "created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
+        ),
+        sa.Column(
+            "updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
+        ),
         sa.CheckConstraint(
             "confidence_score IS NULL OR (confidence_score >= 0 AND confidence_score <= 1)",
             name="ck_document_metadata_document_metadata_confidence_valid",
@@ -182,8 +200,12 @@ def upgrade() -> None:
         sa.Column("color", sa.String(length=20), nullable=True),
         sa.Column("source", sa.String(length=32), server_default="manual", nullable=False),
         sa.Column("id", sa.Uuid(), nullable=False),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column(
+            "created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
+        ),
+        sa.Column(
+            "updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
+        ),
         sa.CheckConstraint(
             "source IN ('ai', 'manual', 'smart')",
             name="ck_tags_tag_source_valid",
@@ -206,7 +228,9 @@ def upgrade() -> None:
         sa.Column("source", sa.String(length=32), server_default="manual", nullable=False),
         sa.Column("confidence_score", sa.Numeric(precision=5, scale=4), nullable=True),
         sa.Column("assigned_by_id", sa.Uuid(), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column(
+            "created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
+        ),
         sa.CheckConstraint(
             "confidence_score IS NULL OR (confidence_score >= 0 AND confidence_score <= 1)",
             name="ck_document_tags_document_tag_confidence_valid",
@@ -244,7 +268,9 @@ def upgrade() -> None:
         sa.Column("actor_id", sa.Uuid(), nullable=True),
         sa.Column("event_type", sa.String(length=80), nullable=False),
         sa.Column("payload", sa.JSON(), nullable=False),
-        sa.Column("occurred_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column(
+            "occurred_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
+        ),
         sa.Column("id", sa.Uuid(), nullable=False),
         sa.CheckConstraint(
             "event_type IN ("

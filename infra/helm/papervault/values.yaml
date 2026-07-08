@@ -39,7 +39,10 @@ podSecurityContext:
     seccompProfile:
       type: RuntimeDefault
   web:
+    fsGroup: 10001
     runAsNonRoot: true
+    runAsGroup: 10001
+    runAsUser: 10001
     seccompProfile:
       type: RuntimeDefault
 
@@ -128,6 +131,19 @@ ingress:
     host: papervault.example.com
     tls: []
 
+gateway:
+  httpRoute:
+    enabled: false
+    gatewayName: traefik-gateway
+    gatewayNamespace: traefik
+    sectionName: websecure
+    hostnames: []
+    api:
+      pathPrefix: /api
+      rewritePrefix: /
+    web:
+      pathPrefix: /
+
 migrations:
   enabled: true
   backoffLimit: 3
@@ -136,6 +152,24 @@ resources:
   api: {}
   worker: {}
   web: {}
+
+labDependencies:
+  enabled: false
+  postgres:
+    image: postgres:17-alpine
+    storageSize: 5Gi
+    username: papervault
+    password: papervault
+    database: papervault
+  redis:
+    image: redis:7.4-alpine
+  minio:
+    image: minio/minio:RELEASE.2025-04-22T22-12-26Z
+    mcImage: minio/mc:RELEASE.2025-04-16T18-13-26Z
+    storageSize: 10Gi
+    rootUser: papervault
+    rootPassword: papervault-secret
+    bucket: documents
 
 external:
   postgres:

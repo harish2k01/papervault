@@ -1,0 +1,36 @@
+{{- if .Values.gateway.httpRoute.enabled }}
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: {{ include "papervault.fullname" . }}
+  labels:
+    {{- include "papervault.labels" . | nindent 4 }}
+spec:
+  hostnames:
+    {{- toYaml .Values.gateway.httpRoute.hostnames | nindent 4 }}
+  parentRefs:
+    - name: {{ .Values.gateway.httpRoute.gatewayName }}
+      namespace: {{ .Values.gateway.httpRoute.gatewayNamespace }}
+      sectionName: {{ .Values.gateway.httpRoute.sectionName }}
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: {{ .Values.gateway.httpRoute.api.pathPrefix | quote }}
+      filters:
+        - type: URLRewrite
+          urlRewrite:
+            path:
+              type: ReplacePrefixMatch
+              replacePrefixMatch: {{ .Values.gateway.httpRoute.api.rewritePrefix | quote }}
+      backendRefs:
+        - name: {{ include "papervault.fullname" . }}-api
+          port: {{ .Values.service.api.port }}
+    - matches:
+        - path:
+            type: PathPrefix
+            value: {{ .Values.gateway.httpRoute.web.pathPrefix | quote }}
+      backendRefs:
+        - name: {{ include "papervault.fullname" . }}-web
+          port: {{ .Values.service.web.port }}
+{{- end }}

@@ -34,8 +34,12 @@ def upgrade() -> None:
         sa.Column("error_message", sa.Text(), nullable=True),
         sa.Column("is_current", sa.Boolean(), server_default=sa.text("true"), nullable=False),
         sa.Column("id", sa.Uuid(), nullable=False),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column(
+            "created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
+        ),
+        sa.Column(
+            "updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
+        ),
         sa.CheckConstraint(
             "confidence_score IS NULL OR (confidence_score >= 0 AND confidence_score <= 1)",
             name="ck_document_ai_analyses_document_ai_analysis_confidence_valid",
@@ -53,7 +57,7 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(
             ["text_extraction_id"],
             ["document_text_extractions.id"],
-            name="fk_document_ai_analyses_text_extraction_id_document_text_extractions",
+            name="fk_document_ai_analyses_text_extraction",
             ondelete="SET NULL",
         ),
         sa.PrimaryKeyConstraint("id", name="pk_document_ai_analyses"),
@@ -81,15 +85,19 @@ def upgrade() -> None:
         sa.Column("source_text_sha256", sa.String(length=64), nullable=False),
         sa.Column("is_current", sa.Boolean(), server_default=sa.text("true"), nullable=False),
         sa.Column("id", sa.Uuid(), nullable=False),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column(
+            "created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
+        ),
+        sa.Column(
+            "updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
+        ),
         sa.CheckConstraint(
             "dimensions > 0",
             name="ck_document_embeddings_document_embedding_dimensions_positive",
         ),
         sa.CheckConstraint(
             "vector_norm >= 0",
-            name="ck_document_embeddings_document_embedding_vector_norm_non_negative",
+            name="ck_document_embeddings_vector_norm_non_negative",
         ),
         sa.ForeignKeyConstraint(
             ["document_id"],
@@ -100,7 +108,7 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(
             ["text_extraction_id"],
             ["document_text_extractions.id"],
-            name="fk_document_embeddings_text_extraction_id_document_text_extractions",
+            name="fk_document_embeddings_text_extraction",
             ondelete="SET NULL",
         ),
         sa.PrimaryKeyConstraint("id", name="pk_document_embeddings"),

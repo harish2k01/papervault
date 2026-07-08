@@ -200,7 +200,11 @@ class DocumentAIAnalysis(UuidPrimaryKeyMixin, TimestampMixin, Base):
         nullable=False,
     )
     text_extraction_id: Mapped[UUID | None] = mapped_column(
-        ForeignKey("document_text_extractions.id", ondelete="SET NULL"),
+        ForeignKey(
+            "document_text_extractions.id",
+            name="fk_document_ai_analyses_text_extraction",
+            ondelete="SET NULL",
+        ),
     )
     provider: Mapped[str] = mapped_column(String(80), nullable=False)
     model: Mapped[str] = mapped_column(String(120), nullable=False)
@@ -222,7 +226,7 @@ class DocumentEmbedding(UuidPrimaryKeyMixin, TimestampMixin, Base):
     __tablename__ = "document_embeddings"
     __table_args__ = (
         CheckConstraint("dimensions > 0", name="document_embedding_dimensions_positive"),
-        CheckConstraint("vector_norm >= 0", name="document_embedding_vector_norm_non_negative"),
+        CheckConstraint("vector_norm >= 0", name="embedding_vector_norm_non_negative"),
         Index("ix_document_embeddings_current", "document_id", "is_current"),
     )
 
@@ -231,7 +235,11 @@ class DocumentEmbedding(UuidPrimaryKeyMixin, TimestampMixin, Base):
         nullable=False,
     )
     text_extraction_id: Mapped[UUID | None] = mapped_column(
-        ForeignKey("document_text_extractions.id", ondelete="SET NULL"),
+        ForeignKey(
+            "document_text_extractions.id",
+            name="fk_document_embeddings_text_extraction",
+            ondelete="SET NULL",
+        ),
     )
     provider: Mapped[str] = mapped_column(String(80), nullable=False)
     model: Mapped[str] = mapped_column(String(120), nullable=False)
@@ -249,14 +257,14 @@ class DocumentTextExtraction(UuidPrimaryKeyMixin, TimestampMixin, Base):
     __table_args__ = (
         CheckConstraint(
             "confidence_score IS NULL OR (confidence_score >= 0 AND confidence_score <= 1)",
-            name="document_text_extraction_confidence_valid",
+            name="text_extraction_confidence_valid",
         ),
         CheckConstraint(
             "page_count IS NULL OR page_count >= 0",
-            name="document_text_extraction_page_count_valid",
+            name="text_extraction_page_count_valid",
         ),
-        check_values("source", TextExtractionSource, "document_text_extraction_source_valid"),
-        check_values("status", TextExtractionStatus, "document_text_extraction_status_valid"),
+        check_values("source", TextExtractionSource, "text_extraction_source_valid"),
+        check_values("status", TextExtractionStatus, "text_extraction_status_valid"),
         Index("ix_document_text_extractions_current", "document_id", "is_current"),
     )
 

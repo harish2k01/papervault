@@ -1,0 +1,137 @@
+{{- if .Values.labDependencies.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "papervault.fullname" . }}-minio
+  labels:
+    {{- include "papervault.labels" . | nindent 4 }}
+    app.kubernetes.io/component: minio
+spec:
+  ports:
+    - name: api
+      port: 9000
+      targetPort: api
+  selector:
+    {{- include "papervault.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: minio
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "papervault.fullname" . }}-minio
+  labels:
+    {{- include "papervault.labels" . | nindent 4 }}
+    app.kubernetes.io/component: minio
+spec:
+  serviceName: {{ include "papervault.fullname" . }}-minio
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "papervault.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: minio
+  template:
+    metadata:
+      labels:
+        {{- include "papervault.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: minio
+    spec:
+      securityContext:
+        fsGroup: 1000
+        runAsGroup: 1000
+        runAsNonRoot: true
+        runAsUser: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: minio
+          image: {{ .Values.labDependencies.minio.image | quote }}
+          imagePullPolicy: IfNotPresent
+          args: ["server", "/data"]
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          ports:
+            - name: api
+              containerPort: 9000
+          envFrom:
+            - secretRef:
+                name: {{ include "papervault.secretName" . }}
+          volumeMounts:
+            - name: data
+              mountPath: /data
+          readinessProbe:
+            httpGet:
+              path: /minio/health/ready
+              port: api
+            initialDelaySeconds: 10
+            periodSeconds: 10
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: {{ .Values.labDependencies.minio.storageSize }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "papervault.fullname" . }}-minio-bucket
+  labels:
+    {{- include "papervault.labels" . | nindent 4 }}
+    app.kubernetes.io/component: minio-bucket
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: 12
+  template:
+    metadata:
+      labels:
+        {{- include "papervault.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: minio-bucket
+    spec:
+      restartPolicy: OnFailure
+      securityContext:
+        runAsGroup: 1000
+        runAsNonRoot: true
+        runAsUser: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: create-bucket
+          image: {{ .Values.labDependencies.minio.mcImage | quote }}
+          imagePullPolicy: IfNotPresent
+          command:
+            - /bin/sh
+            - -c
+            - |
+              until mc alias set local http://{{ include "papervault.fullname" . }}-minio:9000 "$MINIO_ROOT_USER" "$MINIO_ROOT_PASSWORD"; do
+                sleep 5
+              done
+              mc mb --ignore-existing local/{{ .Values.labDependencies.minio.bucket }}
+              mc anonymous set none local/{{ .Values.labDependencies.minio.bucket }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          envFrom:
+            - secretRef:
+                name: {{ include "papervault.secretName" . }}
+          env:
+            - name: HOME
+              value: /tmp
+            - name: MC_CONFIG_DIR
+              value: /tmp/.mc
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+{{- end }}

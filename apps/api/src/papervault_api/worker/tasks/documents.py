@@ -4,7 +4,8 @@ from uuid import UUID
 import structlog
 
 from papervault_api.core.config import get_settings
-from papervault_api.db.session import AsyncSessionFactory
+from papervault_api.db import models as _models  # noqa: F401
+from papervault_api.db.session import AsyncSessionFactory, engine
 from papervault_api.documents.application.ai import DocumentAIProcessingService
 from papervault_api.documents.application.processing import DocumentProcessingService
 from papervault_api.documents.infrastructure.ai import (
@@ -23,8 +24,15 @@ logger = structlog.get_logger(__name__)
 
 @celery_app.task(name="papervault.documents.process_document")  # type: ignore[untyped-decorator]
 def process_document(document_id: str) -> str:
-    asyncio.run(_process_document(UUID(document_id)))
+    asyncio.run(_run_process_document_task(UUID(document_id)))
     return document_id
+
+
+async def _run_process_document_task(document_id: UUID) -> None:
+    try:
+        await _process_document(document_id)
+    finally:
+        await engine.dispose()
 
 
 async def _process_document(document_id: UUID) -> None:

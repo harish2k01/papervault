@@ -30,23 +30,27 @@ def upgrade() -> None:
         sa.Column("error_message", sa.Text(), nullable=True),
         sa.Column("is_current", sa.Boolean(), server_default=sa.text("true"), nullable=False),
         sa.Column("id", sa.Uuid(), nullable=False),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column(
+            "created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
+        ),
+        sa.Column(
+            "updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
+        ),
         sa.CheckConstraint(
             "confidence_score IS NULL OR (confidence_score >= 0 AND confidence_score <= 1)",
-            name="ck_document_text_extractions_document_text_extraction_confidence_valid",
+            name="ck_document_text_extractions_confidence_valid",
         ),
         sa.CheckConstraint(
             "page_count IS NULL OR page_count >= 0",
-            name="ck_document_text_extractions_document_text_extraction_page_count_valid",
+            name="ck_document_text_extractions_page_count_valid",
         ),
         sa.CheckConstraint(
             "source IN ('embedded_text', 'ocr')",
-            name="ck_document_text_extractions_document_text_extraction_source_valid",
+            name="ck_document_text_extractions_source_valid",
         ),
         sa.CheckConstraint(
             "status IN ('failed', 'skipped', 'succeeded')",
-            name="ck_document_text_extractions_document_text_extraction_status_valid",
+            name="ck_document_text_extractions_status_valid",
         ),
         sa.ForeignKeyConstraint(
             ["document_id"],
