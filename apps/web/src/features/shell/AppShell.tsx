@@ -4,22 +4,35 @@ import {
   Bell,
   FileText,
   History,
+  LogIn,
+  LogOut,
   Search,
   ShieldCheck,
   Tags,
   Upload,
+  UserPlus,
 } from "lucide-react";
 
 import { Button } from "../../components/ui/button";
 import {
+  AuthConfig,
+  AuthUser,
   DocumentDetail,
   DocumentItem,
+  TokenResponse,
+  clearStoredAccessToken,
+  getAuthConfig,
   getDocument,
   getDocumentFile,
+  getMe,
+  getStoredAccessToken,
   listDocuments,
   listDuplicates,
   listNotifications,
+  loginAccount,
+  registerAccount,
   searchDocuments,
+  storeAccessToken,
   uploadDocument,
 } from "../../lib/api";
 
@@ -33,33 +46,53 @@ const navItems = [
 
 export function AppShell() {
   const queryClient = useQueryClient();
+  const [accessToken, setAccessToken] = useState<string | null>(() =>
+    getStoredAccessToken(),
+  );
+  const [showAuthScreen, setShowAuthScreen] = useState(false);
   const [query, setQuery] = useState("");
   const [submittedQuery, setSubmittedQuery] = useState("");
   const [selectedDocumentId, setSelectedDocumentId] = useState<string | null>(
     null,
   );
 
+  const authConfigQuery = useQuery({
+    queryKey: ["auth-config"],
+    queryFn: getAuthConfig,
+  });
+  const meQuery = useQuery({
+    queryKey: ["auth", "me", accessToken],
+    queryFn: getMe,
+    enabled: accessToken !== null,
+  });
+  const canUseDevIdentity = authConfigQuery.data?.dev_headers_enabled === true;
+  const canAccessWorkspace = accessToken !== null || canUseDevIdentity;
+  const workspaceEnabled = canAccessWorkspace && !showAuthScreen;
+
   const documentsQuery = useQuery({
     queryKey: ["documents"],
     queryFn: listDocuments,
+    enabled: workspaceEnabled,
   });
   const searchQuery = useQuery({
     queryKey: ["search", submittedQuery],
     queryFn: () => searchDocuments(submittedQuery),
-    enabled: submittedQuery.trim().length > 0,
+    enabled: workspaceEnabled && submittedQuery.trim().length > 0,
   });
   const notificationsQuery = useQuery({
     queryKey: ["notifications"],
     queryFn: listNotifications,
+    enabled: workspaceEnabled,
   });
   const duplicatesQuery = useQuery({
     queryKey: ["duplicates"],
     queryFn: listDuplicates,
+    enabled: workspaceEnabled,
   });
   const detailQuery = useQuery({
     queryKey: ["document", selectedDocumentId],
     queryFn: () => getDocument(selectedDocumentId!),
-    enabled: selectedDocumentId !== null,
+    enabled: workspaceEnabled && selectedDocumentId !== null,
   });
   const uploadMutation = useMutation({
     mutationFn: (file: File) => uploadDocument(file),
@@ -71,6 +104,20 @@ export function AppShell() {
       ]);
     },
   });
+
+  function handleAuthenticated(response: TokenResponse) {
+    storeAccessToken(response.access_token);
+    setAccessToken(response.access_token);
+    setShowAuthScreen(false);
+    void queryClient.invalidateQueries();
+  }
+
+  function handleSignOut() {
+    clearStoredAccessToken();
+    setAccessToken(null);
+    setSelectedDocumentId(null);
+    queryClient.clear();
+  }
 
   const visibleDocuments = useMemo(() => {
     if (submittedQuery.trim()) {
@@ -87,10 +134,10 @@ export function AppShell() {
   }, [documentsQuery.data, searchQuery.data, submittedQuery]);
 
   useEffect(() => {
-    if (!selectedDocumentId && visibleDocuments.length > 0) {
+    if (workspaceEnabled && !selectedDocumentId && visibleDocuments.length > 0) {
       setSelectedDocumentId(visibleDocuments[0].id);
     }
-  }, [selectedDocumentId, visibleDocuments]);
+  }, [selectedDocumentId, visibleDocuments, workspaceEnabled]);
 
   const pendingNotifications =
     notificationsQuery.data?.filter((item) => item.status === "pending")
@@ -99,6 +146,21 @@ export function AppShell() {
     documentsQuery.data?.filter((item) => item.status.includes("processing"))
       .length ?? 0;
   const duplicateGroups = duplicatesQuery.data?.length ?? 0;
+
+  if (!authConfigQuery.data && accessToken === null) {
+    return <AuthLoading />;
+  }
+
+  if (!canAccessWorkspace || showAuthScreen) {
+    return (
+      <AuthScreen
+        authConfig={authConfigQuery.data}
+        allowDevIdentity={canUseDevIdentity}
+        onAuthenticated={handleAuthenticated}
+        onDevIdentity={() => setShowAuthScreen(false)}
+      />
+    );
+  }
 
   return (
     <main className="min-h-screen bg-background text-foreground">
@@ -128,6 +190,13 @@ export function AppShell() {
               </a>
             ))}
           </nav>
+
+          <AuthStatus
+            user={meQuery.data}
+            usingDevIdentity={accessToken === null}
+            onSignIn={() => setShowAuthScreen(true)}
+            onSignOut={handleSignOut}
+          />
         </aside>
 
         <section className="flex min-w-0 flex-col border-r border-border">
@@ -195,7 +264,7 @@ export function AppShell() {
                   >
                     <span className="block font-medium">{document.title}</span>
                     <span className="mt-1 block text-xs text-muted-foreground">
-                      {document.document_type.replaceAll("_", " ")} ·{" "}
+                      {document.document_type.replaceAll("_", " ")} -{" "}
                       {document.status.replaceAll("_", " ")}
                     </span>
                   </button>
@@ -215,6 +284,218 @@ export function AppShell() {
         </section>
       </div>
     </main>
+  );
+}
+
+function AuthLoading() {
+  return (
+    <main className="flex min-h-screen items-center justify-center bg-background text-foreground">
+      <div className="rounded-md border border-border bg-card p-5 text-sm text-muted-foreground">
+        Loading authentication settings...
+      </div>
+    </main>
+  );
+}
+
+function AuthScreen({
+  authConfig,
+  allowDevIdentity,
+  onAuthenticated,
+  onDevIdentity,
+}: {
+  authConfig: AuthConfig | undefined;
+  allowDevIdentity: boolean;
+  onAuthenticated: (response: TokenResponse) => void;
+  onDevIdentity: () => void;
+}) {
+  const registrationEnabled = authConfig?.local_registration_enabled === true;
+  const [mode, setMode] = useState<"login" | "register">(
+    registrationEnabled ? "register" : "login",
+  );
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [displayName, setDisplayName] = useState("");
+  const authMutation = useMutation({
+    mutationFn: () =>
+      mode === "login"
+        ? loginAccount({ email, password })
+        : registerAccount({
+            email,
+            password,
+            display_name: displayName.trim() || undefined,
+          }),
+    onSuccess: onAuthenticated,
+  });
+  const errorMessage =
+    authMutation.error instanceof Error ? authMutation.error.message : null;
+
+  return (
+    <main className="flex min-h-screen items-center justify-center bg-background px-4 text-foreground">
+      <section className="w-full max-w-md rounded-md border border-border bg-card p-6">
+        <div className="mb-6 flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-md bg-primary text-primary-foreground">
+            <ShieldCheck className="h-5 w-5" aria-hidden="true" />
+          </div>
+          <div>
+            <h1 className="text-lg font-semibold">PaperVault</h1>
+            <p className="text-sm text-muted-foreground">
+              Sign in to your document vault.
+            </p>
+          </div>
+        </div>
+
+        <div className="mb-4 grid grid-cols-2 rounded-md bg-muted p-1">
+          <button
+            className={`rounded px-3 py-2 text-sm ${
+              mode === "login" ? "bg-background shadow-sm" : "text-muted-foreground"
+            }`}
+            type="button"
+            onClick={() => setMode("login")}
+          >
+            Sign in
+          </button>
+          <button
+            className={`rounded px-3 py-2 text-sm ${
+              mode === "register"
+                ? "bg-background shadow-sm"
+                : "text-muted-foreground"
+            }`}
+            type="button"
+            disabled={!registrationEnabled}
+            onClick={() => setMode("register")}
+          >
+            Register
+          </button>
+        </div>
+
+        <form
+          className="space-y-4"
+          onSubmit={(event) => {
+            event.preventDefault();
+            authMutation.mutate();
+          }}
+        >
+          {mode === "register" ? (
+            <label className="block text-sm">
+              <span className="mb-1 block text-muted-foreground">Display name</span>
+              <input
+                className="h-10 w-full rounded-md border border-input bg-background px-3 outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                autoComplete="name"
+                value={displayName}
+                onChange={(event) => setDisplayName(event.target.value)}
+              />
+            </label>
+          ) : null}
+
+          <label className="block text-sm">
+            <span className="mb-1 block text-muted-foreground">Email</span>
+            <input
+              className="h-10 w-full rounded-md border border-input bg-background px-3 outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              autoComplete="email"
+              type="email"
+              required
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+            />
+          </label>
+
+          <label className="block text-sm">
+            <span className="mb-1 block text-muted-foreground">Password</span>
+            <input
+              className="h-10 w-full rounded-md border border-input bg-background px-3 outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              autoComplete={
+                mode === "register" ? "new-password" : "current-password"
+              }
+              type="password"
+              required
+              minLength={mode === "register" ? 12 : 1}
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+            />
+          </label>
+
+          {errorMessage ? (
+            <p className="rounded-md border border-border bg-muted p-3 text-sm text-foreground">
+              {errorMessage}
+            </p>
+          ) : null}
+
+          <Button
+            className="w-full"
+            disabled={
+              authMutation.isPending || authConfig?.local_auth_enabled !== true
+            }
+            type="submit"
+          >
+            {mode === "login" ? (
+              <LogIn className="h-4 w-4" aria-hidden="true" />
+            ) : (
+              <UserPlus className="h-4 w-4" aria-hidden="true" />
+            )}
+            {mode === "login" ? "Sign in" : "Create account"}
+          </Button>
+        </form>
+
+        {allowDevIdentity ? (
+          <Button
+            className="mt-3 w-full"
+            variant="secondary"
+            type="button"
+            onClick={onDevIdentity}
+          >
+            Continue with development identity
+          </Button>
+        ) : null}
+      </section>
+    </main>
+  );
+}
+
+function AuthStatus({
+  user,
+  usingDevIdentity,
+  onSignIn,
+  onSignOut,
+}: {
+  user: AuthUser | undefined;
+  usingDevIdentity: boolean;
+  onSignIn: () => void;
+  onSignOut: () => void;
+}) {
+  return (
+    <section className="mt-8 rounded-md border border-border bg-background p-3">
+      <p className="text-xs uppercase text-muted-foreground">Account</p>
+      {usingDevIdentity ? (
+        <>
+          <p className="mt-2 text-sm font-medium">Development identity</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Header fallback is active for local development.
+          </p>
+          <Button className="mt-3 w-full" size="sm" type="button" onClick={onSignIn}>
+            Sign in
+          </Button>
+        </>
+      ) : (
+        <>
+          <p className="mt-2 truncate text-sm font-medium">
+            {user?.email ?? "Signed in"}
+          </p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {user?.role ?? "Loading account"}
+          </p>
+          <Button
+            className="mt-3 w-full"
+            size="sm"
+            variant="secondary"
+            type="button"
+            onClick={onSignOut}
+          >
+            <LogOut className="h-4 w-4" aria-hidden="true" />
+            Sign out
+          </Button>
+        </>
+      )}
+    </section>
   );
 }
 

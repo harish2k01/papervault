@@ -45,6 +45,21 @@ These providers require no external credentials. Model-backed providers can be a
 
 The frontend uses the same temporary development identity headers as the API. A generated development user id is stored in browser `localStorage` under `papervault.devUserId`.
 
+Phase 6 adds local JWT authentication. The frontend stores the current bearer token in browser `localStorage` under `papervault.accessToken`. Development headers remain available only when:
+
+```env
+PAPERVAULT_AUTH_ALLOW_DEV_HEADERS=true
+PAPERVAULT_ENV=development
+```
+
+The first registered local account becomes an administrator. Disable open registration before exposing a deployment to untrusted users:
+
+```env
+PAPERVAULT_LOCAL_REGISTRATION_ENABLED=false
+PAPERVAULT_AUTH_ALLOW_DEV_HEADERS=false
+JWT_SIGNING_KEY=<replace-with-a-long-random-secret>
+```
+
 On Windows PowerShell:
 
 ```powershell

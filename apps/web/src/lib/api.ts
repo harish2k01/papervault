@@ -2,6 +2,32 @@ import { appConfig } from "./config";
 
 const DEV_USER_ID_KEY = "papervault.devUserId";
 const DEV_USER_EMAIL = "local@papervault.dev";
+const ACCESS_TOKEN_KEY = "papervault.accessToken";
+
+export type AuthConfig = {
+  local_auth_enabled: boolean;
+  local_registration_enabled: boolean;
+  dev_headers_enabled: boolean;
+  oidc_configured: boolean;
+};
+
+export type AuthUser = {
+  id: string;
+  email: string;
+  display_name: string | null;
+  role: string;
+  auth_provider: string;
+  is_active: boolean;
+  created_at: string;
+  last_login_at: string | null;
+};
+
+export type TokenResponse = {
+  access_token: string;
+  token_type: string;
+  expires_in_seconds: number;
+  user: AuthUser;
+};
 
 export type DocumentItem = {
   id: string;
@@ -104,6 +130,46 @@ export function getDevUserId() {
   return generated;
 }
 
+export function getStoredAccessToken() {
+  return window.localStorage.getItem(ACCESS_TOKEN_KEY);
+}
+
+export function storeAccessToken(token: string) {
+  window.localStorage.setItem(ACCESS_TOKEN_KEY, token);
+}
+
+export function clearStoredAccessToken() {
+  window.localStorage.removeItem(ACCESS_TOKEN_KEY);
+}
+
+export async function getAuthConfig() {
+  return apiFetch<AuthConfig>("/auth/config", { skipAuth: true });
+}
+
+export async function getMe() {
+  return apiFetch<AuthUser>("/auth/me");
+}
+
+export async function registerAccount(input: {
+  email: string;
+  password: string;
+  display_name?: string;
+}) {
+  return apiFetch<TokenResponse>("/auth/register", {
+    method: "POST",
+    body: JSON.stringify(input),
+    skipAuth: true,
+  });
+}
+
+export async function loginAccount(input: { email: string; password: string }) {
+  return apiFetch<TokenResponse>("/auth/login", {
+    method: "POST",
+    body: JSON.stringify(input),
+    skipAuth: true,
+  });
+}
+
 export async function listDocuments() {
   return apiFetch<DocumentItem[]>("/documents");
 }
@@ -160,11 +226,13 @@ export async function listDuplicates() {
 
 async function apiFetch<T>(
   path: string,
-  options: RequestInit & { skipJsonContentType?: boolean } = {},
+  options: RequestInit & { skipAuth?: boolean; skipJsonContentType?: boolean } = {},
 ) {
   const headers = new Headers(options.headers);
-  for (const [key, value] of Object.entries(authHeaders())) {
-    headers.set(key, value);
+  if (!options.skipAuth) {
+    for (const [key, value] of Object.entries(authHeaders())) {
+      headers.set(key, value);
+    }
   }
   if (!options.skipJsonContentType) {
     headers.set("Content-Type", "application/json");
@@ -181,7 +249,13 @@ async function apiFetch<T>(
   return response.json() as Promise<T>;
 }
 
-function authHeaders() {
+function authHeaders(): Record<string, string> {
+  const token = getStoredAccessToken();
+  if (token) {
+    return {
+      Authorization: `Bearer ${token}`,
+    };
+  }
   return {
     "X-PaperVault-User-Id": getDevUserId(),
     "X-PaperVault-User-Email": DEV_USER_EMAIL,

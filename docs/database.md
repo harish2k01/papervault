@@ -4,7 +4,7 @@ Phase 2 establishes the core relational model. PostgreSQL stores metadata and re
 
 ## Core Tables
 
-- `users`: local and OIDC-backed users, roles, active state.
+- `users`: local and OIDC-backed users, password hashes for local accounts, roles, active state, and last login time.
 - `documents`: one row per logical document, with owner, object-storage reference, hash, status, type key, optional issuer/date/organization, and summary.
 - `document_versions`: immutable object-storage references for document revisions.
 - `document_metadata`: versioned structured extraction payloads per document.
@@ -14,6 +14,9 @@ Phase 2 establishes the core relational model. PostgreSQL stores metadata and re
 - `tags`: user-owned manual, AI, or smart tags.
 - `document_tags`: document/tag assignments with source and optional confidence.
 - `timeline_events`: append-only user/document history events.
+- `saved_searches`: user-owned reusable search definitions.
+- `recent_searches`: user-owned search history.
+- `notifications`: user-owned due-date and expiry notification records.
 
 ## Document Types
 
@@ -36,4 +39,4 @@ Examples:
 
 ## Deferred Tables
 
-Search indexes, duplicate groups, saved searches, notifications, and auth session state are intentionally deferred to later phases.
+Search index projections, duplicate merge records, and auth refresh/session state are intentionally deferred to later phases.

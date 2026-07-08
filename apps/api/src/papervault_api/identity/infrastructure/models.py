@@ -1,6 +1,7 @@
+from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import Boolean, ForeignKey, String, UniqueConstraint
+from sqlalchemy import Boolean, DateTime, ForeignKey, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from papervault_api.db.base import Base
@@ -26,6 +27,7 @@ class User(UuidPrimaryKeyMixin, TimestampMixin, Base):
         server_default=AuthProvider.LOCAL.value,
     )
     external_subject: Mapped[str | None] = mapped_column(String(255))
+    password_hash: Mapped[str | None] = mapped_column(String(512))
     role: Mapped[str] = mapped_column(
         String(40),
         nullable=False,
@@ -36,3 +38,4 @@ class User(UuidPrimaryKeyMixin, TimestampMixin, Base):
         Boolean, nullable=False, default=True, server_default="true"
     )
     disabled_by_id: Mapped[UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

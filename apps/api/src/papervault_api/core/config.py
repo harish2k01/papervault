@@ -52,6 +52,20 @@ class Settings(BaseSettings):
     oidc_client_id: str | None = Field(default=None, alias="OIDC_CLIENT_ID")
     oidc_client_secret: str | None = Field(default=None, alias="OIDC_CLIENT_SECRET")
     jwt_signing_key: str = Field(default="change-me-in-production", alias="JWT_SIGNING_KEY")
+    jwt_issuer: str = Field(default="papervault", alias="JWT_ISSUER")
+    jwt_audience: str = Field(default="papervault-web", alias="JWT_AUDIENCE")
+    jwt_access_token_minutes: int = Field(default=60, alias="JWT_ACCESS_TOKEN_MINUTES")
+    local_auth_enabled: bool = Field(default=True, alias="PAPERVAULT_LOCAL_AUTH_ENABLED")
+    local_registration_enabled: bool = Field(
+        default=True,
+        alias="PAPERVAULT_LOCAL_REGISTRATION_ENABLED",
+    )
+    auth_allow_dev_headers: bool = Field(default=True, alias="PAPERVAULT_AUTH_ALLOW_DEV_HEADERS")
+    password_hash_iterations: int = Field(
+        default=600_000,
+        ge=100_000,
+        alias="PAPERVAULT_PASSWORD_HASH_ITERATIONS",
+    )
 
     otel_service_name: str = Field(default="papervault-api", alias="OTEL_SERVICE_NAME")
     otel_exporter_otlp_endpoint: str | None = Field(
@@ -81,6 +95,10 @@ class Settings(BaseSettings):
             for origin in self.api_cors_origins.split(",")
             if origin.strip()
         ]
+
+    @property
+    def dev_auth_enabled(self) -> bool:
+        return self.auth_allow_dev_headers and self.environment != "production"
 
 
 @lru_cache

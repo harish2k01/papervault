@@ -2,7 +2,7 @@
 
 ## System Context
 
-PaperVault stores personal documents as immutable binary objects and keeps metadata, timelines, tags, extraction results, and user state in PostgreSQL. Searchable text and vector-ready documents are indexed in OpenSearch. Long-running work runs outside the request path through Celery workers.
+PaperVault stores personal documents as immutable binary objects and keeps metadata, timelines, tags, extraction results, search history, notifications, and user state in PostgreSQL. Searchable text and vector-ready documents are initially queried through application services and will be indexed in OpenSearch once index contracts are hardened. Long-running work runs outside the request path through Celery workers.
 
 ```mermaid
 flowchart LR
@@ -27,8 +27,7 @@ The backend follows clean architecture boundaries:
 - `core`: configuration, logging, observability, cross-cutting runtime concerns.
 - `db`: SQLAlchemy engine/session and Alembic integration.
 - `worker`: Celery application and task registration.
-- Feature packages: `documents`, `timeline`, `tags`, `identity`.
-- Future feature packages: `search`, `notifications`, `auth`.
+- Feature packages: `documents`, `timeline`, `tags`, `identity`, `search`, `notifications`.
 
 Feature packages should own their use cases, domain models, API schemas, and infrastructure adapters. Cross-feature imports should be deliberate and minimal.
 
@@ -80,7 +79,19 @@ Phase 4 adds provider interfaces for AI analysis and embeddings. The default pro
 - Rule-based document analysis for summary, keywords, entities, suggested tags, category, confidence, and metadata.
 - Hashing-based embeddings for a self-hosted baseline.
 
-Provider outputs are stored in PostgreSQL so later phases can index them into OpenSearch for hybrid and semantic search.
+Provider outputs are stored in PostgreSQL. Phase 5 uses those records for database-backed keyword, semantic, and hybrid search while leaving OpenSearch indexing as a later hardening step.
+
+## Identity and Access
+
+Phase 6 adds local authentication without moving auth logic into route handlers:
+
+- Local account registration and login are handled by the identity application service.
+- Password hashes use PBKDF2-SHA256 with per-password salts and configurable iterations.
+- Bearer tokens are signed JWTs with issuer, audience, expiry, user id, email, and role claims.
+- `get_current_user` validates bearer tokens first and falls back to development headers only outside production when explicitly enabled.
+- RBAC is exposed through reusable dependencies such as admin-only user management.
+
+OIDC settings remain in configuration and will be wired in a later phase.
 
 ## Frontend Boundaries
 

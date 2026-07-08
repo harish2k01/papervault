@@ -18,6 +18,9 @@ image:
 config:
   environment: production
   logLevel: INFO
+  authAllowDevHeaders: "false"
+  localAuthEnabled: "true"
+  localRegistrationEnabled: "false"
 
 external:
   postgres:

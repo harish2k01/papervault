@@ -2,7 +2,7 @@
 
 PaperVault is a production-oriented, self-hostable personal document management system. It turns PDFs, scanned PDFs, and images into a searchable knowledge base with OCR, metadata extraction, AI summaries, semantic search, timelines, duplicate detection, and notifications.
 
-This repository is being built iteratively. Phase 1 established the foundation. Phase 2 added the core domain registry, relational schema, migrations, and persistence boundaries. Phase 3 added uploads, object storage, processing jobs, and text-extraction records. Phase 4 added AI analysis and embedding provider boundaries. Phase 5 adds the first usable knowledge-base layer: search, viewer, tags, timeline, duplicate candidates, saved/recent searches, and notifications.
+This repository is being built iteratively. Phase 1 established the foundation. Phase 2 added the core domain registry, relational schema, migrations, and persistence boundaries. Phase 3 added uploads, object storage, processing jobs, and text-extraction records. Phase 4 added AI analysis and embedding provider boundaries. Phase 5 added the first usable knowledge-base layer. Phase 6 adds local JWT authentication, password hashing, RBAC dependencies, admin user management, and a frontend auth gate.
 
 ## Architecture
 
@@ -40,7 +40,7 @@ Expected local services:
 
 ## Current Status
 
-Phase 5 includes database-backed keyword, semantic, and hybrid search; saved and recent searches; document detail and authenticated file preview APIs; tag assignment; timeline views; exact-hash duplicate candidates; and due-date notification records. OpenSearch indexing, real authentication flows, OCR provider implementation, and deployment hardening are planned for later phases after approval.
+Phase 6 includes local account registration/login, bearer-token authentication, first-user admin bootstrap, admin user listing and updates, explicit development-header auth fallback, and frontend sign-in/register flows. OIDC login, OpenSearch indexing, OCR provider implementation, and deployment hardening are planned for later phases after approval.
 
 ## License
 

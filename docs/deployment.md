@@ -15,8 +15,11 @@ This guide is a placeholder for production deployment details. Phase 1 includes 
 ## Production Notes
 
 - Replace every development secret.
+- Set a long random `JWT_SIGNING_KEY`.
+- Set `PAPERVAULT_AUTH_ALLOW_DEV_HEADERS=false`.
+- Set `PAPERVAULT_LOCAL_REGISTRATION_ENABLED=false` after creating the initial administrator.
 - Use TLS at the ingress layer.
 - Use managed backups for PostgreSQL and object storage.
 - Pin container image tags.
 - Enable OpenTelemetry export to your tracing backend.
-- Configure OIDC before exposing the service to untrusted networks.
+- Configure OIDC before relying on external identity providers.

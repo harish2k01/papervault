@@ -10,7 +10,7 @@ The API includes health endpoints:
 
 ## Documents
 
-Phase 3 adds the first document endpoint:
+Document endpoints:
 
 - `POST /documents/uploads`: multipart PDF/image upload.
 
@@ -20,12 +20,12 @@ Supported content types:
 - `image/jpeg`
 - `image/png`
 
-Current authentication boundary:
+Development authentication fallback:
 
 - `X-PaperVault-User-Id`: required UUID
 - `X-PaperVault-User-Email`: optional email
 
-This header boundary is temporary. OIDC/local-login integration will replace it in the authentication phase.
+These headers are accepted only when `PAPERVAULT_AUTH_ALLOW_DEV_HEADERS=true` and `PAPERVAULT_ENV` is not `production`. Production callers should use bearer tokens from `/auth/login`.
 
 Successful uploads persist the original file in object storage, create document metadata rows, create a version row, append a timeline event, and enqueue worker processing.
 
@@ -58,3 +58,14 @@ Phase 5 search is database-backed. OpenSearch indexing is deferred until the sea
 - `GET /notifications`: list notifications
 - `POST /notifications/sync/{document_id}`: regenerate document notifications from current metadata
 - `PATCH /notifications/{notification_id}`: mark a notification `pending`, `read`, or `dismissed`
+
+## Authentication and Users
+
+- `GET /auth/config`: public auth capability discovery
+- `POST /auth/register`: create a local account and return a bearer token
+- `POST /auth/login`: authenticate a local account and return a bearer token
+- `GET /auth/me`: current user profile
+- `GET /users`: admin-only user listing
+- `PATCH /users/{user_id}`: admin-only role, display name, or active-state update
+
+The first registered local user is assigned the `admin` role. Later users are assigned `user` by default.
