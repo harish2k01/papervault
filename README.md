@@ -1,0 +1,47 @@
+# PaperVault
+
+PaperVault is a production-oriented, self-hostable personal document management system. It turns PDFs, scanned PDFs, and images into a searchable knowledge base with OCR, metadata extraction, AI summaries, semantic search, timelines, duplicate detection, and notifications.
+
+This repository is being built iteratively. Phase 1 established the foundation. Phase 2 added the core domain registry, relational schema, migrations, and persistence boundaries. Phase 3 added uploads, object storage, processing jobs, and text-extraction records. Phase 4 added AI analysis and embedding provider boundaries. Phase 5 adds the first usable knowledge-base layer: search, viewer, tags, timeline, duplicate candidates, saved/recent searches, and notifications.
+
+## Architecture
+
+PaperVault starts as a modular monolith with explicit boundaries:
+
+- `apps/api`: FastAPI HTTP API, configuration, observability, database setup, route composition, domain modules, and persistence adapters.
+- `apps/worker`: Celery worker container using the backend package.
+- `apps/web`: React, TypeScript, Vite, TanStack Router, TanStack Query, Tailwind, shadcn-style primitives.
+- `infra`: Docker Compose, Kubernetes, and Helm deployment assets.
+- `docs`: architecture documentation and ADRs.
+
+The first durable boundary is between orchestration and domain logic. HTTP routes and Celery tasks should remain thin. Business workflows belong in application services/use cases. Provider-specific integrations such as OCR, embeddings, object storage, and search should sit behind interfaces so implementations can be swapped.
+
+## Local Development
+
+Copy the environment template:
+
+```bash
+cp .env.example .env
+```
+
+Start the stack:
+
+```bash
+docker compose up --build
+```
+
+Expected local services:
+
+- API: `http://localhost:8000`
+- API health: `http://localhost:8000/health`
+- Web: `http://localhost:5173`
+- MinIO console: `http://localhost:9001`
+- OpenSearch: `http://localhost:9200`
+
+## Current Status
+
+Phase 5 includes database-backed keyword, semantic, and hybrid search; saved and recent searches; document detail and authenticated file preview APIs; tag assignment; timeline views; exact-hash duplicate candidates; and due-date notification records. OpenSearch indexing, real authentication flows, OCR provider implementation, and deployment hardening are planned for later phases after approval.
+
+## License
+
+MIT. See [LICENSE](LICENSE).

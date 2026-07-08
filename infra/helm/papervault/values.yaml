@@ -1,0 +1,30 @@
+nameOverride: ""
+fullnameOverride: ""
+
+image:
+  api:
+    repository: ghcr.io/example/papervault-api
+    tag: "0.1.0"
+    pullPolicy: IfNotPresent
+  worker:
+    repository: ghcr.io/example/papervault-worker
+    tag: "0.1.0"
+    pullPolicy: IfNotPresent
+  web:
+    repository: ghcr.io/example/papervault-web
+    tag: "0.1.0"
+    pullPolicy: IfNotPresent
+
+config:
+  environment: production
+  logLevel: INFO
+
+external:
+  postgres:
+    enabled: true
+  redis:
+    enabled: true
+  objectStorage:
+    enabled: true
+  search:
+    enabled: true

@@ -1,0 +1,71 @@
+# Developer Setup
+
+## Prerequisites
+
+- Docker and Docker Compose
+- Python 3.13
+- Node.js 22 or newer
+
+## Backend
+
+```bash
+cd apps/api
+python -m venv .venv
+source .venv/bin/activate
+pip install -e ".[dev]"
+pytest
+```
+
+Run migrations:
+
+```bash
+alembic upgrade head
+```
+
+Upload API requests currently require development identity headers:
+
+```bash
+curl -X POST http://localhost:8000/documents/uploads \
+  -H "X-PaperVault-User-Id: 00000000-0000-0000-0000-000000000001" \
+  -H "X-PaperVault-User-Email: local@example.com" \
+  -F "document_type=generic_pdf" \
+  -F "file=@example.pdf;type=application/pdf"
+```
+
+AI processing is enabled by default with local deterministic providers:
+
+```env
+PAPERVAULT_AI_ENABLED=true
+PAPERVAULT_AI_PROVIDER=local
+PAPERVAULT_EMBEDDING_PROVIDER=local
+PAPERVAULT_EMBEDDING_DIMENSIONS=64
+```
+
+These providers require no external credentials. Model-backed providers can be added behind the same interfaces.
+
+The frontend uses the same temporary development identity headers as the API. A generated development user id is stored in browser `localStorage` under `papervault.devUserId`.
+
+On Windows PowerShell:
+
+```powershell
+cd apps/api
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+pip install -e ".[dev]"
+pytest
+```
+
+## Frontend
+
+```bash
+cd apps/web
+npm install
+npm run dev
+```
+
+## Full Stack
+
+```bash
+cp .env.example .env
+docker compose up --build
+```

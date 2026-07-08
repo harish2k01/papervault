@@ -1,0 +1,77 @@
+from pathlib import Path
+from tempfile import TemporaryDirectory
+from uuid import UUID
+
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from papervault_api.documents.application.extraction import TextExtractor
+from papervault_api.documents.application.storage import ObjectStorage
+from papervault_api.documents.domain.enums import DocumentStatus, TextExtractionStatus
+from papervault_api.documents.infrastructure.models import Document, DocumentTextExtraction
+
+
+class DocumentProcessingService:
+    def __init__(
+        self,
+        session: AsyncSession,
+        storage: ObjectStorage,
+        text_extractor: TextExtractor,
+    ) -> None:
+        self._session = session
+        self._storage = storage
+        self._text_extractor = text_extractor
+
+    async def process_document(self, document_id: UUID) -> None:
+        document = await self._session.get(Document, document_id)
+        if document is None:
+            return
+
+        document.status = DocumentStatus.PROCESSING.value
+        await self._session.flush()
+
+        with TemporaryDirectory(prefix="papervault-process-") as temp_dir:
+            file_path = Path(temp_dir) / "source"
+            await self._storage.download_to_file(
+                bucket=document.storage_bucket,
+                key=document.storage_key,
+                destination=file_path,
+            )
+            result = self._text_extractor.extract(file_path, document.content_type)
+
+        await self._mark_existing_extractions_not_current(document.id)
+        self._session.add(
+            DocumentTextExtraction(
+                document_id=document.id,
+                source=result.source.value,
+                status=result.status.value,
+                content_text=result.content_text,
+                page_count=result.page_count,
+                language=result.language,
+                confidence_score=result.confidence_score,
+                extractor=result.extractor,
+                error_message=result.error_message,
+                is_current=True,
+            ),
+        )
+        document.page_count = result.page_count or document.page_count
+        document.status = (
+            DocumentStatus.READY.value
+            if result.status is TextExtractionStatus.SUCCEEDED
+            else DocumentStatus.FAILED.value
+        )
+        await self._session.commit()
+
+    async def _mark_existing_extractions_not_current(self, document_id: UUID) -> None:
+        for extraction in await self._load_current_extractions(document_id):
+            extraction.is_current = False
+
+    async def _load_current_extractions(self, document_id: UUID) -> list[DocumentTextExtraction]:
+        await self._session.flush()
+        result = await self._session.execute(
+            select(DocumentTextExtraction).where(
+                DocumentTextExtraction.document_id == document_id,
+                DocumentTextExtraction.is_current.is_(True),
+            ),
+        )
+        return list(result.scalars())

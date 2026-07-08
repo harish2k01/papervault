@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "papervault.fullname" . }}-config
+  labels:
+    app.kubernetes.io/name: {{ include "papervault.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+data:
+  PAPERVAULT_ENV: {{ .Values.config.environment | quote }}
+  PAPERVAULT_LOG_LEVEL: {{ .Values.config.logLevel | quote }}

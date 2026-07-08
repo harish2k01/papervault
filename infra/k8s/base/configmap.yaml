@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: papervault-config
+  namespace: papervault
+data:
+  PAPERVAULT_ENV: production
+  PAPERVAULT_LOG_LEVEL: INFO
