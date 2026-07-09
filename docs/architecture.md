@@ -94,15 +94,17 @@ Phase 8 adds OpenSearch indexing behind a provider boundary, and Phase 10 adds u
 
 ## Identity and Access
 
-Phase 6 adds local authentication without moving auth logic into route handlers:
+Phase 6 adds local authentication without moving auth logic into route handlers, and Phase 11
+adds OIDC authorization-code login:
 
 - Local account registration and login are handled by the identity application service.
 - Password hashes use PBKDF2-SHA256 with per-password salts and configurable iterations.
 - Bearer tokens are signed JWTs with issuer, audience, expiry, user id, email, and role claims.
 - `get_current_user` validates bearer tokens first and falls back to development headers only outside production when explicitly enabled.
 - RBAC is exposed through reusable dependencies such as admin-only user management.
-
-OIDC settings remain in configuration and will be wired in a later phase.
+- OIDC discovery, authorization URL generation, token exchange, and JWKS-backed ID token verification live behind an infrastructure adapter.
+- OIDC callback state is signed with `JWT_SIGNING_KEY` and includes a nonce, expiry, and same-origin post-login redirect path.
+- OIDC users are created by provider subject. Existing local accounts are not automatically linked by email.
 
 ## Frontend Boundaries
 

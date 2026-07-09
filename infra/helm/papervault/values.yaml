@@ -79,6 +79,7 @@ config:
   jwtIssuer: papervault
   jwtAudience: papervault-web
   jwtAccessTokenMinutes: "60"
+  webAppUrl: https://papervault.example.com
   ocrProvider: tesseract
   ocrLanguages: eng
   ocrTimeoutSeconds: "120"
@@ -95,6 +96,10 @@ config:
   opensearchTimeoutSeconds: "5"
   oidcIssuerUrl: ""
   oidcClientId: ""
+  oidcRedirectUri: ""
+  oidcScopes: openid email profile
+  oidcStateTtlSeconds: "600"
+  oidcHttpTimeoutSeconds: "5"
   otelServiceName: papervault-api
   otelExporterOtlpEndpoint: ""
 

@@ -20,6 +20,7 @@ import {
   DocumentDetail,
   DocumentItem,
   TokenResponse,
+  buildOidcLoginUrl,
   clearStoredAccessToken,
   getAuthConfig,
   getDocument,
@@ -30,6 +31,7 @@ import {
   listDuplicates,
   listNotifications,
   loginAccount,
+  parseOidcCallbackHash,
   registerAccount,
   searchDocuments,
   storeAccessToken,
@@ -50,6 +52,7 @@ export function AppShell() {
     getStoredAccessToken(),
   );
   const [showAuthScreen, setShowAuthScreen] = useState(false);
+  const [oidcError, setOidcError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [submittedQuery, setSubmittedQuery] = useState("");
   const [selectedDocumentId, setSelectedDocumentId] = useState<string | null>(
@@ -109,7 +112,13 @@ export function AppShell() {
     storeAccessToken(response.access_token);
     setAccessToken(response.access_token);
     setShowAuthScreen(false);
+    setOidcError(null);
     void queryClient.invalidateQueries();
+  }
+
+  function handleOidcSignIn() {
+    const redirectTo = `${window.location.pathname}${window.location.search}`;
+    window.location.assign(buildOidcLoginUrl(redirectTo));
   }
 
   function handleSignOut() {
@@ -118,6 +127,34 @@ export function AppShell() {
     setSelectedDocumentId(null);
     queryClient.clear();
   }
+
+  useEffect(() => {
+    if (window.location.pathname !== "/auth/oidc/callback") {
+      return;
+    }
+
+    const callbackResult = parseOidcCallbackHash(window.location.hash);
+    if (!callbackResult) {
+      setShowAuthScreen(true);
+      setOidcError("OIDC sign-in did not return an access token.");
+      window.history.replaceState(null, "", "/");
+      return;
+    }
+
+    if (callbackResult.status === "error") {
+      setShowAuthScreen(true);
+      setOidcError(callbackResult.errorDescription ?? callbackResult.error);
+      window.history.replaceState(null, "", callbackResult.redirectTo);
+      return;
+    }
+
+    storeAccessToken(callbackResult.accessToken);
+    setAccessToken(callbackResult.accessToken);
+    setShowAuthScreen(false);
+    setOidcError(null);
+    window.history.replaceState(null, "", callbackResult.redirectTo);
+    void queryClient.invalidateQueries();
+  }, [queryClient]);
 
   const visibleDocuments = useMemo(() => {
     if (submittedQuery.trim()) {
@@ -134,7 +171,11 @@ export function AppShell() {
   }, [documentsQuery.data, searchQuery.data, submittedQuery]);
 
   useEffect(() => {
-    if (workspaceEnabled && !selectedDocumentId && visibleDocuments.length > 0) {
+    if (
+      workspaceEnabled &&
+      !selectedDocumentId &&
+      visibleDocuments.length > 0
+    ) {
       setSelectedDocumentId(visibleDocuments[0].id);
     }
   }, [selectedDocumentId, visibleDocuments, workspaceEnabled]);
@@ -156,8 +197,10 @@ export function AppShell() {
       <AuthScreen
         authConfig={authConfigQuery.data}
         allowDevIdentity={canUseDevIdentity}
+        oidcError={oidcError}
         onAuthenticated={handleAuthenticated}
         onDevIdentity={() => setShowAuthScreen(false)}
+        onOidcSignIn={handleOidcSignIn}
       />
     );
   }
@@ -238,7 +281,10 @@ export function AppShell() {
           </header>
 
           <div className="grid grid-cols-3 gap-3 border-b border-border p-4">
-            <Metric label="Documents" value={documentsQuery.data?.length ?? 0} />
+            <Metric
+              label="Documents"
+              value={documentsQuery.data?.length ?? 0}
+            />
             <Metric label="Processing" value={pendingDocuments} />
             <Metric label="Due" value={pendingNotifications} />
           </div>
@@ -300,13 +346,17 @@ function AuthLoading() {
 function AuthScreen({
   authConfig,
   allowDevIdentity,
+  oidcError,
   onAuthenticated,
   onDevIdentity,
+  onOidcSignIn,
 }: {
   authConfig: AuthConfig | undefined;
   allowDevIdentity: boolean;
+  oidcError: string | null;
   onAuthenticated: (response: TokenResponse) => void;
   onDevIdentity: () => void;
+  onOidcSignIn: () => void;
 }) {
   const registrationEnabled = authConfig?.local_registration_enabled === true;
   const [mode, setMode] = useState<"login" | "register">(
@@ -328,6 +378,7 @@ function AuthScreen({
   });
   const errorMessage =
     authMutation.error instanceof Error ? authMutation.error.message : null;
+  const oidcEnabled = authConfig?.oidc_configured === true;
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-background px-4 text-foreground">
@@ -347,7 +398,9 @@ function AuthScreen({
         <div className="mb-4 grid grid-cols-2 rounded-md bg-muted p-1">
           <button
             className={`rounded px-3 py-2 text-sm ${
-              mode === "login" ? "bg-background shadow-sm" : "text-muted-foreground"
+              mode === "login"
+                ? "bg-background shadow-sm"
+                : "text-muted-foreground"
             }`}
             type="button"
             onClick={() => setMode("login")}
@@ -368,6 +421,18 @@ function AuthScreen({
           </button>
         </div>
 
+        {oidcEnabled ? (
+          <Button
+            className="mb-4 w-full"
+            variant="secondary"
+            type="button"
+            onClick={onOidcSignIn}
+          >
+            <ShieldCheck className="h-4 w-4" aria-hidden="true" />
+            Sign in with OIDC
+          </Button>
+        ) : null}
+
         <form
           className="space-y-4"
           onSubmit={(event) => {
@@ -377,7 +442,9 @@ function AuthScreen({
         >
           {mode === "register" ? (
             <label className="block text-sm">
-              <span className="mb-1 block text-muted-foreground">Display name</span>
+              <span className="mb-1 block text-muted-foreground">
+                Display name
+              </span>
               <input
                 className="h-10 w-full rounded-md border border-input bg-background px-3 outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 autoComplete="name"
@@ -417,6 +484,12 @@ function AuthScreen({
           {errorMessage ? (
             <p className="rounded-md border border-border bg-muted p-3 text-sm text-foreground">
               {errorMessage}
+            </p>
+          ) : null}
+
+          {oidcError ? (
+            <p className="rounded-md border border-border bg-muted p-3 text-sm text-foreground">
+              {oidcError}
             </p>
           ) : null}
 
@@ -471,7 +544,12 @@ function AuthStatus({
           <p className="mt-1 text-xs text-muted-foreground">
             Header fallback is active for local development.
           </p>
-          <Button className="mt-3 w-full" size="sm" type="button" onClick={onSignIn}>
+          <Button
+            className="mt-3 w-full"
+            size="sm"
+            type="button"
+            onClick={onSignIn}
+          >
             Sign in
           </Button>
         </>
@@ -545,10 +623,14 @@ function DocumentPanel({
   isLoading: boolean;
 }) {
   if (isLoading) {
-    return <p className="p-5 text-sm text-muted-foreground">Loading document...</p>;
+    return (
+      <p className="p-5 text-sm text-muted-foreground">Loading document...</p>
+    );
   }
   if (!detail) {
-    return <p className="p-5 text-sm text-muted-foreground">Select a document.</p>;
+    return (
+      <p className="p-5 text-sm text-muted-foreground">Select a document.</p>
+    );
   }
 
   return (
@@ -561,7 +643,9 @@ function DocumentPanel({
           <p className="text-xs uppercase text-muted-foreground">
             {detail.document.document_type.replaceAll("_", " ")}
           </p>
-          <h2 className="mt-1 text-lg font-semibold">{detail.document.title}</h2>
+          <h2 className="mt-1 text-lg font-semibold">
+            {detail.document.title}
+          </h2>
           <p className="mt-1 text-sm text-muted-foreground">
             {detail.document.original_filename}
           </p>
@@ -574,7 +658,10 @@ function DocumentPanel({
           {detail.ai_analysis?.suggested_tags?.length ? (
             <div className="mt-3 flex flex-wrap gap-2">
               {detail.ai_analysis.suggested_tags.map((tag) => (
-                <span className="rounded-md bg-muted px-2 py-1 text-xs" key={tag}>
+                <span
+                  className="rounded-md bg-muted px-2 py-1 text-xs"
+                  key={tag}
+                >
                   {tag}
                 </span>
               ))}
@@ -587,13 +674,17 @@ function DocumentPanel({
             <dl className="space-y-2 text-sm">
               {Object.entries(detail.metadata.data).map(([key, value]) => (
                 <div className="grid grid-cols-[130px_1fr] gap-3" key={key}>
-                  <dt className="text-muted-foreground">{key.replaceAll("_", " ")}</dt>
+                  <dt className="text-muted-foreground">
+                    {key.replaceAll("_", " ")}
+                  </dt>
                   <dd>{String(value)}</dd>
                 </div>
               ))}
             </dl>
           ) : (
-            <p className="text-sm text-muted-foreground">No metadata extracted.</p>
+            <p className="text-sm text-muted-foreground">
+              No metadata extracted.
+            </p>
           )}
         </Panel>
 
@@ -601,7 +692,10 @@ function DocumentPanel({
           {detail.tags.length ? (
             <div className="flex flex-wrap gap-2">
               {detail.tags.map((tag) => (
-                <span className="rounded-md border border-border px-2 py-1 text-xs" key={tag.id}>
+                <span
+                  className="rounded-md border border-border px-2 py-1 text-xs"
+                  key={tag.id}
+                >
                   {tag.name}
                 </span>
               ))}
@@ -638,7 +732,8 @@ function DocumentPanel({
 function DocumentPreview({ document }: { document: DocumentItem }) {
   const fileQuery = useQuery({
     queryKey: ["document-file", document.id],
-    queryFn: async () => URL.createObjectURL(await getDocumentFile(document.id)),
+    queryFn: async () =>
+      URL.createObjectURL(await getDocumentFile(document.id)),
   });
 
   useEffect(() => {
@@ -650,10 +745,14 @@ function DocumentPreview({ document }: { document: DocumentItem }) {
   }, [fileQuery.data]);
 
   if (fileQuery.isLoading) {
-    return <p className="p-5 text-sm text-muted-foreground">Loading preview...</p>;
+    return (
+      <p className="p-5 text-sm text-muted-foreground">Loading preview...</p>
+    );
   }
   if (!fileQuery.data) {
-    return <p className="p-5 text-sm text-muted-foreground">Preview unavailable.</p>;
+    return (
+      <p className="p-5 text-sm text-muted-foreground">Preview unavailable.</p>
+    );
   }
   if (document.content_type.startsWith("image/")) {
     return (
@@ -673,17 +772,13 @@ function DocumentPreview({ document }: { document: DocumentItem }) {
   );
 }
 
-function Panel({
-  title,
-  children,
-}: {
-  title: string;
-  children: ReactNode;
-}) {
+function Panel({ title, children }: { title: string; children: ReactNode }) {
   return (
     <section>
       <h3 className="mb-2 text-sm font-medium">{title}</h3>
-      <div className="rounded-md border border-border bg-card p-3">{children}</div>
+      <div className="rounded-md border border-border bg-card p-3">
+        {children}
+      </div>
     </section>
   );
 }

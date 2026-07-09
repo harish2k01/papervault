@@ -21,7 +21,13 @@ const indexRoute = createRoute({
   component: AppShell,
 });
 
-const routeTree = rootRoute.addChildren([indexRoute]);
+const oidcCallbackRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/auth/oidc/callback",
+  component: AppShell,
+});
+
+const routeTree = rootRoute.addChildren([indexRoute, oidcCallbackRoute]);
 
 const router = createRouter({
   routeTree,

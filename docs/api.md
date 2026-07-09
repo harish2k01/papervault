@@ -66,8 +66,12 @@ Phase 10 search uses OpenSearch for user-facing keyword, semantic, and hybrid qu
 - `GET /auth/config`: public auth capability discovery
 - `POST /auth/register`: create a local account and return a bearer token
 - `POST /auth/login`: authenticate a local account and return a bearer token
+- `GET /auth/oidc/start`: redirect the browser to the configured OIDC provider
+- `GET /auth/oidc/callback`: exchange an authorization code, create or update the OIDC user, and redirect back to the web app with a PaperVault bearer token in the URL fragment
 - `GET /auth/me`: current user profile
 - `GET /users`: admin-only user listing
 - `PATCH /users/{user_id}`: admin-only role, display name, or active-state update
 
 The first registered local user is assigned the `admin` role. Later users are assigned `user` by default.
+The first OIDC-created user is also assigned `admin` when no users exist. OIDC login is advertised
+only when issuer URL, client id, client secret, and redirect URI are configured.

@@ -1,6 +1,7 @@
 import asyncio
 from collections.abc import AsyncIterator, Callable
 from typing import Any
+from urllib.parse import parse_qs, urlparse
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
@@ -15,6 +16,8 @@ from sqlalchemy.pool import StaticPool
 from papervault_api.core.config import Settings, get_settings
 from papervault_api.db.base import Base
 from papervault_api.db.session import get_session
+from papervault_api.identity.api.dependencies import get_oidc_provider
+from papervault_api.identity.application.oidc import OIDCClaims, OIDCTokenSet
 from papervault_api.main import create_app
 
 
@@ -161,6 +164,91 @@ def test_cannot_remove_last_active_admin() -> None:
     asyncio.run(engine.dispose())
 
 
+def test_oidc_callback_creates_user_and_returns_access_token() -> None:
+    app, engine = build_identity_test_app(lambda: identity_test_settings(**oidc_settings()))
+    provider = FakeOIDCProvider(
+        claims=OIDCClaims(
+            subject="subject-1",
+            email="Owner@Example.com",
+            display_name="OIDC Owner",
+        ),
+    )
+    app.dependency_overrides[get_oidc_provider] = lambda: provider
+
+    with TestClient(app) as client:
+        start_response = client.get(
+            "/auth/oidc/start?redirect_to=/documents?selected=1",
+            follow_redirects=False,
+        )
+        assert start_response.status_code == 302
+        start_location = start_response.headers["location"]
+        start_query = parse_qs(urlparse(start_location).query)
+        state = start_query["state"][0]
+        assert start_query["nonce"][0]
+
+        callback_response = client.get(
+            f"/auth/oidc/callback?code=valid-code&state={state}",
+            follow_redirects=False,
+        )
+        assert callback_response.status_code == 303
+        callback_location = callback_response.headers["location"]
+        parsed_callback = urlparse(callback_location)
+        assert parsed_callback.scheme == "https"
+        assert parsed_callback.netloc == "web.example"
+
+        fragment = parse_qs(parsed_callback.fragment)
+        token = fragment["access_token"][0]
+        assert fragment["redirect_to"][0] == "/documents?selected=1"
+
+        me_response = client.get(
+            "/auth/me",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert me_response.status_code == 200
+        me = me_response.json()
+        assert me["email"] == "owner@example.com"
+        assert me["display_name"] == "OIDC Owner"
+        assert me["auth_provider"] == "oidc"
+        assert me["role"] == "admin"
+
+    asyncio.run(engine.dispose())
+
+
+def test_oidc_callback_does_not_link_existing_local_email() -> None:
+    app, engine = build_identity_test_app(lambda: identity_test_settings(**oidc_settings()))
+    provider = FakeOIDCProvider(
+        claims=OIDCClaims(
+            subject="external-subject",
+            email="owner@example.com",
+            display_name="External Owner",
+        ),
+    )
+    app.dependency_overrides[get_oidc_provider] = lambda: provider
+
+    with TestClient(app) as client:
+        register_response = client.post(
+            "/auth/register",
+            json={
+                "email": "owner@example.com",
+                "password": "correct horse battery staple",
+            },
+        )
+        assert register_response.status_code == 201
+
+        start_response = client.get("/auth/oidc/start", follow_redirects=False)
+        state = parse_qs(urlparse(start_response.headers["location"]).query)["state"][0]
+
+        callback_response = client.get(
+            f"/auth/oidc/callback?code=valid-code&state={state}",
+            follow_redirects=False,
+        )
+        assert callback_response.status_code == 303
+        fragment = parse_qs(urlparse(callback_response.headers["location"]).fragment)
+        assert fragment["error"][0] == "account_conflict"
+
+    asyncio.run(engine.dispose())
+
+
 def register_and_get_token(client: TestClient, email: str) -> str:
     response = client.post(
         "/auth/register",
@@ -179,3 +267,49 @@ def identity_test_settings(**overrides: Any) -> Settings:
         password_hash_iterations=100_000,
         **overrides,
     )
+
+
+def oidc_settings() -> dict[str, str]:
+    return {
+        "oidc_issuer_url": "https://idp.example",
+        "oidc_client_id": "papervault",
+        "oidc_client_secret": "secret",
+        "oidc_redirect_uri": "https://api.example/auth/oidc/callback",
+        "web_app_url": "https://web.example",
+    }
+
+
+class FakeOIDCProvider:
+    def __init__(self, *, claims: OIDCClaims) -> None:
+        self._claims = claims
+
+    async def authorization_url(
+        self,
+        *,
+        state: str,
+        nonce: str,
+        redirect_uri: str,
+    ) -> str:
+        return (
+            f"https://idp.example/authorize?state={state}&nonce={nonce}&redirect_uri={redirect_uri}"
+        )
+
+    async def exchange_code(
+        self,
+        *,
+        code: str,
+        redirect_uri: str,
+    ) -> OIDCTokenSet:
+        assert code == "valid-code"
+        assert redirect_uri == "https://api.example/auth/oidc/callback"
+        return OIDCTokenSet(id_token="verified-token")
+
+    async def verify_id_token(
+        self,
+        *,
+        id_token: str,
+        nonce: str,
+    ) -> OIDCClaims:
+        assert id_token == "verified-token"
+        assert nonce
+        return self._claims

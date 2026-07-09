@@ -21,6 +21,7 @@ dependencies = [
   "prometheus-fastapi-instrumentator>=7.1.0",
   "pydantic>=2.11.0",
   "pydantic-settings>=2.9.0",
+  "PyJWT[crypto]>=2.10.0",
   "pypdf>=5.1.0",
   "python-multipart>=0.0.20",
   "sqlalchemy[asyncio]>=2.0.40",

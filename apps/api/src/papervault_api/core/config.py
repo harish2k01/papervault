@@ -81,6 +81,15 @@ class Settings(BaseSettings):
     oidc_issuer_url: str | None = Field(default=None, alias="OIDC_ISSUER_URL")
     oidc_client_id: str | None = Field(default=None, alias="OIDC_CLIENT_ID")
     oidc_client_secret: str | None = Field(default=None, alias="OIDC_CLIENT_SECRET")
+    oidc_redirect_uri: str | None = Field(default=None, alias="OIDC_REDIRECT_URI")
+    oidc_scopes: str = Field(default="openid email profile", alias="OIDC_SCOPES")
+    oidc_state_ttl_seconds: int = Field(default=600, ge=60, alias="OIDC_STATE_TTL_SECONDS")
+    oidc_http_timeout_seconds: float = Field(
+        default=5.0,
+        gt=0,
+        alias="OIDC_HTTP_TIMEOUT_SECONDS",
+    )
+    web_app_url: str = Field(default="http://localhost:5173", alias="PAPERVAULT_WEB_APP_URL")
     jwt_signing_key: str = Field(default="change-me-in-production", alias="JWT_SIGNING_KEY")
     jwt_issuer: str = Field(default="papervault", alias="JWT_ISSUER")
     jwt_audience: str = Field(default="papervault-web", alias="JWT_AUDIENCE")
@@ -109,6 +118,7 @@ class Settings(BaseSettings):
         "oidc_issuer_url",
         "oidc_client_id",
         "oidc_client_secret",
+        "oidc_redirect_uri",
         "otel_exporter_otlp_endpoint",
         "ocr_max_pdf_pages",
         mode="before",
@@ -138,6 +148,15 @@ class Settings(BaseSettings):
     @property
     def dev_auth_enabled(self) -> bool:
         return self.auth_allow_dev_headers and self.environment != "production"
+
+    @property
+    def oidc_login_enabled(self) -> bool:
+        return bool(
+            self.oidc_issuer_url
+            and self.oidc_client_id
+            and self.oidc_client_secret
+            and self.oidc_redirect_uri
+        )
 
 
 @lru_cache

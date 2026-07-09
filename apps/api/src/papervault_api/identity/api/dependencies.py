@@ -9,12 +9,20 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from papervault_api.core.config import Settings, get_settings
 from papervault_api.db.session import get_session
 from papervault_api.identity.application.current_user import CurrentUser
+from papervault_api.identity.application.oidc import OIDCProvider
 from papervault_api.identity.application.service import current_user_from_model
 from papervault_api.identity.application.tokens import TokenError, verify_access_token
 from papervault_api.identity.domain.enums import AuthProvider, UserRole
 from papervault_api.identity.infrastructure.models import User
+from papervault_api.identity.infrastructure.oidc import HttpOIDCProvider
 
 bearer_scheme = HTTPBearer(auto_error=False)
+
+
+def get_oidc_provider(
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> OIDCProvider:
+    return HttpOIDCProvider(settings)
 
 
 async def get_current_user(

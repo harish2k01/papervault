@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from papervault_api.core.config import Settings
 from papervault_api.identity.application.current_user import CurrentUser
+from papervault_api.identity.application.oidc import OIDCClaims
 from papervault_api.identity.application.passwords import hash_password, verify_password
 from papervault_api.identity.application.tokens import create_access_token
 from papervault_api.identity.domain.enums import AuthProvider, UserRole
@@ -94,6 +95,50 @@ class IdentityService:
         await self._session.refresh(user)
         return user
 
+    async def authenticate_oidc_user(self, *, claims: OIDCClaims) -> User:
+        normalized_email = normalize_email(claims.email)
+        now = datetime.now(UTC)
+
+        result = await self._session.execute(
+            select(User).where(
+                User.auth_provider == AuthProvider.OIDC.value,
+                User.external_subject == claims.subject,
+            ),
+        )
+        user = result.scalar_one_or_none()
+        if user is not None:
+            if not user.is_active:
+                raise AuthenticationFailedError("User account is disabled")
+            if user.email != normalized_email:
+                existing_user = await self.get_user_by_email(normalized_email)
+                if existing_user is not None and existing_user.id != user.id:
+                    raise UserAlreadyExistsError("A user with this email already exists")
+                user.email = normalized_email
+            user.display_name = normalize_display_name(claims.display_name) or user.display_name
+            user.last_login_at = now
+            await self._session.commit()
+            await self._session.refresh(user)
+            return user
+
+        existing_user = await self.get_user_by_email(normalized_email)
+        if existing_user is not None:
+            raise UserAlreadyExistsError("A user with this email already exists")
+
+        role = UserRole.ADMIN if await self._is_first_user() else UserRole.USER
+        user = User(
+            email=normalized_email,
+            display_name=normalize_display_name(claims.display_name),
+            auth_provider=AuthProvider.OIDC.value,
+            external_subject=claims.subject,
+            password_hash=None,
+            role=role.value,
+            last_login_at=now,
+        )
+        self._session.add(user)
+        await self._session.commit()
+        await self._session.refresh(user)
+        return user
+
     async def get_user_by_email(self, email: str) -> User | None:
         result = await self._session.execute(
             select(User).where(User.email == normalize_email(email)),
@@ -163,6 +208,15 @@ class IdentityService:
 
 def normalize_email(email: str) -> str:
     return email.strip().lower()
+
+
+def normalize_display_name(display_name: str | None) -> str | None:
+    if display_name is None:
+        return None
+    stripped = display_name.strip()
+    if not stripped:
+        return None
+    return stripped[:120]
 
 
 def current_user_from_model(user: User) -> CurrentUser:

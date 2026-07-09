@@ -82,6 +82,20 @@ PAPERVAULT_AUTH_ALLOW_DEV_HEADERS=false
 JWT_SIGNING_KEY=<replace-with-a-long-random-secret>
 ```
 
+OIDC login uses the provider authorization-code flow and exchanges the provider ID
+token for PaperVault's own bearer token:
+
+```env
+OIDC_ISSUER_URL=https://idp.example.com/application/o/papervault/
+OIDC_CLIENT_ID=papervault
+OIDC_CLIENT_SECRET=<client-secret>
+OIDC_REDIRECT_URI=http://localhost:8000/auth/oidc/callback
+PAPERVAULT_WEB_APP_URL=http://localhost:5173
+```
+
+Register `OIDC_REDIRECT_URI` with the provider. For Gateway API deployments that
+serve the API under `/api`, use `https://<host>/api/auth/oidc/callback`.
+
 On Windows PowerShell:
 
 ```powershell

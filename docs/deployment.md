@@ -30,6 +30,34 @@ This guide covers the current production deployment boundary. The Helm chart dep
 - Monitor worker logs for `document_search_indexing_failed`; indexing is eventually consistent and does not fail document processing.
 - Keep `PAPERVAULT_SEARCH_QUERY_FALLBACK_ENABLED=true` unless you intentionally want OpenSearch outages to fail user-facing search.
 
+## OIDC Login
+
+PaperVault supports OIDC authorization-code login for providers such as Authentik
+and Keycloak. Register this redirect URI with the provider:
+
+```text
+https://<papervault-host>/api/auth/oidc/callback
+```
+
+Set the corresponding runtime values:
+
+```yaml
+config:
+  webAppUrl: https://papervault.example.com
+  oidcIssuerUrl: https://idp.example.com/application/o/papervault/
+  oidcClientId: papervault
+  oidcRedirectUri: https://papervault.example.com/api/auth/oidc/callback
+  oidcScopes: openid email profile
+secret:
+  values:
+    oidcClientSecret: <client-secret>
+```
+
+OIDC login is enabled only when issuer URL, client id, client secret, and redirect
+URI are all configured. The first OIDC user becomes `admin` if no users exist.
+PaperVault does not automatically link an OIDC account to an existing local account
+with the same email address.
+
 ## Container Images
 
 The `Images` GitHub Actions workflow publishes:

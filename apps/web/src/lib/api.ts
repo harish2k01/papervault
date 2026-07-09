@@ -29,6 +29,19 @@ export type TokenResponse = {
   user: AuthUser;
 };
 
+export type OidcCallbackResult =
+  | {
+      status: "authenticated";
+      accessToken: string;
+      redirectTo: string;
+    }
+  | {
+      status: "error";
+      error: string;
+      errorDescription: string | null;
+      redirectTo: string;
+    };
+
 export type DocumentItem = {
   id: string;
   owner_id: string;
@@ -142,6 +155,42 @@ export function clearStoredAccessToken() {
   window.localStorage.removeItem(ACCESS_TOKEN_KEY);
 }
 
+export function buildOidcLoginUrl(redirectTo = "/") {
+  const params = new URLSearchParams({
+    redirect_to: sanitizeRedirectPath(redirectTo),
+  });
+  return `${appConfig.apiBaseUrl}/auth/oidc/start?${params.toString()}`;
+}
+
+export function parseOidcCallbackHash(hash: string): OidcCallbackResult | null {
+  const normalizedHash = hash.startsWith("#") ? hash.slice(1) : hash;
+  if (!normalizedHash) {
+    return null;
+  }
+
+  const params = new URLSearchParams(normalizedHash);
+  const redirectTo = sanitizeRedirectPath(params.get("redirect_to") ?? "/");
+  const error = params.get("error");
+  if (error) {
+    return {
+      status: "error",
+      error,
+      errorDescription: params.get("error_description"),
+      redirectTo,
+    };
+  }
+
+  const accessToken = params.get("access_token");
+  if (!accessToken) {
+    return null;
+  }
+  return {
+    status: "authenticated",
+    accessToken,
+    redirectTo,
+  };
+}
+
 export async function getAuthConfig() {
   return apiFetch<AuthConfig>("/auth/config", { skipAuth: true });
 }
@@ -179,9 +228,12 @@ export async function getDocument(documentId: string) {
 }
 
 export async function getDocumentFile(documentId: string) {
-  const response = await fetch(`${appConfig.apiBaseUrl}/documents/${documentId}/file`, {
-    headers: authHeaders(),
-  });
+  const response = await fetch(
+    `${appConfig.apiBaseUrl}/documents/${documentId}/file`,
+    {
+      headers: authHeaders(),
+    },
+  );
   if (!response.ok) {
     throw new Error(`Failed to fetch document file: ${response.status}`);
   }
@@ -206,14 +258,14 @@ export async function uploadDocument(file: File, documentType = "generic_pdf") {
   const body = new FormData();
   body.append("document_type", documentType);
   body.append("file", file);
-  return apiFetch<{ document: DocumentItem; processing_task_id: string | null }>(
-    "/documents/uploads",
-    {
-      method: "POST",
-      body,
-      skipJsonContentType: true,
-    },
-  );
+  return apiFetch<{
+    document: DocumentItem;
+    processing_task_id: string | null;
+  }>("/documents/uploads", {
+    method: "POST",
+    body,
+    skipJsonContentType: true,
+  });
 }
 
 export async function listNotifications() {
@@ -226,7 +278,10 @@ export async function listDuplicates() {
 
 async function apiFetch<T>(
   path: string,
-  options: RequestInit & { skipAuth?: boolean; skipJsonContentType?: boolean } = {},
+  options: RequestInit & {
+    skipAuth?: boolean;
+    skipJsonContentType?: boolean;
+  } = {},
 ) {
   const headers = new Headers(options.headers);
   if (!options.skipAuth) {
@@ -260,4 +315,15 @@ function authHeaders(): Record<string, string> {
     "X-PaperVault-User-Id": getDevUserId(),
     "X-PaperVault-User-Email": DEV_USER_EMAIL,
   };
+}
+
+function sanitizeRedirectPath(value: string) {
+  if (
+    !value.startsWith("/") ||
+    value.startsWith("//") ||
+    value.includes("\\")
+  ) {
+    return "/";
+  }
+  return value;
 }

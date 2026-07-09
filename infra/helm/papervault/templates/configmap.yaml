@@ -20,6 +20,7 @@ data:
   JWT_ISSUER: {{ .Values.config.jwtIssuer | quote }}
   JWT_AUDIENCE: {{ .Values.config.jwtAudience | quote }}
   JWT_ACCESS_TOKEN_MINUTES: {{ .Values.config.jwtAccessTokenMinutes | quote }}
+  PAPERVAULT_WEB_APP_URL: {{ .Values.config.webAppUrl | quote }}
   PAPERVAULT_OCR_PROVIDER: {{ .Values.config.ocrProvider | quote }}
   PAPERVAULT_OCR_LANGUAGES: {{ .Values.config.ocrLanguages | quote }}
   PAPERVAULT_OCR_TIMEOUT_SECONDS: {{ .Values.config.ocrTimeoutSeconds | quote }}
@@ -36,5 +37,9 @@ data:
   OPENSEARCH_TIMEOUT_SECONDS: {{ .Values.config.opensearchTimeoutSeconds | quote }}
   OIDC_ISSUER_URL: {{ .Values.config.oidcIssuerUrl | quote }}
   OIDC_CLIENT_ID: {{ .Values.config.oidcClientId | quote }}
+  OIDC_REDIRECT_URI: {{ .Values.config.oidcRedirectUri | quote }}
+  OIDC_SCOPES: {{ .Values.config.oidcScopes | quote }}
+  OIDC_STATE_TTL_SECONDS: {{ .Values.config.oidcStateTtlSeconds | quote }}
+  OIDC_HTTP_TIMEOUT_SECONDS: {{ .Values.config.oidcHttpTimeoutSeconds | quote }}
   OTEL_SERVICE_NAME: {{ .Values.config.otelServiceName | quote }}
   OTEL_EXPORTER_OTLP_ENDPOINT: {{ .Values.config.otelExporterOtlpEndpoint | quote }}
