@@ -103,6 +103,8 @@ Phase 8 adds OpenSearch indexing behind a provider boundary, and Phase 10 adds u
 - `/search/index/documents/{document_id}` and `/search/index/rebuild` allow owner-scoped reindexing.
 - `POST /search` uses OpenSearch for keyword, semantic, and hybrid queries when `PAPERVAULT_SEARCH_QUERY_BACKEND=opensearch` and indexing is enabled.
 - PostgreSQL remains the source of truth and the fallback query path when OpenSearch is unavailable or explicitly disabled.
+- Phase 13 exposes advanced filters in the web app for document type, tag, issuer, organization, date range, and archived inclusion.
+- Saved and recent searches reuse the same typed search request shape, so applying a saved or recent search goes through the same query path as a manual search.
 
 ## Identity and Access
 

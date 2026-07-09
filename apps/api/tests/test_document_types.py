@@ -1,4 +1,5 @@
 import pytest
+from fastapi.testclient import TestClient
 
 from papervault_api.documents.domain.document_types import (
     MetadataFieldType,
@@ -6,6 +7,7 @@ from papervault_api.documents.domain.document_types import (
     get_document_type,
     list_document_types,
 )
+from papervault_api.main import create_app
 
 
 def test_document_type_registry_contains_initial_supported_types() -> None:
@@ -54,3 +56,14 @@ def test_document_type_registry_has_structured_fields_for_core_examples() -> Non
 def test_unknown_document_type_raises_explicit_error() -> None:
     with pytest.raises(UnknownDocumentTypeError):
         get_document_type("unsupported")
+
+
+def test_document_type_registry_is_exposed_over_api() -> None:
+    with TestClient(create_app()) as client:
+        response = client.get("/documents/types")
+
+    assert response.status_code == 200
+    body = response.json()
+    by_key = {item["key"]: item for item in body}
+    assert by_key["salary_slip"]["label"] == "Salary Slip"
+    assert any(field["key"] == "net_salary" for field in by_key["salary_slip"]["metadata_fields"])

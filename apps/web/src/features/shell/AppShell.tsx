@@ -19,6 +19,13 @@ import {
   AuthUser,
   DocumentDetail,
   DocumentItem,
+  DocumentTypeDefinition,
+  RecentSearch,
+  SavedSearch,
+  SearchFilters,
+  SearchMode,
+  SearchRequestInput,
+  TagItem,
   TokenResponse,
   archiveDocument,
   buildOidcLoginUrl,
@@ -28,12 +35,17 @@ import {
   getDocumentFile,
   getMe,
   getStoredAccessToken,
+  listDocumentTypes,
   listDocuments,
   listDuplicates,
   listNotifications,
+  listRecentSearches,
+  listSavedSearches,
+  listTags,
   loginAccount,
   parseOidcCallbackHash,
   registerAccount,
+  saveSearch,
   searchDocuments,
   storeAccessToken,
   updateDocument,
@@ -49,6 +61,16 @@ const navItems = [
   { label: "Security", icon: ShieldCheck },
 ];
 
+const defaultSearchFilters: SearchFilters = {
+  document_type: null,
+  issuer: null,
+  organization: null,
+  tag: null,
+  date_from: null,
+  date_to: null,
+  include_archived: false,
+};
+
 export function AppShell() {
   const queryClient = useQueryClient();
   const [accessToken, setAccessToken] = useState<string | null>(() =>
@@ -57,7 +79,11 @@ export function AppShell() {
   const [showAuthScreen, setShowAuthScreen] = useState(false);
   const [oidcError, setOidcError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
-  const [submittedQuery, setSubmittedQuery] = useState("");
+  const [searchMode, setSearchMode] = useState<SearchMode>("hybrid");
+  const [filters, setFilters] = useState<SearchFilters>(defaultSearchFilters);
+  const [submittedSearch, setSubmittedSearch] =
+    useState<SearchRequestInput | null>(null);
+  const [saveSearchName, setSaveSearchName] = useState("");
   const [selectedDocumentId, setSelectedDocumentId] = useState<string | null>(
     null,
   );
@@ -80,10 +106,34 @@ export function AppShell() {
     queryFn: listDocuments,
     enabled: workspaceEnabled,
   });
+  const documentTypesQuery = useQuery({
+    queryKey: ["document-types"],
+    queryFn: listDocumentTypes,
+    enabled: workspaceEnabled,
+  });
+  const tagsQuery = useQuery({
+    queryKey: ["tags"],
+    queryFn: listTags,
+    enabled: workspaceEnabled,
+  });
+  const savedSearchesQuery = useQuery({
+    queryKey: ["search", "saved"],
+    queryFn: listSavedSearches,
+    enabled: workspaceEnabled,
+  });
+  const recentSearchesQuery = useQuery({
+    queryKey: ["search", "recent"],
+    queryFn: listRecentSearches,
+    enabled: workspaceEnabled,
+  });
   const searchQuery = useQuery({
-    queryKey: ["search", submittedQuery],
-    queryFn: () => searchDocuments(submittedQuery),
-    enabled: workspaceEnabled && submittedQuery.trim().length > 0,
+    queryKey: ["search", "results", submittedSearch],
+    queryFn: async () => {
+      const results = await searchDocuments(submittedSearch!);
+      await queryClient.invalidateQueries({ queryKey: ["search", "recent"] });
+      return results;
+    },
+    enabled: workspaceEnabled && submittedSearch !== null,
   });
   const notificationsQuery = useQuery({
     queryKey: ["notifications"],
@@ -150,6 +200,13 @@ export function AppShell() {
       ]);
     },
   });
+  const saveSearchMutation = useMutation({
+    mutationFn: saveSearch,
+    onSuccess: async () => {
+      setSaveSearchName("");
+      await queryClient.invalidateQueries({ queryKey: ["search", "saved"] });
+    },
+  });
 
   function handleAuthenticated(response: TokenResponse) {
     storeAccessToken(response.access_token);
@@ -169,6 +226,47 @@ export function AppShell() {
     setAccessToken(null);
     setSelectedDocumentId(null);
     queryClient.clear();
+  }
+
+  function currentSearchInput(): SearchRequestInput {
+    return {
+      query: query.trim(),
+      mode: searchMode,
+      filters: normalizeUiFilters(filters),
+      limit: 50,
+      offset: 0,
+    };
+  }
+
+  function submitSearch(input = currentSearchInput()) {
+    const normalizedInput = {
+      ...input,
+      filters: normalizeUiFilters(input.filters),
+    };
+    setQuery(normalizedInput.query);
+    setSearchMode(normalizedInput.mode);
+    setFilters(normalizedInput.filters);
+    setSubmittedSearch(normalizedInput);
+  }
+
+  function clearSearch() {
+    setQuery("");
+    setSearchMode("hybrid");
+    setFilters(defaultSearchFilters);
+    setSubmittedSearch(null);
+  }
+
+  function saveCurrentSearch() {
+    const name = saveSearchName.trim();
+    if (!name) {
+      return;
+    }
+    saveSearchMutation.mutate({
+      name,
+      query: query.trim(),
+      mode: searchMode,
+      filters: normalizeUiFilters(filters),
+    });
   }
 
   useEffect(() => {
@@ -200,7 +298,7 @@ export function AppShell() {
   }, [queryClient]);
 
   const visibleDocuments = useMemo(() => {
-    if (submittedQuery.trim()) {
+    if (submittedSearch) {
       return (searchQuery.data ?? []).map((result) => ({
         id: result.document_id,
         title: result.title,
@@ -211,7 +309,7 @@ export function AppShell() {
       }));
     }
     return documentsQuery.data ?? [];
-  }, [documentsQuery.data, searchQuery.data, submittedQuery]);
+  }, [documentsQuery.data, searchQuery.data, submittedSearch]);
 
   useEffect(() => {
     if (
@@ -302,25 +400,25 @@ export function AppShell() {
               />
             </div>
 
-            <form
-              className="relative"
-              onSubmit={(event) => {
-                event.preventDefault();
-                setSubmittedQuery(query.trim());
-              }}
-            >
-              <Search
-                className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
-                aria-hidden="true"
-              />
-              <input
-                className="h-11 w-full rounded-md border border-input bg-background pl-10 pr-4 text-sm outline-none ring-offset-background placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring"
-                placeholder="Search documents, tags, issuers, or questions"
-                type="search"
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-              />
-            </form>
+            <SearchControls
+              query={query}
+              mode={searchMode}
+              filters={filters}
+              saveSearchName={saveSearchName}
+              documentTypes={documentTypesQuery.data ?? []}
+              tags={tagsQuery.data ?? []}
+              savedSearches={savedSearchesQuery.data ?? []}
+              recentSearches={recentSearchesQuery.data ?? []}
+              isSaving={saveSearchMutation.isPending}
+              onQueryChange={setQuery}
+              onModeChange={setSearchMode}
+              onFiltersChange={setFilters}
+              onSaveNameChange={setSaveSearchName}
+              onSubmit={() => submitSearch()}
+              onClear={clearSearch}
+              onSave={saveCurrentSearch}
+              onApplySearch={submitSearch}
+            />
           </header>
 
           <div className="grid grid-cols-3 gap-3 border-b border-border p-4">
@@ -664,6 +762,371 @@ function UploadButton({
       </span>
     </label>
   );
+}
+
+function SearchControls({
+  query,
+  mode,
+  filters,
+  saveSearchName,
+  documentTypes,
+  tags,
+  savedSearches,
+  recentSearches,
+  isSaving,
+  onQueryChange,
+  onModeChange,
+  onFiltersChange,
+  onSaveNameChange,
+  onSubmit,
+  onClear,
+  onSave,
+  onApplySearch,
+}: {
+  query: string;
+  mode: SearchMode;
+  filters: SearchFilters;
+  saveSearchName: string;
+  documentTypes: DocumentTypeDefinition[];
+  tags: TagItem[];
+  savedSearches: SavedSearch[];
+  recentSearches: RecentSearch[];
+  isSaving: boolean;
+  onQueryChange: (query: string) => void;
+  onModeChange: (mode: SearchMode) => void;
+  onFiltersChange: (filters: SearchFilters) => void;
+  onSaveNameChange: (name: string) => void;
+  onSubmit: () => void;
+  onClear: () => void;
+  onSave: () => void;
+  onApplySearch: (search: SearchRequestInput) => void;
+}) {
+  function updateFilter<K extends keyof SearchFilters>(
+    key: K,
+    value: SearchFilters[K],
+  ) {
+    onFiltersChange({ ...filters, [key]: value });
+  }
+
+  return (
+    <div className="space-y-4">
+      <form
+        className="space-y-3"
+        onSubmit={(event) => {
+          event.preventDefault();
+          onSubmit();
+        }}
+      >
+        <div className="relative">
+          <Search
+            className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
+            aria-hidden="true"
+          />
+          <input
+            className="h-11 w-full rounded-md border border-input bg-background pl-10 pr-4 text-sm outline-none ring-offset-background placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring"
+            placeholder="Search documents, tags, issuers, or questions"
+            type="search"
+            value={query}
+            onChange={(event) => onQueryChange(event.target.value)}
+          />
+        </div>
+
+        <div className="grid grid-cols-2 gap-2 text-sm">
+          <label>
+            <span className="mb-1 block text-xs text-muted-foreground">
+              Mode
+            </span>
+            <select
+              className="h-9 w-full rounded-md border border-input bg-background px-2 outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              value={mode}
+              onChange={(event) =>
+                onModeChange(event.target.value as SearchMode)
+              }
+            >
+              <option value="hybrid">Hybrid</option>
+              <option value="keyword">Keyword</option>
+              <option value="semantic">Semantic</option>
+            </select>
+          </label>
+          <label>
+            <span className="mb-1 block text-xs text-muted-foreground">
+              Type
+            </span>
+            <select
+              className="h-9 w-full rounded-md border border-input bg-background px-2 outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              value={filters.document_type ?? ""}
+              onChange={(event) =>
+                updateFilter("document_type", event.target.value || null)
+              }
+            >
+              <option value="">Any type</option>
+              {documentTypes.map((documentType) => (
+                <option key={documentType.key} value={documentType.key}>
+                  {documentType.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            <span className="mb-1 block text-xs text-muted-foreground">
+              Tag
+            </span>
+            <select
+              className="h-9 w-full rounded-md border border-input bg-background px-2 outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              value={filters.tag ?? ""}
+              onChange={(event) =>
+                updateFilter("tag", event.target.value || null)
+              }
+            >
+              <option value="">Any tag</option>
+              {tags.map((tag) => (
+                <option key={tag.id} value={tag.slug}>
+                  {tag.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            <span className="mb-1 block text-xs text-muted-foreground">
+              Issuer
+            </span>
+            <input
+              className="h-9 w-full rounded-md border border-input bg-background px-2 outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              value={filters.issuer ?? ""}
+              onChange={(event) => updateFilter("issuer", event.target.value)}
+            />
+          </label>
+          <label>
+            <span className="mb-1 block text-xs text-muted-foreground">
+              Organization
+            </span>
+            <input
+              className="h-9 w-full rounded-md border border-input bg-background px-2 outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              value={filters.organization ?? ""}
+              onChange={(event) =>
+                updateFilter("organization", event.target.value)
+              }
+            />
+          </label>
+          <label>
+            <span className="mb-1 block text-xs text-muted-foreground">
+              From
+            </span>
+            <input
+              className="h-9 w-full rounded-md border border-input bg-background px-2 outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              type="date"
+              value={filters.date_from ?? ""}
+              onChange={(event) =>
+                updateFilter("date_from", event.target.value || null)
+              }
+            />
+          </label>
+          <label>
+            <span className="mb-1 block text-xs text-muted-foreground">To</span>
+            <input
+              className="h-9 w-full rounded-md border border-input bg-background px-2 outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              type="date"
+              value={filters.date_to ?? ""}
+              onChange={(event) =>
+                updateFilter("date_to", event.target.value || null)
+              }
+            />
+          </label>
+          <label className="flex items-center gap-2 pt-6 text-xs text-muted-foreground">
+            <input
+              className="h-4 w-4"
+              type="checkbox"
+              checked={filters.include_archived === true}
+              onChange={(event) =>
+                updateFilter("include_archived", event.target.checked)
+              }
+            />
+            Include archived
+          </label>
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+          <Button size="sm" type="submit">
+            Search
+          </Button>
+          <Button size="sm" variant="secondary" type="button" onClick={onClear}>
+            Clear
+          </Button>
+        </div>
+      </form>
+
+      <div className="flex gap-2">
+        <input
+          className="h-9 min-w-0 flex-1 rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          placeholder="Saved search name"
+          value={saveSearchName}
+          onChange={(event) => onSaveNameChange(event.target.value)}
+        />
+        <Button
+          size="sm"
+          variant="secondary"
+          type="button"
+          disabled={isSaving || !saveSearchName.trim()}
+          onClick={onSave}
+        >
+          Save
+        </Button>
+      </div>
+
+      <div className="grid gap-3 md:grid-cols-2">
+        <SearchShortcutList
+          title="Saved"
+          emptyText="No saved searches."
+          items={savedSearches.map((savedSearch) => ({
+            id: savedSearch.id,
+            title: savedSearch.name,
+            description: describeSearch(savedSearch.query, savedSearch.filters),
+            input: searchInputFromStoredSearch(savedSearch),
+          }))}
+          onApply={onApplySearch}
+        />
+        <SearchShortcutList
+          title="Recent"
+          emptyText="No recent searches."
+          items={recentSearches.map((recentSearch) => ({
+            id: recentSearch.id,
+            title: recentSearch.query || "Filtered documents",
+            description: describeSearch(
+              recentSearch.query,
+              recentSearch.filters,
+            ),
+            input: searchInputFromStoredSearch(recentSearch),
+          }))}
+          onApply={onApplySearch}
+        />
+      </div>
+    </div>
+  );
+}
+
+function SearchShortcutList({
+  title,
+  emptyText,
+  items,
+  onApply,
+}: {
+  title: string;
+  emptyText: string;
+  items: Array<{
+    id: string;
+    title: string;
+    description: string;
+    input: SearchRequestInput;
+  }>;
+  onApply: (input: SearchRequestInput) => void;
+}) {
+  return (
+    <section>
+      <p className="mb-2 text-xs font-medium uppercase text-muted-foreground">
+        {title}
+      </p>
+      {items.length ? (
+        <div className="space-y-1">
+          {items.slice(0, 4).map((item) => (
+            <button
+              className="w-full rounded-md border border-border bg-card px-3 py-2 text-left text-xs hover:bg-muted"
+              key={item.id}
+              type="button"
+              onClick={() => onApply(item.input)}
+            >
+              <span className="block truncate font-medium">{item.title}</span>
+              <span className="mt-1 block truncate text-muted-foreground">
+                {item.description}
+              </span>
+            </button>
+          ))}
+        </div>
+      ) : (
+        <p className="text-xs text-muted-foreground">{emptyText}</p>
+      )}
+    </section>
+  );
+}
+
+function searchInputFromStoredSearch(
+  search: SavedSearch | RecentSearch,
+): SearchRequestInput {
+  return {
+    query: search.query,
+    mode: search.mode,
+    filters: coerceStoredFilters(search.filters),
+    limit: 50,
+    offset: 0,
+  };
+}
+
+function normalizeUiFilters(filters: SearchFilters): SearchFilters {
+  return {
+    document_type: normalizeFilterText(filters.document_type),
+    issuer: normalizeFilterText(filters.issuer),
+    organization: normalizeFilterText(filters.organization),
+    tag: normalizeFilterText(filters.tag),
+    date_from: normalizeFilterText(filters.date_from),
+    date_to: normalizeFilterText(filters.date_to),
+    include_archived: filters.include_archived === true,
+  };
+}
+
+function coerceStoredFilters(filters: Record<string, unknown>): SearchFilters {
+  return {
+    document_type: storedFilterText(filters.document_type),
+    issuer: storedFilterText(filters.issuer),
+    organization: storedFilterText(filters.organization),
+    tag: storedFilterText(filters.tag),
+    date_from: storedFilterText(filters.date_from),
+    date_to: storedFilterText(filters.date_to),
+    include_archived:
+      filters.include_archived === true || filters.include_archived === "true",
+  };
+}
+
+function describeSearch(
+  query: string,
+  filters: Record<string, unknown>,
+): string {
+  const normalized = coerceStoredFilters(filters);
+  const parts = [];
+  if (query.trim()) {
+    parts.push(query.trim());
+  }
+  if (normalized.document_type) {
+    parts.push(normalized.document_type.replaceAll("_", " "));
+  }
+  if (normalized.tag) {
+    parts.push(`#${normalized.tag}`);
+  }
+  if (normalized.issuer) {
+    parts.push(`issuer ${normalized.issuer}`);
+  }
+  if (normalized.organization) {
+    parts.push(`org ${normalized.organization}`);
+  }
+  if (normalized.date_from || normalized.date_to) {
+    parts.push(
+      `${normalized.date_from ?? "any"} to ${normalized.date_to ?? "any"}`,
+    );
+  }
+  if (normalized.include_archived) {
+    parts.push("with archived");
+  }
+  return parts.join(" - ") || "All active documents";
+}
+
+function normalizeFilterText(value: string | null | undefined) {
+  const normalized = value?.trim();
+  return normalized ? normalized : null;
+}
+
+function storedFilterText(value: unknown) {
+  if (typeof value !== "string") {
+    return null;
+  }
+  return normalizeFilterText(value);
 }
 
 function DocumentPanel({

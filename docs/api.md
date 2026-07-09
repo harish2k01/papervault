@@ -32,6 +32,7 @@ Successful uploads persist the original file in object storage, create document 
 Additional document endpoints:
 
 - `GET /documents`: list documents
+- `GET /documents/types`: list supported document type keys, labels, and metadata field definitions
 - `GET /documents/{document_id}`: document detail with AI summary, metadata, tags, timeline, and extraction status
 - `PATCH /documents/{document_id}`: edit document title, type, date, issuer, or organization
 - `PUT /documents/{document_id}/metadata`: replace current structured metadata with a manual metadata version
@@ -51,6 +52,7 @@ Additional document endpoints:
 
 Phase 10 search uses OpenSearch for user-facing keyword, semantic, and hybrid queries when `PAPERVAULT_SEARCH_QUERY_BACKEND=opensearch` and indexing is enabled. PostgreSQL remains the source of truth and fallback query path when OpenSearch errors or is disabled.
 Archived documents are excluded by default. Set `filters.include_archived=true` to include them.
+Supported filters are document type, issuer, organization, tag slug, document date range, and archived inclusion.
 
 ## Tags
 

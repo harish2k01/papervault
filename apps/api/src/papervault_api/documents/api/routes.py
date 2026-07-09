@@ -20,9 +20,11 @@ from papervault_api.documents.api.schemas import (
     DocumentDetailResponse,
     DocumentResponse,
     DocumentTagResponse,
+    DocumentTypeResponse,
     DocumentVersionResponse,
     DuplicateCandidateDocumentResponse,
     DuplicateCandidateGroupResponse,
+    MetadataFieldDefinitionResponse,
     MetadataResponse,
     TextExtractionResponse,
     TimelineEventResponse,
@@ -45,7 +47,10 @@ from papervault_api.documents.application.uploads import (
     UploadDocumentCommand,
     UploadTooLargeError,
 )
-from papervault_api.documents.domain.document_types import UnknownDocumentTypeError
+from papervault_api.documents.domain.document_types import (
+    UnknownDocumentTypeError,
+    list_document_types,
+)
 from papervault_api.documents.domain.enums import DocumentSourceKind, DocumentStatus
 from papervault_api.documents.domain.models import DocumentRecord
 from papervault_api.documents.infrastructure.models import Document
@@ -107,6 +112,26 @@ async def list_duplicate_candidates(
             ],
         )
         for group in groups
+    ]
+
+
+@router.get("/types", response_model=list[DocumentTypeResponse])
+async def get_document_types() -> list[DocumentTypeResponse]:
+    return [
+        DocumentTypeResponse(
+            key=definition.key,
+            label=definition.label,
+            metadata_fields=[
+                MetadataFieldDefinitionResponse(
+                    key=field.key,
+                    label=field.label,
+                    field_type=field.field_type.value,
+                    required=field.required,
+                )
+                for field in definition.metadata_fields
+            ],
+        )
+        for definition in list_document_types()
     ]
 
 

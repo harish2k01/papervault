@@ -73,6 +73,43 @@ export type SearchResult = {
   highlights: string[];
 };
 
+export type SearchMode = "keyword" | "semantic" | "hybrid";
+
+export type SearchFilters = {
+  document_type?: string | null;
+  issuer?: string | null;
+  organization?: string | null;
+  tag?: string | null;
+  date_from?: string | null;
+  date_to?: string | null;
+  include_archived?: boolean;
+};
+
+export type SearchRequestInput = {
+  query: string;
+  mode: SearchMode;
+  filters: SearchFilters;
+  limit?: number;
+  offset?: number;
+};
+
+export type SavedSearch = {
+  id: string;
+  name: string;
+  query: string;
+  mode: SearchMode;
+  filters: Record<string, unknown>;
+  created_at: string;
+};
+
+export type RecentSearch = {
+  id: string;
+  query: string;
+  mode: SearchMode;
+  filters: Record<string, unknown>;
+  searched_at: string;
+};
+
 export type TimelineEvent = {
   id: string;
   event_type: string;
@@ -85,6 +122,23 @@ export type DocumentTag = {
   name: string;
   slug: string;
   color: string | null;
+};
+
+export type TagItem = DocumentTag & {
+  description: string | null;
+  source: string;
+  created_at: string;
+};
+
+export type DocumentTypeDefinition = {
+  key: string;
+  label: string;
+  metadata_fields: Array<{
+    key: string;
+    label: string;
+    field_type: string;
+    required: boolean;
+  }>;
 };
 
 export type DocumentDetail = {
@@ -236,6 +290,10 @@ export async function listDocuments() {
   return apiFetch<DocumentItem[]>("/documents");
 }
 
+export async function listDocumentTypes() {
+  return apiFetch<DocumentTypeDefinition[]>("/documents/types");
+}
+
 export async function getDocument(documentId: string) {
   return apiFetch<DocumentDetail>(`/documents/${documentId}`);
 }
@@ -253,18 +311,43 @@ export async function getDocumentFile(documentId: string) {
   return response.blob();
 }
 
-export async function searchDocuments(query: string) {
+export async function searchDocuments(input: SearchRequestInput) {
   const response = await apiFetch<{ results: SearchResult[] }>("/search", {
     method: "POST",
     body: JSON.stringify({
-      query,
-      mode: "hybrid",
-      filters: {},
-      limit: 50,
-      offset: 0,
+      query: input.query,
+      mode: input.mode,
+      filters: normalizeSearchFilters(input.filters),
+      limit: input.limit ?? 50,
+      offset: input.offset ?? 0,
     }),
   });
   return response.results;
+}
+
+export async function listSavedSearches() {
+  return apiFetch<SavedSearch[]>("/search/saved");
+}
+
+export async function listRecentSearches() {
+  return apiFetch<RecentSearch[]>("/search/recent");
+}
+
+export async function saveSearch(input: {
+  name: string;
+  query: string;
+  mode: SearchMode;
+  filters: SearchFilters;
+}) {
+  return apiFetch<SavedSearch>("/search/saved", {
+    method: "POST",
+    body: JSON.stringify({
+      name: input.name,
+      query: input.query,
+      mode: input.mode,
+      filters: normalizeSearchFilters(input.filters),
+    }),
+  });
 }
 
 export async function uploadDocument(file: File, documentType = "generic_pdf") {
@@ -327,6 +410,10 @@ export async function listNotifications() {
   return apiFetch<NotificationItem[]>("/notifications");
 }
 
+export async function listTags() {
+  return apiFetch<TagItem[]>("/tags");
+}
+
 export async function listDuplicates() {
   return apiFetch<DuplicateGroup[]>("/documents/duplicates/candidates");
 }
@@ -370,6 +457,23 @@ function authHeaders(): Record<string, string> {
     "X-PaperVault-User-Id": getDevUserId(),
     "X-PaperVault-User-Email": DEV_USER_EMAIL,
   };
+}
+
+function normalizeSearchFilters(filters: SearchFilters): SearchFilters {
+  return {
+    document_type: blankToNull(filters.document_type),
+    issuer: blankToNull(filters.issuer),
+    organization: blankToNull(filters.organization),
+    tag: blankToNull(filters.tag),
+    date_from: blankToNull(filters.date_from),
+    date_to: blankToNull(filters.date_to),
+    include_archived: filters.include_archived === true,
+  };
+}
+
+function blankToNull(value: string | null | undefined) {
+  const normalized = value?.trim();
+  return normalized ? normalized : null;
 }
 
 function sanitizeRedirectPath(value: string) {

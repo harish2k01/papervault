@@ -31,6 +31,19 @@ class UploadDocumentResponse(BaseModel):
     processing_task_id: str | None
 
 
+class MetadataFieldDefinitionResponse(BaseModel):
+    key: str
+    label: str
+    field_type: str
+    required: bool
+
+
+class DocumentTypeResponse(BaseModel):
+    key: str
+    label: str
+    metadata_fields: list[MetadataFieldDefinitionResponse]
+
+
 class DocumentTagResponse(BaseModel):
     id: UUID
     name: str
