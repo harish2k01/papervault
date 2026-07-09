@@ -9,7 +9,7 @@ on:
 jobs:
   backend:
     name: Backend
-    runs-on: ubuntu-latest
+    runs-on: papervault-runner
     defaults:
       run:
         working-directory: apps/api
@@ -33,7 +33,7 @@ jobs:
 
   frontend:
     name: Frontend
-    runs-on: ubuntu-latest
+    runs-on: papervault-runner
     defaults:
       run:
         working-directory: apps/web
@@ -55,7 +55,7 @@ jobs:
 
   helm:
     name: Helm chart
-    runs-on: ubuntu-latest
+    runs-on: papervault-runner
     steps:
       - uses: actions/checkout@v4
       - uses: azure/setup-helm@v4
