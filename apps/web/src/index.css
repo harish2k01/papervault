@@ -4,16 +4,16 @@
 
 @layer base {
   :root {
-    --background: 210 20% 98%;
+    --background: 216 33% 97%;
     --foreground: 222 40% 11%;
     --card: 0 0% 100%;
     --card-foreground: 222 40% 11%;
-    --muted: 210 20% 93%;
-    --muted-foreground: 215 16% 42%;
-    --border: 214 18% 84%;
-    --input: 214 18% 84%;
-    --ring: 218 88% 42%;
-    --primary: 218 88% 42%;
+    --muted: 216 28% 92%;
+    --muted-foreground: 218 17% 39%;
+    --border: 218 20% 84%;
+    --input: 218 20% 82%;
+    --ring: 221 83% 45%;
+    --primary: 221 83% 45%;
     --primary-foreground: 0 0% 100%;
     --radius: 0.5rem;
   }
@@ -44,6 +44,9 @@
       "Segoe UI",
       sans-serif;
     background: hsl(var(--background));
+    color: hsl(var(--foreground));
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
   }
 
   * {

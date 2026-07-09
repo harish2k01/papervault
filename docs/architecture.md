@@ -139,6 +139,14 @@ The frontend is feature-first:
 - `components/ui`: shared primitive components.
 - `lib`: small shared utilities and API client code.
 
+Phase 15 improves the production workspace shell without changing API contracts:
+
+- The document workspace uses three explicit regions: vault navigation, search/list, and document review.
+- Empty states are actionable workflow surfaces with upload and search recovery actions instead of plain text placeholders.
+- Search keeps the primary query path visible while advanced filters are grouped behind an expandable panel.
+- Document review separates preview, document identity, operational metrics, metadata editing, tags, timeline, and versions into a consistent sidebar.
+- Shared styling remains small: design tokens, the button primitive, and local shell presentation components. A larger design-system extraction is deferred until repeated UI patterns justify it.
+
 ## Data Storage
 
 Document files are never stored in PostgreSQL. The database stores metadata and object references. Object storage is responsible for original uploads, extracted page images if needed, and derived artifacts that are too large for relational storage.

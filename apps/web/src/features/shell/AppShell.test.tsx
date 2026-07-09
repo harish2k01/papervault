@@ -87,6 +87,9 @@ describe("AppShell", () => {
         "Search documents, tags, issuers, or questions",
       ),
     ).toBeInTheDocument();
+    expect(
+      await screen.findByRole("heading", { name: "Start building your vault" }),
+    ).toBeInTheDocument();
   });
 
   it("renders OIDC sign-in when configured", async () => {
