@@ -33,6 +33,9 @@ Additional document endpoints:
 
 - `GET /documents`: list documents
 - `GET /documents/{document_id}`: document detail with AI summary, metadata, tags, timeline, and extraction status
+- `PATCH /documents/{document_id}`: edit document title, type, date, issuer, or organization
+- `PUT /documents/{document_id}/metadata`: replace current structured metadata with a manual metadata version
+- `POST /documents/{document_id}/archive`: archive a document and hide it from default list/search results
 - `GET /documents/{document_id}/file`: authenticated document file response for the built-in viewer
 - `GET /documents/{document_id}/timeline`: document timeline events
 - `GET /documents/duplicates/candidates`: exact-hash duplicate candidate groups
@@ -47,6 +50,7 @@ Additional document endpoints:
 - `POST /search/index/rebuild?limit=500`: rebuild the current user's document index projection
 
 Phase 10 search uses OpenSearch for user-facing keyword, semantic, and hybrid queries when `PAPERVAULT_SEARCH_QUERY_BACKEND=opensearch` and indexing is enabled. PostgreSQL remains the source of truth and fallback query path when OpenSearch errors or is disabled.
+Archived documents are excluded by default. Set `filters.include_archived=true` to include them.
 
 ## Tags
 

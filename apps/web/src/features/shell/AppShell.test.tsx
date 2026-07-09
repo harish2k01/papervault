@@ -6,6 +6,7 @@ import { getAuthConfig } from "../../lib/api";
 import { AppShell } from "./AppShell";
 
 vi.mock("../../lib/api", () => ({
+  archiveDocument: vi.fn(),
   buildOidcLoginUrl: vi
     .fn()
     .mockReturnValue("/auth/oidc/start?redirect_to=%2F"),
@@ -23,6 +24,8 @@ vi.mock("../../lib/api", () => ({
   registerAccount: vi.fn(),
   searchDocuments: vi.fn().mockResolvedValue([]),
   storeAccessToken: vi.fn(),
+  updateDocument: vi.fn(),
+  updateDocumentMetadata: vi.fn(),
   uploadDocument: vi.fn(),
 }));
 

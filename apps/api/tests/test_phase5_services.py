@@ -3,6 +3,11 @@ from datetime import date
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from papervault_api.documents.application.lifecycle import (
+    DocumentLifecycleService,
+    DocumentUpdateCommand,
+    MetadataUpdateCommand,
+)
 from papervault_api.documents.application.read import DocumentReadService
 from papervault_api.documents.domain.enums import (
     DocumentStatus,
@@ -214,6 +219,76 @@ async def test_duplicate_candidates_group_by_sha256(session: AsyncSession) -> No
 
     assert len(groups) == 1
     assert {document.title for document in groups[0]} == {"Invoice 1", "Invoice 1 Copy"}
+
+
+async def test_document_lifecycle_updates_metadata_archives_and_writes_timeline(
+    session: AsyncSession,
+) -> None:
+    user, document = await create_document_with_text(
+        session,
+        title="Invoice",
+        text="Invoice from Acme",
+        document_type="invoice",
+    )
+    service = DocumentLifecycleService(session)
+
+    updated_document = await service.update_document(
+        DocumentUpdateCommand(
+            owner_id=user.id,
+            actor_id=user.id,
+            document_id=document.id,
+            updates={"title": "Invoice 2026", "issuer": "Acme"},
+        ),
+    )
+    metadata = await service.replace_metadata(
+        MetadataUpdateCommand(
+            owner_id=user.id,
+            actor_id=user.id,
+            document_id=document.id,
+            schema_name="invoice",
+            data={
+                "vendor": "Acme Store",
+                "purchase_date": "2026-07-01",
+                "total_amount": 1200,
+            },
+        ),
+    )
+    archived = await service.archive_document(
+        owner_id=user.id,
+        actor_id=user.id,
+        document_id=document.id,
+    )
+
+    timeline_events = tuple(
+        (
+            await session.execute(
+                select(TimelineEvent).where(TimelineEvent.document_id == document.id),
+            )
+        ).scalars(),
+    )
+    visible_documents = await DocumentReadService(session).list_documents(owner_id=user.id)
+    all_documents = await DocumentReadService(session).list_documents(
+        owner_id=user.id,
+        include_archived=True,
+    )
+    search_results = await DocumentSearchService(
+        session=session,
+        embedding_provider_name="local",
+        embedding_dimensions=16,
+    ).search(SearchRequest(owner_id=user.id, query="", record_recent=False))
+
+    assert updated_document is not None
+    assert updated_document.title == "Invoice 2026"
+    assert metadata is not None
+    assert metadata.source == MetadataSource.MANUAL.value
+    assert archived is not None
+    assert archived.status == DocumentStatus.ARCHIVED.value
+    assert archived.issuer == "Acme Store"
+    assert visible_documents == ()
+    assert len(all_documents) == 1
+    assert search_results == ()
+    assert any(event.event_type == "metadata_edited" for event in timeline_events)
+    assert any(event.event_type == "document_archived" for event in timeline_events)
 
 
 async def test_notification_service_generates_and_updates_due_date(session: AsyncSession) -> None:

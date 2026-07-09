@@ -9,6 +9,7 @@ import structlog
 from sqlalchemy import Select, and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from papervault_api.documents.domain.enums import DocumentStatus
 from papervault_api.documents.infrastructure.ai import build_embedding_provider, tokenize
 from papervault_api.documents.infrastructure.models import (
     Document,
@@ -30,6 +31,7 @@ class SearchFilters:
     tag: str | None = None
     date_from: date | None = None
     date_to: date | None = None
+    include_archived: bool = False
 
     def as_dict(self) -> dict[str, str]:
         values: dict[str, str] = {}
@@ -45,6 +47,8 @@ class SearchFilters:
             values["date_from"] = self.date_from.isoformat()
         if self.date_to:
             values["date_to"] = self.date_to.isoformat()
+        if self.include_archived:
+            values["include_archived"] = "true"
         return values
 
 
@@ -288,6 +292,8 @@ def apply_filters(
     statement: Select[tuple[Document]], filters: SearchFilters
 ) -> Select[tuple[Document]]:
     clauses = []
+    if not filters.include_archived:
+        clauses.append(Document.status != DocumentStatus.ARCHIVED.value)
     if filters.document_type:
         clauses.append(Document.document_type == filters.document_type)
     if filters.issuer:

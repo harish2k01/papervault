@@ -14,6 +14,7 @@ class SearchFiltersRequest(BaseModel):
     tag: str | None = None
     date_from: date | None = None
     date_to: date | None = None
+    include_archived: bool = False
 
 
 class SearchRequestBody(BaseModel):

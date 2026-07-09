@@ -20,6 +20,7 @@ import {
   DocumentDetail,
   DocumentItem,
   TokenResponse,
+  archiveDocument,
   buildOidcLoginUrl,
   clearStoredAccessToken,
   getAuthConfig,
@@ -35,6 +36,8 @@ import {
   registerAccount,
   searchDocuments,
   storeAccessToken,
+  updateDocument,
+  updateDocumentMetadata,
   uploadDocument,
 } from "../../lib/api";
 
@@ -104,6 +107,46 @@ export function AppShell() {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["documents"] }),
         queryClient.invalidateQueries({ queryKey: ["search"] }),
+      ]);
+    },
+  });
+  const documentUpdateMutation = useMutation({
+    mutationFn: (input: {
+      documentId: string;
+      updates: Parameters<typeof updateDocument>[1];
+    }) => updateDocument(input.documentId, input.updates),
+    onSuccess: async (document) => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["documents"] }),
+        queryClient.invalidateQueries({ queryKey: ["document", document.id] }),
+        queryClient.invalidateQueries({ queryKey: ["search"] }),
+      ]);
+    },
+  });
+  const metadataUpdateMutation = useMutation({
+    mutationFn: (input: {
+      documentId: string;
+      metadata: Parameters<typeof updateDocumentMetadata>[1];
+    }) => updateDocumentMetadata(input.documentId, input.metadata),
+    onSuccess: async (_metadata, input) => {
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: ["document", input.documentId],
+        }),
+        queryClient.invalidateQueries({ queryKey: ["documents"] }),
+        queryClient.invalidateQueries({ queryKey: ["search"] }),
+      ]);
+    },
+  });
+  const archiveMutation = useMutation({
+    mutationFn: archiveDocument,
+    onSuccess: async (document) => {
+      setSelectedDocumentId(null);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["documents"] }),
+        queryClient.invalidateQueries({ queryKey: ["document", document.id] }),
+        queryClient.invalidateQueries({ queryKey: ["search"] }),
+        queryClient.invalidateQueries({ queryKey: ["duplicates"] }),
       ]);
     },
   });
@@ -326,6 +369,18 @@ export function AppShell() {
             duplicateGroups={duplicateGroups}
             notifications={notificationsQuery.data ?? []}
             isLoading={detailQuery.isLoading}
+            isUpdating={
+              documentUpdateMutation.isPending ||
+              metadataUpdateMutation.isPending ||
+              archiveMutation.isPending
+            }
+            onArchive={(documentId) => archiveMutation.mutate(documentId)}
+            onUpdateDocument={(documentId, updates) =>
+              documentUpdateMutation.mutate({ documentId, updates })
+            }
+            onUpdateMetadata={(documentId, metadata) =>
+              metadataUpdateMutation.mutate({ documentId, metadata })
+            }
           />
         </section>
       </div>
@@ -616,11 +671,25 @@ function DocumentPanel({
   duplicateGroups,
   notifications,
   isLoading,
+  isUpdating,
+  onArchive,
+  onUpdateDocument,
+  onUpdateMetadata,
 }: {
   detail: DocumentDetail | undefined;
   duplicateGroups: number;
   notifications: Array<{ id: string; title: string; due_date: string }>;
   isLoading: boolean;
+  isUpdating: boolean;
+  onArchive: (documentId: string) => void;
+  onUpdateDocument: (
+    documentId: string,
+    updates: Parameters<typeof updateDocument>[1],
+  ) => void;
+  onUpdateMetadata: (
+    documentId: string,
+    metadata: Parameters<typeof updateDocumentMetadata>[1],
+  ) => void;
 }) {
   if (isLoading) {
     return (
@@ -643,13 +712,35 @@ function DocumentPanel({
           <p className="text-xs uppercase text-muted-foreground">
             {detail.document.document_type.replaceAll("_", " ")}
           </p>
-          <h2 className="mt-1 text-lg font-semibold">
-            {detail.document.title}
-          </h2>
+          <div className="mt-1 flex items-start justify-between gap-3">
+            <h2 className="text-lg font-semibold">{detail.document.title}</h2>
+            <Button
+              size="sm"
+              variant="secondary"
+              type="button"
+              disabled={detail.document.status === "archived" || isUpdating}
+              onClick={() => onArchive(detail.document.id)}
+            >
+              Archive
+            </Button>
+          </div>
           <p className="mt-1 text-sm text-muted-foreground">
             {detail.document.original_filename}
           </p>
+          {detail.document.archived_at ? (
+            <p className="mt-2 rounded-md border border-border bg-muted p-2 text-xs text-muted-foreground">
+              Archived {new Date(detail.document.archived_at).toLocaleString()}
+            </p>
+          ) : null}
         </div>
+
+        <Panel title="Document Fields">
+          <DocumentFieldsEditor
+            document={detail.document}
+            disabled={isUpdating}
+            onSave={(updates) => onUpdateDocument(detail.document.id, updates)}
+          />
+        </Panel>
 
         <Panel title="AI Summary">
           <p className="text-sm text-muted-foreground">
@@ -670,22 +761,14 @@ function DocumentPanel({
         </Panel>
 
         <Panel title="Metadata">
-          {detail.metadata ? (
-            <dl className="space-y-2 text-sm">
-              {Object.entries(detail.metadata.data).map(([key, value]) => (
-                <div className="grid grid-cols-[130px_1fr] gap-3" key={key}>
-                  <dt className="text-muted-foreground">
-                    {key.replaceAll("_", " ")}
-                  </dt>
-                  <dd>{String(value)}</dd>
-                </div>
-              ))}
-            </dl>
-          ) : (
-            <p className="text-sm text-muted-foreground">
-              No metadata extracted.
-            </p>
-          )}
+          <MetadataEditor
+            metadata={detail.metadata}
+            document={detail.document}
+            disabled={isUpdating}
+            onSave={(metadata) =>
+              onUpdateMetadata(detail.document.id, metadata)
+            }
+          />
         </Panel>
 
         <Panel title="Tags">
@@ -724,8 +807,207 @@ function DocumentPanel({
             <Metric label="Notifications" value={notifications.length} />
           </div>
         </Panel>
+
+        <Panel title="Versions">
+          {detail.versions.length ? (
+            <div className="space-y-3 text-sm">
+              {detail.versions.map((version) => (
+                <div key={version.id}>
+                  <p>Version {version.version_number}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {new Date(version.created_at).toLocaleString()} -{" "}
+                    {Math.round(version.file_size_bytes / 1024)} KB
+                  </p>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              No versions recorded.
+            </p>
+          )}
+        </Panel>
       </aside>
     </div>
+  );
+}
+
+function DocumentFieldsEditor({
+  document,
+  disabled,
+  onSave,
+}: {
+  document: DocumentItem;
+  disabled: boolean;
+  onSave: (updates: Parameters<typeof updateDocument>[1]) => void;
+}) {
+  const [title, setTitle] = useState(document.title);
+  const [documentType, setDocumentType] = useState(document.document_type);
+  const [documentDate, setDocumentDate] = useState(
+    document.document_date ?? "",
+  );
+  const [issuer, setIssuer] = useState(document.issuer ?? "");
+  const [organization, setOrganization] = useState(document.organization ?? "");
+
+  useEffect(() => {
+    setTitle(document.title);
+    setDocumentType(document.document_type);
+    setDocumentDate(document.document_date ?? "");
+    setIssuer(document.issuer ?? "");
+    setOrganization(document.organization ?? "");
+  }, [document]);
+
+  return (
+    <form
+      className="space-y-3 text-sm"
+      onSubmit={(event) => {
+        event.preventDefault();
+        onSave({
+          title: title.trim(),
+          document_type: documentType.trim(),
+          document_date: documentDate || null,
+          issuer: issuer.trim() || null,
+          organization: organization.trim() || null,
+        });
+      }}
+    >
+      <label className="block">
+        <span className="mb-1 block text-muted-foreground">Title</span>
+        <input
+          className="h-9 w-full rounded-md border border-input bg-background px-3 outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          value={title}
+          disabled={disabled}
+          onChange={(event) => setTitle(event.target.value)}
+        />
+      </label>
+      <div className="grid grid-cols-2 gap-3">
+        <label className="block">
+          <span className="mb-1 block text-muted-foreground">Type</span>
+          <input
+            className="h-9 w-full rounded-md border border-input bg-background px-3 outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            value={documentType}
+            disabled={disabled}
+            onChange={(event) => setDocumentType(event.target.value)}
+          />
+        </label>
+        <label className="block">
+          <span className="mb-1 block text-muted-foreground">Date</span>
+          <input
+            className="h-9 w-full rounded-md border border-input bg-background px-3 outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            type="date"
+            value={documentDate}
+            disabled={disabled}
+            onChange={(event) => setDocumentDate(event.target.value)}
+          />
+        </label>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <label className="block">
+          <span className="mb-1 block text-muted-foreground">Issuer</span>
+          <input
+            className="h-9 w-full rounded-md border border-input bg-background px-3 outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            value={issuer}
+            disabled={disabled}
+            onChange={(event) => setIssuer(event.target.value)}
+          />
+        </label>
+        <label className="block">
+          <span className="mb-1 block text-muted-foreground">Organization</span>
+          <input
+            className="h-9 w-full rounded-md border border-input bg-background px-3 outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            value={organization}
+            disabled={disabled}
+            onChange={(event) => setOrganization(event.target.value)}
+          />
+        </label>
+      </div>
+      <Button size="sm" type="submit" disabled={disabled || !title.trim()}>
+        Save fields
+      </Button>
+    </form>
+  );
+}
+
+function MetadataEditor({
+  metadata,
+  document,
+  disabled,
+  onSave,
+}: {
+  metadata: DocumentDetail["metadata"];
+  document: DocumentItem;
+  disabled: boolean;
+  onSave: (metadata: Parameters<typeof updateDocumentMetadata>[1]) => void;
+}) {
+  const [schemaName, setSchemaName] = useState(
+    metadata?.schema_name ?? document.document_type,
+  );
+  const [dataText, setDataText] = useState(
+    JSON.stringify(metadata?.data ?? {}, null, 2),
+  );
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setSchemaName(metadata?.schema_name ?? document.document_type);
+    setDataText(JSON.stringify(metadata?.data ?? {}, null, 2));
+    setError(null);
+  }, [document, metadata]);
+
+  return (
+    <form
+      className="space-y-3 text-sm"
+      onSubmit={(event) => {
+        event.preventDefault();
+        try {
+          const parsed = JSON.parse(dataText) as unknown;
+          if (
+            parsed === null ||
+            typeof parsed !== "object" ||
+            Array.isArray(parsed)
+          ) {
+            throw new Error("Metadata must be a JSON object.");
+          }
+          setError(null);
+          onSave({
+            schema_name: schemaName.trim() || document.document_type,
+            data: parsed as Record<string, unknown>,
+          });
+        } catch (metadataError) {
+          setError(
+            metadataError instanceof Error
+              ? metadataError.message
+              : "Metadata JSON is invalid.",
+          );
+        }
+      }}
+    >
+      <label className="block">
+        <span className="mb-1 block text-muted-foreground">Schema</span>
+        <input
+          className="h-9 w-full rounded-md border border-input bg-background px-3 outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          value={schemaName}
+          disabled={disabled}
+          onChange={(event) => setSchemaName(event.target.value)}
+        />
+      </label>
+      <label className="block">
+        <span className="mb-1 block text-muted-foreground">JSON</span>
+        <textarea
+          className="min-h-40 w-full rounded-md border border-input bg-background p-3 font-mono text-xs outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          value={dataText}
+          disabled={disabled}
+          onChange={(event) => setDataText(event.target.value)}
+        />
+      </label>
+      {error ? (
+        <p className="rounded-md border border-border bg-muted p-2 text-xs">
+          {error}
+        </p>
+      ) : null}
+      <Button size="sm" type="submit" disabled={disabled}>
+        Save metadata
+      </Button>
+    </form>
   );
 }
 

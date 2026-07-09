@@ -72,6 +72,18 @@ sequenceDiagram
 
 OCR is an adapter behind the text extraction interface. Phase 7 adds a local Tesseract adapter for scanned PDFs and images. PDFs without embedded text are rendered to page images with Poppler before OCR. The unavailable OCR adapter remains available for deployments that intentionally disable OCR.
 
+## Document Lifecycle
+
+Phase 12 adds command-side document lifecycle operations:
+
+- Document fields such as title, type, date, issuer, and organization can be manually edited.
+- Structured metadata replacement creates a new current manual metadata record and keeps older records for audit/history.
+- Metadata updates derive searchable document fields from common metadata keys such as `vendor`, `provider`, `bank`, `employer`, `purchase_date`, and `expiry_date`.
+- Archive marks a document as `archived`, records a timeline event, and removes it from default document listing, duplicate detection, and search results.
+- Version history is exposed in document detail from the existing `document_versions` table.
+
+Lifecycle commands update PostgreSQL first and then refresh the OpenSearch projection on a best-effort basis. Search indexing failures are logged but do not reject the user's metadata edit or archive action.
+
 ## AI Processing
 
 Phase 4 adds provider interfaces for AI analysis and embeddings. The default providers are local and deterministic:

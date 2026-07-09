@@ -41,3 +41,7 @@ class DocumentRecord:
     document_type: str
     created_at: datetime
     updated_at: datetime
+    document_date: date | None = None
+    issuer: str | None = None
+    organization: str | None = None
+    archived_at: datetime | None = None

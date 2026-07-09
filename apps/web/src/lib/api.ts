@@ -53,6 +53,10 @@ export type DocumentItem = {
   source_kind: string;
   status: string;
   document_type: string;
+  document_date: string | null;
+  issuer: string | null;
+  organization: string | null;
+  archived_at: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -108,6 +112,15 @@ export type DocumentDetail = {
   } | null;
   tags: DocumentTag[];
   timeline_events: TimelineEvent[];
+  versions: Array<{
+    id: string;
+    version_number: number;
+    sha256_hash: string;
+    file_size_bytes: number;
+    change_reason: string | null;
+    created_by_id: string | null;
+    created_at: string;
+  }>;
 };
 
 export type NotificationItem = {
@@ -265,6 +278,48 @@ export async function uploadDocument(file: File, documentType = "generic_pdf") {
     method: "POST",
     body,
     skipJsonContentType: true,
+  });
+}
+
+export async function updateDocument(
+  documentId: string,
+  input: Partial<{
+    title: string;
+    document_type: string;
+    document_date: string | null;
+    issuer: string | null;
+    organization: string | null;
+  }>,
+) {
+  return apiFetch<DocumentItem>(`/documents/${documentId}`, {
+    method: "PATCH",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function updateDocumentMetadata(
+  documentId: string,
+  input: {
+    schema_name?: string;
+    data: Record<string, unknown>;
+    document_date?: string | null;
+    issuer?: string | null;
+    organization?: string | null;
+  },
+) {
+  return apiFetch<DocumentDetail["metadata"]>(
+    `/documents/${documentId}/metadata`,
+    {
+      method: "PUT",
+      body: JSON.stringify(input),
+    },
+  );
+}
+
+export async function archiveDocument(documentId: string) {
+  return apiFetch<DocumentItem>(`/documents/${documentId}/archive`, {
+    method: "POST",
+    body: JSON.stringify({}),
   });
 }
 

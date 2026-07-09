@@ -61,6 +61,10 @@ def document_record_from_model(model: Document) -> DocumentRecord:
         source_kind=DocumentSourceKind(model.source_kind),
         status=DocumentStatus(model.status),
         document_type=model.document_type,
+        document_date=model.document_date,
+        issuer=model.issuer,
+        organization=model.organization,
+        archived_at=model.archived_at,
         created_at=model.created_at,
         updated_at=model.updated_at,
     )

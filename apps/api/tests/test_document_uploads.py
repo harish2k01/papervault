@@ -7,6 +7,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker, create_async_engine
 from sqlalchemy.pool import StaticPool
 
+from papervault_api.core.config import Settings, get_settings
 from papervault_api.db.base import Base
 from papervault_api.db.session import get_session
 from papervault_api.documents.api.dependencies import (
@@ -108,4 +109,64 @@ def test_upload_rejects_unsupported_content_type() -> None:
         )
 
     assert response.status_code == 415
+    asyncio.run(engine.dispose())
+
+
+def test_document_lifecycle_routes_update_metadata_and_archive() -> None:
+    app, _storage, engine = build_upload_test_app()
+    app.dependency_overrides[get_settings] = lambda: Settings(search_index_enabled=False)
+
+    user_id = uuid4()
+    headers = {
+        "X-PaperVault-User-Id": str(user_id),
+        "X-PaperVault-User-Email": "person@example.com",
+    }
+    with TestClient(app) as client:
+        upload_response = client.post(
+            "/documents/uploads",
+            headers=headers,
+            data={"document_type": "invoice"},
+            files={"file": ("invoice.pdf", b"%PDF-1.4\n", "application/pdf")},
+        )
+        assert upload_response.status_code == 201
+        document_id = upload_response.json()["document"]["id"]
+
+        update_response = client.patch(
+            f"/documents/{document_id}",
+            headers=headers,
+            json={"title": "iPad Invoice", "issuer": "Apple Store"},
+        )
+        assert update_response.status_code == 200
+        assert update_response.json()["title"] == "iPad Invoice"
+
+        metadata_response = client.put(
+            f"/documents/{document_id}/metadata",
+            headers=headers,
+            json={
+                "schema_name": "invoice",
+                "data": {
+                    "vendor": "Apple Store",
+                    "purchase_date": "2026-07-01",
+                    "total_amount": 999,
+                },
+            },
+        )
+        assert metadata_response.status_code == 200
+        assert metadata_response.json()["data"]["vendor"] == "Apple Store"
+
+        detail_response = client.get(f"/documents/{document_id}", headers=headers)
+        assert detail_response.status_code == 200
+        detail = detail_response.json()
+        assert detail["document"]["issuer"] == "Apple Store"
+        assert detail["document"]["document_date"] == "2026-07-01"
+        assert detail["versions"][0]["version_number"] == 1
+
+        archive_response = client.post(f"/documents/{document_id}/archive", headers=headers)
+        assert archive_response.status_code == 200
+        assert archive_response.json()["status"] == "archived"
+
+        list_response = client.get("/documents", headers=headers)
+        assert list_response.status_code == 200
+        assert list_response.json() == []
+
     asyncio.run(engine.dispose())

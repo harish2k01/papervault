@@ -325,6 +325,8 @@ def opensearch_query(
 
 def opensearch_filters(owner_id: UUID, filters: SearchFilters) -> list[dict[str, Any]]:
     clauses: list[dict[str, Any]] = [{"term": {"owner_id": str(owner_id)}}]
+    if not filters.include_archived:
+        clauses.append({"bool": {"must_not": [{"term": {"status": "archived"}}]}})
     if filters.document_type:
         clauses.append({"term": {"document_type": filters.document_type}})
     if filters.issuer:

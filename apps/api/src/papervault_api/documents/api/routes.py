@@ -3,11 +3,13 @@ from tempfile import NamedTemporaryFile
 from typing import Annotated
 from uuid import UUID
 
+import structlog
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.background import BackgroundTask
 
+from papervault_api.core.config import Settings, get_settings
 from papervault_api.db.session import get_session
 from papervault_api.documents.api.dependencies import (
     get_document_upload_service,
@@ -18,12 +20,21 @@ from papervault_api.documents.api.schemas import (
     DocumentDetailResponse,
     DocumentResponse,
     DocumentTagResponse,
+    DocumentVersionResponse,
     DuplicateCandidateDocumentResponse,
     DuplicateCandidateGroupResponse,
     MetadataResponse,
     TextExtractionResponse,
     TimelineEventResponse,
+    UpdateDocumentRequest,
+    UpdateMetadataRequest,
     UploadDocumentResponse,
+)
+from papervault_api.documents.application.lifecycle import (
+    DocumentLifecycleService,
+    DocumentUpdateCommand,
+    InvalidMetadataError,
+    MetadataUpdateCommand,
 )
 from papervault_api.documents.application.read import DocumentReadService
 from papervault_api.documents.application.storage import ObjectStorage
@@ -40,8 +51,14 @@ from papervault_api.documents.domain.models import DocumentRecord
 from papervault_api.documents.infrastructure.models import Document
 from papervault_api.identity.api.dependencies import get_current_user
 from papervault_api.identity.application.current_user import CurrentUser
+from papervault_api.search.application.indexing import SearchIndexingService
+from papervault_api.search.infrastructure.opensearch import (
+    OpenSearchError,
+    build_search_document_index,
+)
 
 router = APIRouter(prefix="/documents", tags=["documents"])
+logger = structlog.get_logger(__name__)
 
 
 @router.get("", response_model=list[DocumentResponse])
@@ -50,9 +67,15 @@ async def list_documents(
     session: Annotated[AsyncSession, Depends(get_session)],
     limit: int = 50,
     offset: int = 0,
+    include_archived: bool = False,
 ) -> list[DocumentResponse]:
     service = DocumentReadService(session)
-    documents = await service.list_documents(owner_id=current_user.id, limit=limit, offset=offset)
+    documents = await service.list_documents(
+        owner_id=current_user.id,
+        limit=limit,
+        offset=offset,
+        include_archived=include_archived,
+    )
     return [
         DocumentResponse.model_validate(document_record_from_orm(document), from_attributes=True)
         for document in documents
@@ -205,7 +228,106 @@ async def get_document_detail(
             )
             for event in detail.timeline_events
         ],
+        versions=[
+            DocumentVersionResponse(
+                id=version.id,
+                version_number=version.version_number,
+                sha256_hash=version.sha256_hash,
+                file_size_bytes=version.file_size_bytes,
+                change_reason=version.change_reason,
+                created_by_id=version.created_by_id,
+                created_at=version.created_at,
+            )
+            for version in detail.versions
+        ],
     )
+
+
+@router.patch("/{document_id}", response_model=DocumentResponse)
+async def update_document(
+    document_id: UUID,
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    session: Annotated[AsyncSession, Depends(get_session)],
+    settings: Annotated[Settings, Depends(get_settings)],
+    request: UpdateDocumentRequest,
+) -> DocumentResponse:
+    service = DocumentLifecycleService(session)
+    try:
+        document = await service.update_document(
+            DocumentUpdateCommand(
+                owner_id=current_user.id,
+                actor_id=current_user.id,
+                document_id=document_id,
+                updates=request.model_dump(exclude_unset=True),
+            ),
+        )
+    except UnknownDocumentTypeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(exc),
+        ) from exc
+    if document is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
+
+    await reindex_document_best_effort(session=session, settings=settings, document_id=document.id)
+    return DocumentResponse.model_validate(document_record_from_orm(document), from_attributes=True)
+
+
+@router.put("/{document_id}/metadata", response_model=MetadataResponse)
+async def replace_document_metadata(
+    document_id: UUID,
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    session: Annotated[AsyncSession, Depends(get_session)],
+    settings: Annotated[Settings, Depends(get_settings)],
+    request: UpdateMetadataRequest,
+) -> MetadataResponse:
+    service = DocumentLifecycleService(session)
+    try:
+        metadata = await service.replace_metadata(
+            MetadataUpdateCommand(
+                owner_id=current_user.id,
+                actor_id=current_user.id,
+                document_id=document_id,
+                schema_name=request.schema_name,
+                data=request.data,
+                document_date=request.document_date,
+                issuer=request.issuer,
+                organization=request.organization,
+            ),
+        )
+    except InvalidMetadataError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    if metadata is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
+
+    await reindex_document_best_effort(session=session, settings=settings, document_id=document_id)
+    return MetadataResponse(
+        schema_name=metadata.schema_name,
+        schema_version=metadata.schema_version,
+        data=metadata.data,
+        confidence_score=float(metadata.confidence_score)
+        if metadata.confidence_score is not None
+        else None,
+    )
+
+
+@router.post("/{document_id}/archive", response_model=DocumentResponse)
+async def archive_document(
+    document_id: UUID,
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    session: Annotated[AsyncSession, Depends(get_session)],
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> DocumentResponse:
+    document = await DocumentLifecycleService(session).archive_document(
+        owner_id=current_user.id,
+        actor_id=current_user.id,
+        document_id=document_id,
+    )
+    if document is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
+
+    await reindex_document_best_effort(session=session, settings=settings, document_id=document.id)
+    return DocumentResponse.model_validate(document_record_from_orm(document), from_attributes=True)
 
 
 @router.get("/{document_id}/file")
@@ -270,6 +392,30 @@ def document_record_from_orm(document: Document) -> DocumentRecord:
         source_kind=DocumentSourceKind(document.source_kind),
         status=DocumentStatus(document.status),
         document_type=document.document_type,
+        document_date=document.document_date,
+        issuer=document.issuer,
+        organization=document.organization,
+        archived_at=document.archived_at,
         created_at=document.created_at,
         updated_at=document.updated_at,
     )
+
+
+async def reindex_document_best_effort(
+    *,
+    session: AsyncSession,
+    settings: Settings,
+    document_id: UUID,
+) -> None:
+    service = SearchIndexingService(
+        session=session,
+        search_index=build_search_document_index(settings),
+    )
+    try:
+        await service.index_document(document_id)
+    except OpenSearchError as exc:
+        logger.warning(
+            "document_lifecycle_search_indexing_failed",
+            document_id=str(document_id),
+            error=str(exc),
+        )

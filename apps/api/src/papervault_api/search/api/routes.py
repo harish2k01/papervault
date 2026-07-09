@@ -221,4 +221,5 @@ def filters_from_request(request: SearchFiltersRequest) -> SearchFilters:
         tag=request.tag,
         date_from=request.date_from,
         date_to=request.date_to,
+        include_archived=request.include_archived,
     )
