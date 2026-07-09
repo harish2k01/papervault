@@ -24,6 +24,7 @@ apps/web/dist/
 
 # Local data
 .data/
+.tmp/
 tmp/
 
 # Editors

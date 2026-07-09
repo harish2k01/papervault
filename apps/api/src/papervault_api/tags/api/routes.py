@@ -4,9 +4,11 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from papervault_api.core.config import Settings, get_settings
 from papervault_api.db.session import get_session
 from papervault_api.identity.api.dependencies import get_current_user
 from papervault_api.identity.application.current_user import CurrentUser
+from papervault_api.search.api.indexing import reindex_document_best_effort
 from papervault_api.tags.api.schemas import CreateTagRequest, TagAssignmentResponse, TagResponse
 from papervault_api.tags.application.service import TagService
 
@@ -64,6 +66,7 @@ async def attach_tag(
     tag_id: UUID,
     current_user: Annotated[CurrentUser, Depends(get_current_user)],
     session: Annotated[AsyncSession, Depends(get_session)],
+    settings: Annotated[Settings, Depends(get_settings)],
 ) -> TagAssignmentResponse:
     service = TagService(session)
     attached = await service.attach_tag(
@@ -75,6 +78,12 @@ async def attach_tag(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Document or tag not found"
         )
+    await reindex_document_best_effort(
+        session=session,
+        settings=settings,
+        document_id=document_id,
+        reason="tag_attached",
+    )
     return TagAssignmentResponse(attached=True)
 
 
@@ -84,6 +93,7 @@ async def detach_tag(
     tag_id: UUID,
     current_user: Annotated[CurrentUser, Depends(get_current_user)],
     session: Annotated[AsyncSession, Depends(get_session)],
+    settings: Annotated[Settings, Depends(get_settings)],
 ) -> None:
     service = TagService(session)
     detached = await service.detach_tag(
@@ -95,3 +105,9 @@ async def detach_tag(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Document or tag not found"
         )
+    await reindex_document_best_effort(
+        session=session,
+        settings=settings,
+        document_id=document_id,
+        reason="tag_detached",
+    )

@@ -61,6 +61,8 @@ Supported filters are document type, issuer, organization, tag slug, document da
 - `POST /documents/{document_id}/tags/{tag_id}`: attach a tag
 - `DELETE /documents/{document_id}/tags/{tag_id}`: detach a tag
 
+Tag assignment endpoints are owner-scoped, append `tags_changed` timeline events, and refresh the affected document's OpenSearch projection on a best-effort basis after PostgreSQL commits. Accepted AI-suggested tags use the same manual tag endpoints.
+
 ## Notifications
 
 - `GET /notifications`: list notifications

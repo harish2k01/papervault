@@ -84,6 +84,15 @@ Phase 12 adds command-side document lifecycle operations:
 
 Lifecycle commands update PostgreSQL first and then refresh the OpenSearch projection on a best-effort basis. Search indexing failures are logged but do not reject the user's metadata edit or archive action.
 
+## Tags
+
+Phase 14 makes tags an editable document workflow:
+
+- Users can attach an existing tag, create a new manual tag directly from document detail, detach an assigned tag, or accept an AI-suggested tag.
+- Suggested tags are treated as recommendations until the user accepts them. Accepted suggestions create or reuse manual tags and then attach them to the document.
+- Tag assignment remains an owner-scoped backend use case that validates document and tag ownership and writes `tags_changed` timeline events.
+- Tag attach and detach operations refresh the OpenSearch document projection on a best-effort basis so tag filters remain consistent with PostgreSQL.
+
 ## AI Processing
 
 Phase 4 adds provider interfaces for AI analysis and embeddings. The default providers are local and deterministic:
@@ -103,6 +112,7 @@ Phase 8 adds OpenSearch indexing behind a provider boundary, and Phase 10 adds u
 - `/search/index/documents/{document_id}` and `/search/index/rebuild` allow owner-scoped reindexing.
 - `POST /search` uses OpenSearch for keyword, semantic, and hybrid queries when `PAPERVAULT_SEARCH_QUERY_BACKEND=opensearch` and indexing is enabled.
 - PostgreSQL remains the source of truth and the fallback query path when OpenSearch is unavailable or explicitly disabled.
+- Document lifecycle and tag mutations refresh an affected document's projection after the database transaction succeeds.
 - Phase 13 exposes advanced filters in the web app for document type, tag, issuer, organization, date range, and archived inclusion.
 - Saved and recent searches reuse the same typed search request shape, so applying a saved or recent search goes through the same query path as a manual search.
 

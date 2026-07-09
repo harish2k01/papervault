@@ -28,8 +28,11 @@ import {
   TagItem,
   TokenResponse,
   archiveDocument,
+  attachTag,
   buildOidcLoginUrl,
   clearStoredAccessToken,
+  createTag,
+  detachTag,
   getAuthConfig,
   getDocument,
   getDocumentFile,
@@ -200,6 +203,40 @@ export function AppShell() {
       ]);
     },
   });
+  const tagAttachMutation = useMutation({
+    mutationFn: (input: { documentId: string; tagId: string }) =>
+      attachTag(input.documentId, input.tagId),
+    onSuccess: async (_response, input) => {
+      await invalidateDocumentTags(input.documentId);
+    },
+  });
+  const tagDetachMutation = useMutation({
+    mutationFn: (input: { documentId: string; tagId: string }) =>
+      detachTag(input.documentId, input.tagId),
+    onSuccess: async (_response, input) => {
+      await invalidateDocumentTags(input.documentId);
+    },
+  });
+  const tagCreateAttachMutation = useMutation({
+    mutationFn: async (input: { documentId: string; name: string }) => {
+      const tagName = input.name.trim();
+      if (!tagName) {
+        throw new Error("Tag name is required.");
+      }
+      const existingTag = (tagsQuery.data ?? []).find(
+        (tag) => tag.slug === slugifyTagName(tagName),
+      );
+      const tag = existingTag ?? (await createTag({ name: tagName }));
+      await attachTag(input.documentId, tag.id);
+      return { documentId: input.documentId };
+    },
+    onSuccess: async (response) => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["tags"] }),
+        invalidateDocumentTags(response.documentId),
+      ]);
+    },
+  });
   const saveSearchMutation = useMutation({
     mutationFn: saveSearch,
     onSuccess: async () => {
@@ -269,6 +306,13 @@ export function AppShell() {
     });
   }
 
+  async function invalidateDocumentTags(documentId: string) {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ["document", documentId] }),
+      queryClient.invalidateQueries({ queryKey: ["search"] }),
+    ]);
+  }
+
   useEffect(() => {
     if (window.location.pathname !== "/auth/oidc/callback") {
       return;
@@ -328,6 +372,12 @@ export function AppShell() {
     documentsQuery.data?.filter((item) => item.status.includes("processing"))
       .length ?? 0;
   const duplicateGroups = duplicatesQuery.data?.length ?? 0;
+  const tagMutationError =
+    [
+      tagCreateAttachMutation.error,
+      tagAttachMutation.error,
+      tagDetachMutation.error,
+    ].find((error): error is Error => error instanceof Error)?.message ?? null;
 
   if (!authConfigQuery.data && accessToken === null) {
     return <AuthLoading />;
@@ -466,18 +516,34 @@ export function AppShell() {
             detail={detailQuery.data}
             duplicateGroups={duplicateGroups}
             notifications={notificationsQuery.data ?? []}
+            tags={tagsQuery.data ?? []}
             isLoading={detailQuery.isLoading}
             isUpdating={
               documentUpdateMutation.isPending ||
               metadataUpdateMutation.isPending ||
               archiveMutation.isPending
             }
+            isTagUpdating={
+              tagCreateAttachMutation.isPending ||
+              tagAttachMutation.isPending ||
+              tagDetachMutation.isPending
+            }
+            tagError={tagMutationError}
             onArchive={(documentId) => archiveMutation.mutate(documentId)}
             onUpdateDocument={(documentId, updates) =>
               documentUpdateMutation.mutate({ documentId, updates })
             }
             onUpdateMetadata={(documentId, metadata) =>
               metadataUpdateMutation.mutate({ documentId, metadata })
+            }
+            onAttachTag={(documentId, tagId) =>
+              tagAttachMutation.mutate({ documentId, tagId })
+            }
+            onCreateAndAttachTag={(documentId, name) =>
+              tagCreateAttachMutation.mutate({ documentId, name })
+            }
+            onDetachTag={(documentId, tagId) =>
+              tagDetachMutation.mutate({ documentId, tagId })
             }
           />
         </section>
@@ -1129,21 +1195,39 @@ function storedFilterText(value: unknown) {
   return normalizeFilterText(value);
 }
 
+function slugifyTagName(value: string) {
+  const slug = value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  return slug || "tag";
+}
+
 function DocumentPanel({
   detail,
   duplicateGroups,
   notifications,
+  tags,
   isLoading,
   isUpdating,
+  isTagUpdating,
+  tagError,
   onArchive,
   onUpdateDocument,
   onUpdateMetadata,
+  onAttachTag,
+  onCreateAndAttachTag,
+  onDetachTag,
 }: {
   detail: DocumentDetail | undefined;
   duplicateGroups: number;
   notifications: Array<{ id: string; title: string; due_date: string }>;
+  tags: TagItem[];
   isLoading: boolean;
   isUpdating: boolean;
+  isTagUpdating: boolean;
+  tagError: string | null;
   onArchive: (documentId: string) => void;
   onUpdateDocument: (
     documentId: string,
@@ -1153,6 +1237,9 @@ function DocumentPanel({
     documentId: string,
     metadata: Parameters<typeof updateDocumentMetadata>[1],
   ) => void;
+  onAttachTag: (documentId: string, tagId: string) => void;
+  onCreateAndAttachTag: (documentId: string, name: string) => void;
+  onDetachTag: (documentId: string, tagId: string) => void;
 }) {
   if (isLoading) {
     return (
@@ -1235,20 +1322,18 @@ function DocumentPanel({
         </Panel>
 
         <Panel title="Tags">
-          {detail.tags.length ? (
-            <div className="flex flex-wrap gap-2">
-              {detail.tags.map((tag) => (
-                <span
-                  className="rounded-md border border-border px-2 py-1 text-xs"
-                  key={tag.id}
-                >
-                  {tag.name}
-                </span>
-              ))}
-            </div>
-          ) : (
-            <p className="text-sm text-muted-foreground">No tags assigned.</p>
-          )}
+          <TagEditor
+            assignedTags={detail.tags}
+            availableTags={tags}
+            disabled={isTagUpdating}
+            error={tagError}
+            suggestedTags={detail.ai_analysis?.suggested_tags ?? []}
+            onAttachTag={(tagId) => onAttachTag(detail.document.id, tagId)}
+            onCreateAndAttachTag={(name) =>
+              onCreateAndAttachTag(detail.document.id, name)
+            }
+            onDetachTag={(tagId) => onDetachTag(detail.document.id, tagId)}
+          />
         </Panel>
 
         <Panel title="Timeline">
@@ -1291,6 +1376,183 @@ function DocumentPanel({
           )}
         </Panel>
       </aside>
+    </div>
+  );
+}
+
+function TagEditor({
+  assignedTags,
+  availableTags,
+  suggestedTags,
+  disabled,
+  error,
+  onAttachTag,
+  onCreateAndAttachTag,
+  onDetachTag,
+}: {
+  assignedTags: DocumentDetail["tags"];
+  availableTags: TagItem[];
+  suggestedTags: string[];
+  disabled: boolean;
+  error: string | null;
+  onAttachTag: (tagId: string) => void;
+  onCreateAndAttachTag: (name: string) => void;
+  onDetachTag: (tagId: string) => void;
+}) {
+  const [selectedTagId, setSelectedTagId] = useState("");
+  const [tagName, setTagName] = useState("");
+  const assignedTagIds = useMemo(
+    () => new Set(assignedTags.map((tag) => tag.id)),
+    [assignedTags],
+  );
+  const assignedTagSlugs = useMemo(
+    () => new Set(assignedTags.map((tag) => tag.slug)),
+    [assignedTags],
+  );
+  const attachableTags = useMemo(
+    () => availableTags.filter((tag) => !assignedTagIds.has(tag.id)),
+    [assignedTagIds, availableTags],
+  );
+  const attachableSuggestedTags = useMemo(() => {
+    const seen = new Set<string>();
+    return suggestedTags
+      .map((tag) => tag.trim())
+      .filter((tag) => {
+        if (!tag) {
+          return false;
+        }
+        const slug = slugifyTagName(tag);
+        if (assignedTagSlugs.has(slug) || seen.has(slug)) {
+          return false;
+        }
+        seen.add(slug);
+        return true;
+      });
+  }, [assignedTagSlugs, suggestedTags]);
+
+  useEffect(() => {
+    if (selectedTagId && !attachableTags.some((tag) => tag.id === selectedTagId)) {
+      setSelectedTagId("");
+    }
+  }, [attachableTags, selectedTagId]);
+
+  return (
+    <div className="space-y-4 text-sm">
+      {assignedTags.length ? (
+        <div className="flex flex-wrap gap-2">
+          {assignedTags.map((tag) => (
+            <span
+              className="inline-flex items-center gap-2 rounded-md border border-border px-2 py-1 text-xs"
+              key={tag.id}
+            >
+              {tag.name}
+              <button
+                className="text-muted-foreground hover:text-foreground"
+                type="button"
+                disabled={disabled}
+                onClick={() => onDetachTag(tag.id)}
+              >
+                Remove
+              </button>
+            </span>
+          ))}
+        </div>
+      ) : (
+        <p className="text-sm text-muted-foreground">No tags assigned.</p>
+      )}
+
+      <div className="space-y-2">
+        <label className="block">
+          <span className="mb-1 block text-muted-foreground">Existing tag</span>
+          <div className="flex gap-2">
+            <select
+              className="h-9 min-w-0 flex-1 rounded-md border border-input bg-background px-3 outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              value={selectedTagId}
+              disabled={disabled || attachableTags.length === 0}
+              onChange={(event) => setSelectedTagId(event.target.value)}
+            >
+              <option value="">Select a tag</option>
+              {attachableTags.map((tag) => (
+                <option key={tag.id} value={tag.id}>
+                  {tag.name}
+                </option>
+              ))}
+            </select>
+            <Button
+              size="sm"
+              type="button"
+              disabled={disabled || !selectedTagId}
+              onClick={() => {
+                onAttachTag(selectedTagId);
+                setSelectedTagId("");
+              }}
+            >
+              Attach
+            </Button>
+          </div>
+        </label>
+      </div>
+
+      <form
+        className="space-y-2"
+        onSubmit={(event) => {
+          event.preventDefault();
+          const normalizedName = tagName.trim();
+          if (!normalizedName) {
+            return;
+          }
+          onCreateAndAttachTag(normalizedName);
+          setTagName("");
+        }}
+      >
+        <label className="block">
+          <span className="mb-1 block text-muted-foreground">New tag</span>
+          <div className="flex gap-2">
+            <input
+              className="h-9 min-w-0 flex-1 rounded-md border border-input bg-background px-3 outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              placeholder="e.g. tax, warranty, payroll"
+              value={tagName}
+              disabled={disabled}
+              onChange={(event) => setTagName(event.target.value)}
+            />
+            <Button
+              size="sm"
+              type="submit"
+              disabled={disabled || !tagName.trim()}
+            >
+              Create
+            </Button>
+          </div>
+        </label>
+      </form>
+
+      {attachableSuggestedTags.length ? (
+        <div>
+          <p className="mb-2 text-xs uppercase text-muted-foreground">
+            Suggested
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {attachableSuggestedTags.map((tag) => (
+              <Button
+                key={slugifyTagName(tag)}
+                size="sm"
+                variant="secondary"
+                type="button"
+                disabled={disabled}
+                onClick={() => onCreateAndAttachTag(tag)}
+              >
+                Add {tag}
+              </Button>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
+      {error ? (
+        <p className="rounded-md border border-border bg-muted p-2 text-xs" role="alert">
+          {error}
+        </p>
+      ) : null}
     </div>
   );
 }

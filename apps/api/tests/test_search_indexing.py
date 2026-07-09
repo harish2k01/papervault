@@ -2,8 +2,10 @@ from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID, uuid4
 
+from pytest import MonkeyPatch
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from papervault_api.core.config import Settings
 from papervault_api.documents.domain.enums import (
     AIAnalysisStatus,
     DocumentStatus,
@@ -19,6 +21,7 @@ from papervault_api.documents.infrastructure.models import (
     DocumentTextExtraction,
 )
 from papervault_api.identity.infrastructure.models import User
+from papervault_api.search.api import indexing as indexing_api
 from papervault_api.search.application.indexing import SearchIndexDocument, SearchIndexingService
 from papervault_api.search.application.service import SearchFilters, SearchRequest
 from papervault_api.search.domain.enums import SearchMode
@@ -162,6 +165,50 @@ async def test_search_indexing_service_projects_document_state(
     assert projection.keywords == ("invoice", "warranty")
     assert projection.embedding == (0.1, 0.2, 0.3)
     assert projection.source_text_sha256 == "a" * 64
+
+
+async def test_best_effort_reindex_refreshes_tag_projection(
+    session: AsyncSession,
+    monkeypatch: MonkeyPatch,
+) -> None:
+    user = User(email="tag-refresh@example.com")
+    session.add(user)
+    await session.flush()
+    document = Document(
+        owner_id=user.id,
+        title="Tax Return",
+        original_filename="tax-return.pdf",
+        content_type="application/pdf",
+        file_size_bytes=100,
+        sha256_hash="b" * 64,
+        storage_bucket="documents",
+        storage_key="tax-return.pdf",
+        status=DocumentStatus.READY.value,
+        document_type="tax_return",
+    )
+    tag = Tag(owner_id=user.id, name="Tax", slug="tax")
+    session.add_all([document, tag])
+    await session.flush()
+    session.add(DocumentTag(document_id=document.id, tag_id=tag.id, assigned_by_id=user.id))
+    await session.commit()
+
+    fake_index = FakeSearchDocumentIndex()
+    monkeypatch.setattr(
+        indexing_api,
+        "build_search_document_index",
+        lambda settings: fake_index,
+    )
+
+    await indexing_api.reindex_document_best_effort(
+        session=session,
+        settings=Settings(),
+        document_id=document.id,
+        reason="tag_attached",
+    )
+
+    assert fake_index.ensure_calls == 1
+    assert fake_index.indexed_documents[0].document_id == document.id
+    assert fake_index.indexed_documents[0].tags == ("tax",)
 
 
 async def test_search_indexing_service_deletes_missing_document(session: AsyncSession) -> None:

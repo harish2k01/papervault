@@ -414,6 +414,33 @@ export async function listTags() {
   return apiFetch<TagItem[]>("/tags");
 }
 
+export async function createTag(input: {
+  name: string;
+  description?: string | null;
+  color?: string | null;
+}) {
+  return apiFetch<TagItem>("/tags", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function attachTag(documentId: string, tagId: string) {
+  return apiFetch<{ attached: boolean }>(
+    `/documents/${documentId}/tags/${tagId}`,
+    {
+      method: "POST",
+      body: JSON.stringify({}),
+    },
+  );
+}
+
+export async function detachTag(documentId: string, tagId: string) {
+  await apiFetch<void>(`/documents/${documentId}/tags/${tagId}`, {
+    method: "DELETE",
+  });
+}
+
 export async function listDuplicates() {
   return apiFetch<DuplicateGroup[]>("/documents/duplicates/candidates");
 }
@@ -442,6 +469,9 @@ async function apiFetch<T>(
   if (!response.ok) {
     const text = await response.text();
     throw new Error(text || `Request failed: ${response.status}`);
+  }
+  if (response.status === 204) {
+    return undefined as T;
   }
   return response.json() as Promise<T>;
 }

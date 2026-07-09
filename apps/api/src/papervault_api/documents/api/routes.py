@@ -3,7 +3,6 @@ from tempfile import NamedTemporaryFile
 from typing import Annotated
 from uuid import UUID
 
-import structlog
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -56,14 +55,9 @@ from papervault_api.documents.domain.models import DocumentRecord
 from papervault_api.documents.infrastructure.models import Document
 from papervault_api.identity.api.dependencies import get_current_user
 from papervault_api.identity.application.current_user import CurrentUser
-from papervault_api.search.application.indexing import SearchIndexingService
-from papervault_api.search.infrastructure.opensearch import (
-    OpenSearchError,
-    build_search_document_index,
-)
+from papervault_api.search.api.indexing import reindex_document_best_effort
 
 router = APIRouter(prefix="/documents", tags=["documents"])
-logger = structlog.get_logger(__name__)
 
 
 @router.get("", response_model=list[DocumentResponse])
@@ -294,7 +288,12 @@ async def update_document(
     if document is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
 
-    await reindex_document_best_effort(session=session, settings=settings, document_id=document.id)
+    await reindex_document_best_effort(
+        session=session,
+        settings=settings,
+        document_id=document.id,
+        reason="document_fields_updated",
+    )
     return DocumentResponse.model_validate(document_record_from_orm(document), from_attributes=True)
 
 
@@ -325,7 +324,12 @@ async def replace_document_metadata(
     if metadata is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
 
-    await reindex_document_best_effort(session=session, settings=settings, document_id=document_id)
+    await reindex_document_best_effort(
+        session=session,
+        settings=settings,
+        document_id=document_id,
+        reason="metadata_replaced",
+    )
     return MetadataResponse(
         schema_name=metadata.schema_name,
         schema_version=metadata.schema_version,
@@ -351,7 +355,12 @@ async def archive_document(
     if document is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
 
-    await reindex_document_best_effort(session=session, settings=settings, document_id=document.id)
+    await reindex_document_best_effort(
+        session=session,
+        settings=settings,
+        document_id=document.id,
+        reason="document_archived",
+    )
     return DocumentResponse.model_validate(document_record_from_orm(document), from_attributes=True)
 
 
@@ -424,23 +433,3 @@ def document_record_from_orm(document: Document) -> DocumentRecord:
         created_at=document.created_at,
         updated_at=document.updated_at,
     )
-
-
-async def reindex_document_best_effort(
-    *,
-    session: AsyncSession,
-    settings: Settings,
-    document_id: UUID,
-) -> None:
-    service = SearchIndexingService(
-        session=session,
-        search_index=build_search_document_index(settings),
-    )
-    try:
-        await service.index_document(document_id)
-    except OpenSearchError as exc:
-        logger.warning(
-            "document_lifecycle_search_indexing_failed",
-            document_id=str(document_id),
-            error=str(exc),
-        )
