@@ -141,9 +141,10 @@ The frontend is feature-first:
 
 Phase 15 improves the production workspace shell without changing API contracts:
 
-- The document workspace uses three explicit regions: vault navigation, search/list, and document review.
-- Empty states are actionable workflow surfaces with upload and search recovery actions instead of plain text placeholders.
+- The document workspace uses a focused empty-vault mode first, then switches to three explicit regions: vault navigation, search/list, and document review.
+- Empty states are actionable but restrained: the first-run view has one primary upload action, while search recovery appears only when a search has no matches.
 - Search keeps the primary query path visible while advanced filters are grouped behind an expandable panel.
+- Saved and recent search shortcuts are shown only after they contain useful entries.
 - Document review separates preview, document identity, operational metrics, metadata editing, tags, timeline, and versions into a consistent sidebar.
 - Shared styling remains small: design tokens, the button primitive, and local shell presentation components. A larger design-system extraction is deferred until repeated UI patterns justify it.
 

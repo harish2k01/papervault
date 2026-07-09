@@ -10,13 +10,10 @@ import {
   FileSearch,
   FileText,
   FolderOpen,
-  History,
-  LayoutDashboard,
   LogIn,
   LogOut,
   Search,
   ShieldCheck,
-  Sparkles,
   Tags,
   Upload,
   UserPlus,
@@ -67,12 +64,9 @@ import {
 import { cn } from "../../lib/utils";
 
 const navItems = [
-  { label: "Overview", icon: LayoutDashboard, active: false },
   { label: "Documents", icon: FileText, active: true },
   { label: "Tags", icon: Tags, active: false },
-  { label: "Timeline", icon: History, active: false },
   { label: "Notifications", icon: Bell, active: false },
-  { label: "Security", icon: ShieldCheck, active: false },
 ];
 
 type DocumentListEntry = Pick<
@@ -395,6 +389,10 @@ export function AppShell() {
   const documentCount = documentsQuery.data?.length ?? 0;
   const readyDocuments =
     documentsQuery.data?.filter((item) => item.status === "ready").length ?? 0;
+  const workspaceIsEmpty =
+    !documentsQuery.isLoading &&
+    documentCount === 0 &&
+    submittedSearch === null;
   const duplicateGroups = duplicatesQuery.data?.length ?? 0;
   const tagMutationError =
     [
@@ -422,16 +420,23 @@ export function AppShell() {
 
   return (
     <main className="min-h-screen bg-background text-foreground">
-      <div className="grid min-h-screen xl:grid-cols-[280px_minmax(440px,520px)_minmax(0,1fr)]">
-        <aside className="flex min-h-screen flex-col border-r border-border bg-card px-5 py-6">
-          <div className="mb-8 flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm">
+      <div
+        className={cn(
+          "grid min-h-screen",
+          workspaceIsEmpty
+            ? "xl:grid-cols-[252px_minmax(0,1fr)]"
+            : "xl:grid-cols-[252px_minmax(430px,500px)_minmax(0,1fr)]",
+        )}
+      >
+        <aside className="flex flex-col border-b border-border bg-card px-4 py-4 xl:min-h-screen xl:border-b-0 xl:border-r xl:py-5">
+          <div className="mb-7 flex items-center gap-3 px-1">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm">
               <FileText className="h-5 w-5" aria-hidden="true" />
             </div>
             <div>
-              <p className="text-base font-semibold">PaperVault</p>
+              <p className="text-sm font-semibold">PaperVault</p>
               <p className="text-xs text-muted-foreground">
-                Personal document intelligence
+                Document intelligence
               </p>
             </div>
           </div>
@@ -453,7 +458,9 @@ export function AppShell() {
                   <item.icon className="h-4 w-4" aria-hidden="true" />
                   {item.label}
                 </span>
-                {item.label === "Notifications" && pendingNotifications > 0 ? (
+                {item.label === "Notifications" &&
+                pendingNotifications > 0 &&
+                !workspaceIsEmpty ? (
                   <span className="rounded-full bg-background/20 px-2 py-0.5 text-xs">
                     {pendingNotifications}
                   </span>
@@ -462,16 +469,18 @@ export function AppShell() {
             ))}
           </nav>
 
-          <section className="mt-8 rounded-lg border border-border bg-background p-4">
-            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              Vault health
-            </p>
-            <div className="mt-4 space-y-3">
-              <SidebarStat label="Ready" value={readyDocuments} />
-              <SidebarStat label="Processing" value={pendingDocuments} />
-              <SidebarStat label="Due soon" value={pendingNotifications} />
-            </div>
-          </section>
+          {!workspaceIsEmpty ? (
+            <section className="mt-7 rounded-lg border border-border bg-background p-3">
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Vault
+              </p>
+              <div className="mt-3 space-y-2">
+                <SidebarStat label="Ready" value={readyDocuments} />
+                <SidebarStat label="Processing" value={pendingDocuments} />
+                <SidebarStat label="Due soon" value={pendingNotifications} />
+              </div>
+            </section>
+          ) : null}
 
           <div className="mt-auto">
             <AuthStatus
@@ -483,134 +492,141 @@ export function AppShell() {
           </div>
         </aside>
 
-        <section className="flex min-w-0 flex-col border-r border-border bg-card/80">
-          <header className="border-b border-border bg-card px-6 py-5">
-            <div className="mb-5 flex items-start justify-between gap-4">
-              <div>
-                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                  Document workspace
-                </p>
-                <h1 className="mt-1 text-2xl font-semibold tracking-normal">
-                  Documents
-                </h1>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Search, upload, classify, and review extracted knowledge.
-                </p>
-              </div>
-              <UploadButton
-                disabled={uploadMutation.isPending}
-                onUpload={(file) => uploadMutation.mutate(file)}
-              />
-            </div>
-
-            <SearchControls
-              query={query}
-              mode={searchMode}
-              filters={filters}
-              saveSearchName={saveSearchName}
-              documentTypes={documentTypesQuery.data ?? []}
-              tags={tagsQuery.data ?? []}
-              savedSearches={savedSearchesQuery.data ?? []}
-              recentSearches={recentSearchesQuery.data ?? []}
-              isSaving={saveSearchMutation.isPending}
-              onQueryChange={setQuery}
-              onModeChange={setSearchMode}
-              onFiltersChange={setFilters}
-              onSaveNameChange={setSaveSearchName}
-              onSubmit={() => submitSearch()}
-              onClear={clearSearch}
-              onSave={saveCurrentSearch}
-              onApplySearch={submitSearch}
-            />
-          </header>
-
-          <div className="grid grid-cols-3 gap-3 border-b border-border bg-background/70 p-4">
-            <Metric
-              label="Documents"
-              value={documentCount}
-              icon={FolderOpen}
-              detail="In vault"
-              tone="primary"
-            />
-            <Metric
-              label="Processing"
-              value={pendingDocuments}
-              icon={Clock3}
-              detail="In queue"
-              tone="warning"
-            />
-            <Metric
-              label="Due"
-              value={pendingNotifications}
-              icon={CalendarClock}
-              detail="Reminders"
-              tone="danger"
-            />
-          </div>
-
-          <div className="min-h-0 flex-1 overflow-auto bg-background/60 p-4">
-            {documentsQuery.isLoading ? (
-              <DocumentListSkeleton />
-            ) : visibleDocuments.length === 0 ? (
-              <DocumentListEmptyState
-                hasSearch={submittedSearch !== null}
-                isUploading={uploadMutation.isPending}
-                onClear={clearSearch}
-                onUpload={(file) => uploadMutation.mutate(file)}
-              />
-            ) : (
-              <div className="space-y-2">
-                {visibleDocuments.map((document) => (
-                  <DocumentListItem
-                    document={document}
-                    key={document.id}
-                    selected={selectedDocumentId === document.id}
-                    onSelect={() => setSelectedDocumentId(document.id)}
-                  />
-                ))}
-              </div>
-            )}
-          </div>
-        </section>
-
-        <section className="min-w-0 overflow-auto bg-background">
-          <DocumentPanel
-            detail={detailQuery.data}
-            duplicateGroups={duplicateGroups}
-            notifications={notificationsQuery.data ?? []}
-            tags={tagsQuery.data ?? []}
+        {workspaceIsEmpty ? (
+          <EmptyWorkspace
             isUploading={uploadMutation.isPending}
-            isLoading={detailQuery.isLoading}
-            isUpdating={
-              documentUpdateMutation.isPending ||
-              metadataUpdateMutation.isPending ||
-              archiveMutation.isPending
-            }
-            isTagUpdating={
-              tagCreateAttachMutation.isPending ||
-              tagAttachMutation.isPending ||
-              tagDetachMutation.isPending
-            }
-            tagError={tagMutationError}
-            onArchive={(documentId) => archiveMutation.mutate(documentId)}
-            onUpdateDocument={(documentId, updates) =>
-              documentUpdateMutation.mutate({ documentId, updates })
-            }
-            onUpdateMetadata={(documentId, metadata) =>
-              metadataUpdateMutation.mutate({ documentId, metadata })
-            }
             onUpload={(file) => uploadMutation.mutate(file)}
-            onAttachTag={(documentId, tagId) =>
-              tagAttachMutation.mutate({ documentId, tagId })
-            }
-            onCreateAndAttachTag={(documentId, name) =>
-              tagCreateAttachMutation.mutate({ documentId, name })
-            }
-            onDetachTag={(documentId, tagId) =>
-              tagDetachMutation.mutate({ documentId, tagId })
-            }
           />
-        </section>
+        ) : (
+          <>
+            <section className="flex min-w-0 flex-col border-r border-border bg-card/80">
+              <header className="border-b border-border bg-card px-6 py-5">
+                <div className="mb-5 flex items-start justify-between gap-4">
+                  <div>
+                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                      Document workspace
+                    </p>
+                    <h1 className="mt-1 text-2xl font-semibold tracking-normal">
+                      Documents
+                    </h1>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      Search, upload, classify, and review extracted knowledge.
+                    </p>
+                  </div>
+                  <UploadButton
+                    disabled={uploadMutation.isPending}
+                    onUpload={(file) => uploadMutation.mutate(file)}
+                  />
+                </div>
+
+                <SearchControls
+                  query={query}
+                  mode={searchMode}
+                  filters={filters}
+                  saveSearchName={saveSearchName}
+                  documentTypes={documentTypesQuery.data ?? []}
+                  tags={tagsQuery.data ?? []}
+                  savedSearches={savedSearchesQuery.data ?? []}
+                  recentSearches={recentSearchesQuery.data ?? []}
+                  isSaving={saveSearchMutation.isPending}
+                  onQueryChange={setQuery}
+                  onModeChange={setSearchMode}
+                  onFiltersChange={setFilters}
+                  onSaveNameChange={setSaveSearchName}
+                  onSubmit={() => submitSearch()}
+                  onClear={clearSearch}
+                  onSave={saveCurrentSearch}
+                  onApplySearch={submitSearch}
+                />
+              </header>
+
+              <div className="grid grid-cols-3 gap-3 border-b border-border bg-background/70 p-4">
+                <Metric
+                  label="Documents"
+                  value={documentCount}
+                  icon={FolderOpen}
+                  detail="In vault"
+                  tone="primary"
+                />
+                <Metric
+                  label="Processing"
+                  value={pendingDocuments}
+                  icon={Clock3}
+                  detail="In queue"
+                  tone="warning"
+                />
+                <Metric
+                  label="Due"
+                  value={pendingNotifications}
+                  icon={CalendarClock}
+                  detail="Reminders"
+                  tone="danger"
+                />
+              </div>
+
+              <div className="min-h-0 flex-1 overflow-auto bg-background/60 p-4">
+                {documentsQuery.isLoading ? (
+                  <DocumentListSkeleton />
+                ) : visibleDocuments.length === 0 ? (
+                  <DocumentListEmptyState
+                    hasSearch={submittedSearch !== null}
+                    isUploading={uploadMutation.isPending}
+                    onClear={clearSearch}
+                    onUpload={(file) => uploadMutation.mutate(file)}
+                  />
+                ) : (
+                  <div className="space-y-2">
+                    {visibleDocuments.map((document) => (
+                      <DocumentListItem
+                        document={document}
+                        key={document.id}
+                        selected={selectedDocumentId === document.id}
+                        onSelect={() => setSelectedDocumentId(document.id)}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+            </section>
+
+            <section className="min-w-0 overflow-auto bg-background">
+              <DocumentPanel
+                detail={detailQuery.data}
+                duplicateGroups={duplicateGroups}
+                notifications={notificationsQuery.data ?? []}
+                tags={tagsQuery.data ?? []}
+                isLoading={detailQuery.isLoading}
+                isUpdating={
+                  documentUpdateMutation.isPending ||
+                  metadataUpdateMutation.isPending ||
+                  archiveMutation.isPending
+                }
+                isTagUpdating={
+                  tagCreateAttachMutation.isPending ||
+                  tagAttachMutation.isPending ||
+                  tagDetachMutation.isPending
+                }
+                tagError={tagMutationError}
+                onArchive={(documentId) => archiveMutation.mutate(documentId)}
+                onUpdateDocument={(documentId, updates) =>
+                  documentUpdateMutation.mutate({ documentId, updates })
+                }
+                onUpdateMetadata={(documentId, metadata) =>
+                  metadataUpdateMutation.mutate({ documentId, metadata })
+                }
+                onAttachTag={(documentId, tagId) =>
+                  tagAttachMutation.mutate({ documentId, tagId })
+                }
+                onCreateAndAttachTag={(documentId, name) =>
+                  tagCreateAttachMutation.mutate({ documentId, name })
+                }
+                onDetachTag={(documentId, tagId) =>
+                  tagDetachMutation.mutate({ documentId, tagId })
+                }
+              />
+            </section>
+          </>
+        )}
       </div>
     </main>
   );
@@ -914,6 +930,44 @@ function UploadButton({
   );
 }
 
+function EmptyWorkspace({
+  isUploading,
+  onUpload,
+}: {
+  isUploading: boolean;
+  onUpload: (file: File) => void;
+}) {
+  return (
+    <section className="flex min-h-[420px] min-w-0 items-center justify-center bg-background px-6 py-10 sm:min-h-[480px] xl:min-h-screen xl:px-8">
+      <div className="w-full max-w-2xl text-center">
+        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+          <FileSearch className="h-7 w-7" aria-hidden="true" />
+        </div>
+        <p className="mt-8 text-sm font-medium uppercase tracking-wide text-muted-foreground">
+          Empty vault
+        </p>
+        <h1 className="mt-3 text-3xl font-semibold tracking-normal sm:text-4xl">
+          Add your first document.
+        </h1>
+        <p className="mx-auto mt-4 max-w-xl text-base leading-7 text-muted-foreground">
+          Upload a PDF, scanned document, or image. PaperVault will extract
+          text, classify it, generate a summary, and make it searchable.
+        </p>
+        <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
+          <UploadButton
+            disabled={isUploading}
+            onUpload={onUpload}
+            className="h-11 px-5"
+          />
+          <span className="text-sm text-muted-foreground">
+            PDF, JPG, and PNG are supported
+          </span>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function DocumentListSkeleton() {
   return (
     <div className="space-y-3">
@@ -956,12 +1010,13 @@ function DocumentListEmptyState({
           <Button type="button" variant="secondary" onClick={onClear}>
             Clear search
           </Button>
-        ) : null}
-        <UploadButton
-          disabled={isUploading}
-          onUpload={onUpload}
-          className="shadow-sm"
-        />
+        ) : (
+          <UploadButton
+            disabled={isUploading}
+            onUpload={onUpload}
+            className="shadow-sm"
+          />
+        )}
       </div>
     </section>
   );
@@ -1090,6 +1145,9 @@ function SearchControls({
 }) {
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const activeFilterCount = countActiveFilters(filters);
+  const canSaveSearch = query.trim().length > 0 || activeFilterCount > 0;
+  const hasSearchShortcuts =
+    savedSearches.length > 0 || recentSearches.length > 0;
 
   function updateFilter<K extends keyof SearchFilters>(
     key: K,
@@ -1275,63 +1333,70 @@ function SearchControls({
         ) : null}
       </form>
 
-      <div className="mt-3 flex gap-2 border-t border-border pt-3">
-        <input
-          className="h-9 min-w-0 flex-1 rounded-md border border-input bg-card px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          placeholder="Saved search name"
-          value={saveSearchName}
-          onChange={(event) => onSaveNameChange(event.target.value)}
-        />
-        <Button
-          size="sm"
-          variant="secondary"
-          type="button"
-          disabled={isSaving || !saveSearchName.trim()}
-          onClick={onSave}
-        >
-          Save
-        </Button>
-      </div>
+      {canSaveSearch ? (
+        <div className="mt-3 flex gap-2 border-t border-border pt-3">
+          <input
+            className="h-9 min-w-0 flex-1 rounded-md border border-input bg-card px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            placeholder="Saved search name"
+            value={saveSearchName}
+            onChange={(event) => onSaveNameChange(event.target.value)}
+          />
+          <Button
+            size="sm"
+            variant="secondary"
+            type="button"
+            disabled={isSaving || !saveSearchName.trim()}
+            onClick={onSave}
+          >
+            Save
+          </Button>
+        </div>
+      ) : null}
 
-      <div className="mt-3 grid gap-3 md:grid-cols-2">
-        <SearchShortcutList
-          title="Saved"
-          emptyText="No saved searches."
-          items={savedSearches.map((savedSearch) => ({
-            id: savedSearch.id,
-            title: savedSearch.name,
-            description: describeSearch(savedSearch.query, savedSearch.filters),
-            input: searchInputFromStoredSearch(savedSearch),
-          }))}
-          onApply={onApplySearch}
-        />
-        <SearchShortcutList
-          title="Recent"
-          emptyText="No recent searches."
-          items={recentSearches.map((recentSearch) => ({
-            id: recentSearch.id,
-            title: recentSearch.query || "Filtered documents",
-            description: describeSearch(
-              recentSearch.query,
-              recentSearch.filters,
-            ),
-            input: searchInputFromStoredSearch(recentSearch),
-          }))}
-          onApply={onApplySearch}
-        />
-      </div>
+      {hasSearchShortcuts ? (
+        <div className="mt-3 grid gap-3 md:grid-cols-2">
+          {savedSearches.length > 0 ? (
+            <SearchShortcutList
+              title="Saved"
+              items={savedSearches.map((savedSearch) => ({
+                id: savedSearch.id,
+                title: savedSearch.name,
+                description: describeSearch(
+                  savedSearch.query,
+                  savedSearch.filters,
+                ),
+                input: searchInputFromStoredSearch(savedSearch),
+              }))}
+              onApply={onApplySearch}
+            />
+          ) : null}
+          {recentSearches.length > 0 ? (
+            <SearchShortcutList
+              title="Recent"
+              items={recentSearches.map((recentSearch) => ({
+                id: recentSearch.id,
+                title: recentSearch.query || "Filtered documents",
+                description: describeSearch(
+                  recentSearch.query,
+                  recentSearch.filters,
+                ),
+                input: searchInputFromStoredSearch(recentSearch),
+              }))}
+              onApply={onApplySearch}
+            />
+          ) : null}
+        </div>
+      ) : null}
     </div>
   );
 }
 
 function SearchShortcutList({
   title,
-  emptyText,
   items,
   onApply,
 }: {
   title: string;
-  emptyText: string;
   items: Array<{
     id: string;
     title: string;
@@ -1345,27 +1410,21 @@ function SearchShortcutList({
       <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
         {title}
       </p>
-      {items.length ? (
-        <div className="space-y-1">
-          {items.slice(0, 4).map((item) => (
-            <button
-              className="w-full rounded-md border border-border bg-card px-3 py-2 text-left text-xs shadow-sm transition-colors hover:border-primary/40 hover:bg-primary/5"
-              key={item.id}
-              type="button"
-              onClick={() => onApply(item.input)}
-            >
-              <span className="block truncate font-medium">{item.title}</span>
-              <span className="mt-1 block truncate text-muted-foreground">
-                {item.description}
-              </span>
-            </button>
-          ))}
-        </div>
-      ) : (
-        <p className="rounded-md border border-dashed border-border bg-card px-3 py-2 text-xs text-muted-foreground">
-          {emptyText}
-        </p>
-      )}
+      <div className="space-y-1">
+        {items.slice(0, 4).map((item) => (
+          <button
+            className="w-full rounded-md border border-border bg-card px-3 py-2 text-left text-xs shadow-sm transition-colors hover:border-primary/40 hover:bg-primary/5"
+            key={item.id}
+            type="button"
+            onClick={() => onApply(item.input)}
+          >
+            <span className="block truncate font-medium">{item.title}</span>
+            <span className="mt-1 block truncate text-muted-foreground">
+              {item.description}
+            </span>
+          </button>
+        ))}
+      </div>
     </section>
   );
 }
@@ -1483,82 +1542,19 @@ function formatDateTime(value: string | null | undefined) {
   });
 }
 
-function DocumentOverviewEmptyState({
-  isUploading,
-  onUpload,
-}: {
-  isUploading: boolean;
-  onUpload: (file: File) => void;
-}) {
+function DocumentOverviewEmptyState() {
   return (
-    <div className="min-h-screen bg-background p-8">
-      <section className="mx-auto grid max-w-5xl gap-6 xl:grid-cols-[1.2fr_0.8fr]">
-        <div className="rounded-lg border border-border bg-card p-8 shadow-sm">
-          <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10 text-primary">
-            <FileSearch className="h-6 w-6" aria-hidden="true" />
-          </div>
-          <p className="mt-6 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            Ready for review
-          </p>
-          <h2 className="mt-2 text-2xl font-semibold tracking-normal">
-            Select a document or upload one to start.
-          </h2>
-          <p className="mt-3 max-w-xl text-sm leading-6 text-muted-foreground">
-            PaperVault keeps source files separate from metadata, extracts text,
-            identifies document type, and builds searchable summaries for your
-            personal records.
-          </p>
-          <div className="mt-6 flex flex-wrap gap-3">
-            <UploadButton
-              disabled={isUploading}
-              onUpload={onUpload}
-              className="shadow-sm"
-            />
-            <div className="inline-flex items-center gap-2 rounded-md border border-border px-3 py-2 text-sm text-muted-foreground">
-              <Sparkles className="h-4 w-4 text-primary" aria-hidden="true" />
-              AI summary and tags after processing
-            </div>
-          </div>
+    <div className="flex min-h-screen items-center justify-center bg-background p-8 text-center">
+      <div className="max-w-sm">
+        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-muted text-muted-foreground">
+          <FileText className="h-6 w-6" aria-hidden="true" />
         </div>
-
-        <div className="grid gap-4">
-          <OverviewCard
-            icon={FileText}
-            title="Upload PDFs and scans"
-            description="Drop in statements, invoices, certificates, IDs, policies, and receipts."
-          />
-          <OverviewCard
-            icon={Search}
-            title="Ask natural questions"
-            description="Find documents by meaning, metadata, issuer, tags, dates, or exact text."
-          />
-          <OverviewCard
-            icon={CalendarClock}
-            title="Track expiry and due dates"
-            description="Surface warranties, renewals, policy expiry, and upcoming payments."
-          />
-        </div>
-      </section>
-    </div>
-  );
-}
-
-function OverviewCard({
-  icon: Icon,
-  title,
-  description,
-}: {
-  icon: typeof FileText;
-  title: string;
-  description: string;
-}) {
-  return (
-    <div className="rounded-lg border border-border bg-card p-5 shadow-sm">
-      <Icon className="h-5 w-5 text-primary" aria-hidden="true" />
-      <h3 className="mt-3 text-sm font-semibold">{title}</h3>
-      <p className="mt-1 text-sm leading-6 text-muted-foreground">
-        {description}
-      </p>
+        <h2 className="mt-5 text-xl font-semibold">Choose a document</h2>
+        <p className="mt-2 text-sm leading-6 text-muted-foreground">
+          Select a document from the list to review its preview, summary,
+          metadata, tags, and timeline.
+        </p>
+      </div>
     </div>
   );
 }
@@ -1568,7 +1564,6 @@ function DocumentPanel({
   duplicateGroups,
   notifications,
   tags,
-  isUploading,
   isLoading,
   isUpdating,
   isTagUpdating,
@@ -1576,7 +1571,6 @@ function DocumentPanel({
   onArchive,
   onUpdateDocument,
   onUpdateMetadata,
-  onUpload,
   onAttachTag,
   onCreateAndAttachTag,
   onDetachTag,
@@ -1585,7 +1579,6 @@ function DocumentPanel({
   duplicateGroups: number;
   notifications: Array<{ id: string; title: string; due_date: string }>;
   tags: TagItem[];
-  isUploading: boolean;
   isLoading: boolean;
   isUpdating: boolean;
   isTagUpdating: boolean;
@@ -1599,7 +1592,6 @@ function DocumentPanel({
     documentId: string,
     metadata: Parameters<typeof updateDocumentMetadata>[1],
   ) => void;
-  onUpload: (file: File) => void;
   onAttachTag: (documentId: string, tagId: string) => void;
   onCreateAndAttachTag: (documentId: string, name: string) => void;
   onDetachTag: (documentId: string, tagId: string) => void;
@@ -1614,12 +1606,7 @@ function DocumentPanel({
     );
   }
   if (!detail) {
-    return (
-      <DocumentOverviewEmptyState
-        isUploading={isUploading}
-        onUpload={onUpload}
-      />
-    );
+    return <DocumentOverviewEmptyState />;
   }
 
   return (

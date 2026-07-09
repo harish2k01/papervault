@@ -16,14 +16,16 @@ usable.
 
 Refresh the workspace UI while preserving the existing frontend data flow:
 
-- Keep the three-pane information architecture for navigation, document
-  search/list, and document review.
+- Use a focused empty-vault mode before the document list has content, then keep
+  the three-pane information architecture for navigation, document search/list,
+  and document review.
 - Add active navigation, vault health metrics, richer document cards, and
-  production-grade empty states.
+  restrained empty states that avoid repeating the same upload prompt.
 - Keep search focused on one primary query input, with advanced filters behind an
   expandable panel.
-- Replace the blank document detail placeholder with an overview surface that
-  explains the next useful actions.
+- Hide saved and recent search shortcuts until there are useful entries to show.
+- Replace the blank document detail placeholder with a quiet selection state for
+  populated vaults.
 - Improve design tokens and the button primitive, but keep most presentation
   components local to the shell for now.
 

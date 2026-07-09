@@ -80,16 +80,9 @@ describe("AppShell", () => {
     );
 
     expect(
-      await screen.findByRole("heading", { name: "Documents" }),
+      await screen.findByRole("heading", { name: "Add your first document." }),
     ).toBeInTheDocument();
-    expect(
-      screen.getByPlaceholderText(
-        "Search documents, tags, issuers, or questions",
-      ),
-    ).toBeInTheDocument();
-    expect(
-      await screen.findByRole("heading", { name: "Start building your vault" }),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Empty vault")).toBeInTheDocument();
   });
 
   it("renders OIDC sign-in when configured", async () => {
@@ -170,7 +163,9 @@ describe("AppShell", () => {
 
     renderAppShell();
 
-    fireEvent.click(await screen.findByRole("button", { name: "Add warranty" }));
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Add warranty" }),
+    );
 
     await waitFor(() => {
       expect(attachTag).toHaveBeenCalledWith("document-1", "tag-1");
