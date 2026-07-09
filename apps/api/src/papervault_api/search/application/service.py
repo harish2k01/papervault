@@ -1,8 +1,11 @@
+import asyncio
 from dataclasses import dataclass, field
 from datetime import date, datetime
 from math import sqrt
+from typing import Protocol
 from uuid import UUID
 
+import structlog
 from sqlalchemy import Select, and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -15,6 +18,8 @@ from papervault_api.documents.infrastructure.models import (
 from papervault_api.search.domain.enums import SearchMode
 from papervault_api.search.infrastructure.models import RecentSearch, SavedSearch
 from papervault_api.tags.infrastructure.models import DocumentTag, Tag
+
+logger = structlog.get_logger(__name__)
 
 
 @dataclass(frozen=True, slots=True)
@@ -67,6 +72,15 @@ class SearchResult:
     highlights: tuple[str, ...]
 
 
+class SearchQueryIndex(Protocol):
+    def search(
+        self,
+        request: SearchRequest,
+        query_embedding: tuple[float, ...] | None,
+    ) -> tuple[SearchResult, ...]:
+        raise NotImplementedError
+
+
 class DocumentSearchService:
     def __init__(
         self,
@@ -74,33 +88,72 @@ class DocumentSearchService:
         session: AsyncSession,
         embedding_provider_name: str,
         embedding_dimensions: int,
+        search_query_index: SearchQueryIndex | None = None,
+        query_fallback_enabled: bool = True,
     ) -> None:
         self._session = session
         self._embedding_provider_name = embedding_provider_name
         self._embedding_dimensions = embedding_dimensions
+        self._search_query_index = search_query_index
+        self._query_fallback_enabled = query_fallback_enabled
 
     async def search(self, request: SearchRequest) -> tuple[SearchResult, ...]:
-        documents = await self._load_candidate_documents(request)
+        query_embedding = self._build_query_embedding(request)
         if request.record_recent:
-            self._session.add(
-                RecentSearch(
-                    owner_id=request.owner_id,
-                    query=request.query,
-                    mode=request.mode.value,
-                    filters=request.filters.as_dict(),
-                ),
-            )
-            await self._session.flush()
+            await self._record_recent_search(request)
 
+        if self._search_query_index is not None:
+            try:
+                results = await asyncio.to_thread(
+                    self._search_query_index.search,
+                    request,
+                    query_embedding,
+                )
+                await self._session.commit()
+                return results
+            except Exception as exc:
+                if not self._query_fallback_enabled:
+                    await self._session.rollback()
+                    raise
+                logger.warning(
+                    "search_query_index_failed_falling_back",
+                    owner_id=str(request.owner_id),
+                    mode=request.mode.value,
+                    error=str(exc),
+                )
+
+        results = await self._search_database(request, query_embedding)
+        await self._session.commit()
+        return results
+
+    async def _record_recent_search(self, request: SearchRequest) -> None:
+        self._session.add(
+            RecentSearch(
+                owner_id=request.owner_id,
+                query=request.query,
+                mode=request.mode.value,
+                filters=request.filters.as_dict(),
+            ),
+        )
+        await self._session.flush()
+
+    def _build_query_embedding(self, request: SearchRequest) -> tuple[float, ...] | None:
+        if not request.query or request.mode not in {SearchMode.SEMANTIC, SearchMode.HYBRID}:
+            return None
+        provider = build_embedding_provider(
+            self._embedding_provider_name,
+            self._embedding_dimensions,
+        )
+        return provider.embed(request.query).vector
+
+    async def _search_database(
+        self,
+        request: SearchRequest,
+        query_embedding: tuple[float, ...] | None,
+    ) -> tuple[SearchResult, ...]:
+        documents = await self._load_candidate_documents(request)
         text_by_document = await self._load_current_text(documents)
         embedding_by_document = await self._load_current_embeddings(documents)
-        query_embedding = None
-        if request.query and request.mode in {SearchMode.SEMANTIC, SearchMode.HYBRID}:
-            provider = build_embedding_provider(
-                self._embedding_provider_name,
-                self._embedding_dimensions,
-            )
-            query_embedding = provider.embed(request.query).vector
 
         scored: list[SearchResult] = []
         for document in documents:
@@ -142,7 +195,6 @@ class DocumentSearchService:
             )
 
         scored.sort(key=lambda result: (result.score, result.created_at), reverse=True)
-        await self._session.commit()
         return tuple(scored[request.offset : request.offset + request.limit])
 
     async def save_search(

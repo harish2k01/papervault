@@ -60,6 +60,14 @@ class Settings(BaseSettings):
     opensearch_username: str | None = Field(default=None, alias="OPENSEARCH_USERNAME")
     opensearch_password: str | None = Field(default=None, alias="OPENSEARCH_PASSWORD")
     search_index_enabled: bool = Field(default=True, alias="PAPERVAULT_SEARCH_INDEX_ENABLED")
+    search_query_backend: str = Field(
+        default="opensearch",
+        alias="PAPERVAULT_SEARCH_QUERY_BACKEND",
+    )
+    search_query_fallback_enabled: bool = Field(
+        default=True,
+        alias="PAPERVAULT_SEARCH_QUERY_FALLBACK_ENABLED",
+    )
     opensearch_documents_index: str = Field(
         default="papervault-documents-v1",
         alias="OPENSEARCH_DOCUMENTS_INDEX",
@@ -110,6 +118,14 @@ class Settings(BaseSettings):
         if value == "":
             return None
         return value
+
+    @field_validator("search_query_backend", mode="before")
+    @classmethod
+    def validate_search_query_backend(cls, value: Any) -> str:
+        backend = str(value or "opensearch").strip().lower()
+        if backend not in {"database", "opensearch"}:
+            raise ValueError("Search query backend must be 'database' or 'opensearch'")
+        return backend
 
     @property
     def cors_origins(self) -> list[str]:

@@ -30,6 +30,7 @@ from papervault_api.search.domain.enums import SearchMode
 from papervault_api.search.infrastructure.opensearch import (
     OpenSearchError,
     build_search_document_index,
+    build_search_query_index,
 )
 
 router = APIRouter(prefix="/search", tags=["search"])
@@ -46,6 +47,8 @@ async def search_documents(
         session=session,
         embedding_provider_name=settings.embedding_provider,
         embedding_dimensions=settings.embedding_dimensions,
+        search_query_index=build_search_query_index(settings),
+        query_fallback_enabled=settings.search_query_fallback_enabled,
     )
     results = await service.search(
         SearchRequest(

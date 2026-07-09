@@ -85,6 +85,8 @@ config:
   ocrPdfDpi: "200"
   ocrMaxPdfPages: "50"
   searchIndexEnabled: "true"
+  searchQueryBackend: opensearch
+  searchQueryFallbackEnabled: "true"
   s3EndpointUrl: http://minio:9000
   s3BucketDocuments: documents
   s3Region: us-east-1
@@ -146,7 +148,18 @@ gateway:
 
 migrations:
   enabled: true
+  useHelmHooks: true
+  hookEvents: pre-install,pre-upgrade
+  hookDeletePolicy: before-hook-creation,hook-succeeded
   backoffLimit: 3
+  activeDeadlineSeconds: 300
+  ttlSecondsAfterFinished: 86400
+  waitForDatabase: true
+  databaseReadyTimeoutSeconds: "120"
+  databaseReadyIntervalSeconds: "2"
+
+tests:
+  enabled: true
 
 resources:
   api: {}
@@ -170,6 +183,12 @@ labDependencies:
     rootUser: papervault
     rootPassword: papervault-secret
     bucket: documents
+  opensearch:
+    enabled: false
+    image: opensearchproject/opensearch:2.19.1
+    storageSize: 10Gi
+    javaOpts: -Xms512m -Xmx512m
+    initialAdminPassword: PaperVault-Lab-Password1!
 
 external:
   postgres:

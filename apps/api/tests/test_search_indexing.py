@@ -20,8 +20,11 @@ from papervault_api.documents.infrastructure.models import (
 )
 from papervault_api.identity.infrastructure.models import User
 from papervault_api.search.application.indexing import SearchIndexDocument, SearchIndexingService
+from papervault_api.search.application.service import SearchFilters, SearchRequest
+from papervault_api.search.domain.enums import SearchMode
 from papervault_api.search.infrastructure.opensearch import (
     OpenSearchDocumentIndex,
+    OpenSearchDocumentSearchIndex,
     OpenSearchResponse,
     document_to_opensearch_body,
 )
@@ -45,8 +48,9 @@ class FakeSearchDocumentIndex:
 
 
 class FakeOpenSearchClient:
-    def __init__(self, *, exists: bool) -> None:
+    def __init__(self, *, exists: bool, response_body: dict[str, Any] | None = None) -> None:
         self.exists_response = exists
+        self.response_body = response_body
         self.requests: list[tuple[str, str, dict[str, Any] | None, bool]] = []
 
     def exists(self, path: str) -> bool:
@@ -62,7 +66,10 @@ class FakeOpenSearchClient:
         ignore_not_found: bool = False,
     ) -> OpenSearchResponse:
         self.requests.append((method, path, body, ignore_not_found))
-        return OpenSearchResponse(status_code=200, body={"acknowledged": True})
+        return OpenSearchResponse(
+            status_code=200,
+            body=self.response_body or {"acknowledged": True},
+        )
 
 
 async def test_search_indexing_service_projects_document_state(
@@ -255,6 +262,65 @@ def test_opensearch_document_index_delete_ignores_missing_document() -> None:
     assert client.requests == [
         ("DELETE", f"papervault-documents-v1/_doc/{document_id}", None, True),
     ]
+
+
+def test_opensearch_document_search_index_builds_hybrid_query_and_parses_hits() -> None:
+    owner_id = uuid4()
+    document_id = uuid4()
+    client = FakeOpenSearchClient(
+        exists=True,
+        response_body={
+            "hits": {
+                "hits": [
+                    {
+                        "_score": 3.25,
+                        "_source": {
+                            "document_id": str(document_id),
+                            "title": "Salary Slip January",
+                            "original_filename": "salary-january.pdf",
+                            "document_type": "salary_slip",
+                            "status": "ready",
+                            "summary": "Salary for January 2025",
+                            "created_at": "2026-07-08T00:00:00+00:00",
+                            "text": "Net salary INR 120000",
+                        },
+                        "highlight": {"text": ["Net salary INR 120000"]},
+                    },
+                ],
+            },
+        },
+    )
+    index = OpenSearchDocumentSearchIndex(
+        client=client,  # type: ignore[arg-type]
+        index_name="papervault-documents-v1",
+    )
+
+    results = index.search(
+        SearchRequest(
+            owner_id=owner_id,
+            query="salary january",
+            mode=SearchMode.HYBRID,
+            filters=SearchFilters(document_type="salary_slip", tag="payroll"),
+            limit=10,
+            offset=5,
+        ),
+        (0.1, 0.2, 0.3),
+    )
+
+    request = client.requests[0]
+    body = request[2]
+    assert request[0] == "POST"
+    assert request[1] == "papervault-documents-v1/_search"
+    assert body is not None
+    assert body["from"] == 5
+    assert body["size"] == 10
+    assert {"term": {"owner_id": str(owner_id)}} in body["query"]["bool"]["filter"]
+    assert {"term": {"document_type": "salary_slip"}} in body["query"]["bool"]["filter"]
+    assert {"term": {"tags": "payroll"}} in body["query"]["bool"]["filter"]
+    assert body["query"]["bool"]["minimum_should_match"] == 1
+    assert results[0].document_id == document_id
+    assert results[0].score == 3.25
+    assert results[0].highlights == ("Net salary INR 120000",)
 
 
 def test_document_to_opensearch_body_omits_empty_optional_fields() -> None:

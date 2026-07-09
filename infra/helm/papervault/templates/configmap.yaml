@@ -26,6 +26,8 @@ data:
   PAPERVAULT_OCR_PDF_DPI: {{ .Values.config.ocrPdfDpi | quote }}
   PAPERVAULT_OCR_MAX_PDF_PAGES: {{ .Values.config.ocrMaxPdfPages | quote }}
   PAPERVAULT_SEARCH_INDEX_ENABLED: {{ .Values.config.searchIndexEnabled | quote }}
+  PAPERVAULT_SEARCH_QUERY_BACKEND: {{ .Values.config.searchQueryBackend | quote }}
+  PAPERVAULT_SEARCH_QUERY_FALLBACK_ENABLED: {{ .Values.config.searchQueryFallbackEnabled | quote }}
   S3_ENDPOINT_URL: {{ .Values.config.s3EndpointUrl | quote }}
   S3_BUCKET_DOCUMENTS: {{ .Values.config.s3BucketDocuments | quote }}
   S3_REGION: {{ .Values.config.s3Region | quote }}

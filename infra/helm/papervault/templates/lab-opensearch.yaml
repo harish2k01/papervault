@@ -1,0 +1,95 @@
+{{- if and .Values.labDependencies.enabled .Values.labDependencies.opensearch.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "papervault.fullname" . }}-opensearch
+  labels:
+    {{- include "papervault.labels" . | nindent 4 }}
+    app.kubernetes.io/component: opensearch
+spec:
+  type: ClusterIP
+  selector:
+    {{- include "papervault.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: opensearch
+  ports:
+    - name: http
+      port: 9200
+      targetPort: http
+    - name: metrics
+      port: 9600
+      targetPort: metrics
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "papervault.fullname" . }}-opensearch
+  labels:
+    {{- include "papervault.labels" . | nindent 4 }}
+    app.kubernetes.io/component: opensearch
+spec:
+  serviceName: {{ include "papervault.fullname" . }}-opensearch
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "papervault.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: opensearch
+  template:
+    metadata:
+      labels:
+        {{- include "papervault.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: opensearch
+    spec:
+      securityContext:
+        fsGroup: 1000
+        runAsGroup: 1000
+        runAsNonRoot: true
+        runAsUser: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: opensearch
+          image: {{ .Values.labDependencies.opensearch.image | quote }}
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          env:
+            - name: discovery.type
+              value: single-node
+            - name: plugins.security.disabled
+              value: "true"
+            - name: OPENSEARCH_INITIAL_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "papervault.secretName" . }}
+                  key: OPENSEARCH_INITIAL_ADMIN_PASSWORD
+            - name: OPENSEARCH_JAVA_OPTS
+              value: {{ .Values.labDependencies.opensearch.javaOpts | quote }}
+          ports:
+            - name: http
+              containerPort: 9200
+            - name: metrics
+              containerPort: 9600
+          readinessProbe:
+            httpGet:
+              path: /_cluster/health
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 15
+            timeoutSeconds: 5
+            failureThreshold: 12
+          volumeMounts:
+            - name: data
+              mountPath: /usr/share/opensearch/data
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: {{ .Values.labDependencies.opensearch.storageSize }}
+{{- end }}

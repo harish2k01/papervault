@@ -24,10 +24,36 @@ from papervault_api.search.application.service import (
     DocumentSearchService,
     SearchFilters,
     SearchRequest,
+    SearchResult,
 )
 from papervault_api.search.domain.enums import SearchMode
 from papervault_api.tags.application.service import TagService
 from papervault_api.timeline.infrastructure.models import TimelineEvent
+
+
+class FakeSearchQueryIndex:
+    def __init__(self, results: tuple[SearchResult, ...]) -> None:
+        self.results = results
+        self.requests: list[SearchRequest] = []
+        self.query_embeddings: list[tuple[float, ...] | None] = []
+
+    def search(
+        self,
+        request: SearchRequest,
+        query_embedding: tuple[float, ...] | None,
+    ) -> tuple[SearchResult, ...]:
+        self.requests.append(request)
+        self.query_embeddings.append(query_embedding)
+        return self.results
+
+
+class FailingSearchQueryIndex:
+    def search(
+        self,
+        request: SearchRequest,
+        query_embedding: tuple[float, ...] | None,
+    ) -> tuple[SearchResult, ...]:
+        raise RuntimeError("OpenSearch unavailable")
 
 
 async def test_search_service_keyword_semantic_recent_and_saved(session: AsyncSession) -> None:
@@ -71,6 +97,78 @@ async def test_search_service_keyword_semantic_recent_and_saved(session: AsyncSe
     assert results[0].score > 0
     assert saved.name == "Credit cards"
     assert recent[0].query == "credit card due"
+
+
+async def test_search_service_uses_query_index_and_records_recent(
+    session: AsyncSession,
+) -> None:
+    user, document = await create_document_with_text(
+        session,
+        title="Salary Slip January",
+        text="Salary slip with net salary INR 120000",
+        document_type="salary_slip",
+    )
+    indexed_result = SearchResult(
+        document_id=document.id,
+        title=document.title,
+        original_filename=document.original_filename,
+        document_type=document.document_type,
+        status=document.status,
+        summary=document.summary,
+        created_at=document.created_at,
+        score=12.5,
+        highlights=("net salary INR 120000",),
+    )
+    fake_index = FakeSearchQueryIndex((indexed_result,))
+    service = DocumentSearchService(
+        session=session,
+        embedding_provider_name="local",
+        embedding_dimensions=16,
+        search_query_index=fake_index,
+    )
+
+    results = await service.search(
+        SearchRequest(
+            owner_id=user.id,
+            query="salary january",
+            mode=SearchMode.HYBRID,
+        ),
+    )
+    recent = await service.list_recent_searches(user.id)
+
+    assert results == (indexed_result,)
+    assert fake_index.requests[0].owner_id == user.id
+    assert fake_index.query_embeddings[0] is not None
+    assert recent[0].query == "salary january"
+
+
+async def test_search_service_falls_back_to_database_when_query_index_fails(
+    session: AsyncSession,
+) -> None:
+    user, document = await create_document_with_text(
+        session,
+        title="Insurance Policy",
+        text="Insurance policy with expiry date",
+        document_type="insurance_policy",
+    )
+    service = DocumentSearchService(
+        session=session,
+        embedding_provider_name="local",
+        embedding_dimensions=16,
+        search_query_index=FailingSearchQueryIndex(),
+        query_fallback_enabled=True,
+    )
+
+    results = await service.search(
+        SearchRequest(
+            owner_id=user.id,
+            query="insurance expiry",
+            mode=SearchMode.HYBRID,
+        ),
+    )
+
+    assert results[0].document_id == document.id
+    assert results[0].score > 0
 
 
 async def test_tag_service_attaches_tag_and_writes_timeline(session: AsyncSession) -> None:

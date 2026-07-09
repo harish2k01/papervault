@@ -79,17 +79,18 @@ Phase 4 adds provider interfaces for AI analysis and embeddings. The default pro
 - Rule-based document analysis for summary, keywords, entities, suggested tags, category, confidence, and metadata.
 - Hashing-based embeddings for a self-hosted baseline.
 
-Provider outputs are stored in PostgreSQL. Phase 5 uses those records for database-backed keyword, semantic, and hybrid search while leaving OpenSearch indexing as a later hardening step.
+Provider outputs are stored in PostgreSQL. Phase 5 used those records for database-backed keyword, semantic, and hybrid search. Phase 10 keeps the database scorer as a fallback while moving the primary query path to OpenSearch when indexing is enabled.
 
 ## Search Indexing
 
-Phase 8 adds OpenSearch indexing behind a provider boundary:
+Phase 8 adds OpenSearch indexing behind a provider boundary, and Phase 10 adds user-facing query execution:
 
 - The worker projects document metadata, current text extraction, current AI analysis, tags, metadata, and embeddings into a search document.
 - The OpenSearch adapter creates `papervault-documents-v1` with keyword, text, object, date, and `knn_vector` fields.
 - Indexing failures are logged and do not mark document processing as failed.
 - `/search/index/documents/{document_id}` and `/search/index/rebuild` allow owner-scoped reindexing.
-- Query execution remains database-backed until OpenSearch query scoring and fallback behavior are hardened.
+- `POST /search` uses OpenSearch for keyword, semantic, and hybrid queries when `PAPERVAULT_SEARCH_QUERY_BACKEND=opensearch` and indexing is enabled.
+- PostgreSQL remains the source of truth and the fallback query path when OpenSearch is unavailable or explicitly disabled.
 
 ## Identity and Access
 
@@ -122,10 +123,11 @@ OCR, embeddings, LLM summaries, object storage, and search providers are impleme
 
 ## Deployment Model
 
-Phase 9 adds a Kubernetes deployment boundary:
+Phase 9 adds a Kubernetes deployment boundary, and Phase 10 hardens deployment verification:
 
 - GitHub Actions builds API, worker, and web images and pushes them to GHCR.
-- The Helm chart deploys API, worker, web, services, config, secrets, and an Alembic migration hook.
-- PostgreSQL, Redis, S3-compatible object storage, and OpenSearch remain external services.
+- The Helm chart deploys API, worker, web, services, config, secrets, an Alembic migration job, and a Helm smoke test.
+- PostgreSQL, Redis, S3-compatible object storage, and OpenSearch remain external production services.
 - Runtime secrets can be chart-managed for local labs or supplied through an existing Kubernetes Secret for production.
+- The lab profile can optionally deploy PostgreSQL, Redis, MinIO, and OpenSearch for smoke testing.
 - API and worker pods run with non-root, restricted-style security contexts. The web image now listens on port 8080 so it can run as non-root.

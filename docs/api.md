@@ -46,7 +46,7 @@ Additional document endpoints:
 - `POST /search/index/documents/{document_id}`: reindex one owned document
 - `POST /search/index/rebuild?limit=500`: rebuild the current user's document index projection
 
-Phase 5 search is database-backed. Phase 8 adds OpenSearch indexing and reindex endpoints, while user-facing query execution continues to use the database-backed implementation until OpenSearch query semantics are hardened.
+Phase 10 search uses OpenSearch for user-facing keyword, semantic, and hybrid queries when `PAPERVAULT_SEARCH_QUERY_BACKEND=opensearch` and indexing is enabled. PostgreSQL remains the source of truth and fallback query path when OpenSearch errors or is disabled.
 
 ## Tags
 

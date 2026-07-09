@@ -57,11 +57,13 @@ OpenSearch indexing is enabled by default:
 
 ```env
 PAPERVAULT_SEARCH_INDEX_ENABLED=true
+PAPERVAULT_SEARCH_QUERY_BACKEND=opensearch
+PAPERVAULT_SEARCH_QUERY_FALLBACK_ENABLED=true
 OPENSEARCH_DOCUMENTS_INDEX=papervault-documents-v1
 OPENSEARCH_TIMEOUT_SECONDS=5
 ```
 
-The worker indexes documents after text extraction, AI processing, and notification generation. User-facing search still uses the database-backed service in this phase. Use `POST /search/index/rebuild` to rebuild the current user's index projection after changing mappings or adapter behavior.
+The worker indexes documents after text extraction, AI processing, and notification generation. User-facing search uses OpenSearch when it is enabled and falls back to the database-backed scorer if OpenSearch is unavailable. Use `POST /search/index/rebuild` to rebuild the current user's index projection after changing mappings or adapter behavior.
 
 The frontend uses the same temporary development identity headers as the API. A generated development user id is stored in browser `localStorage` under `papervault.devUserId`.
 
@@ -115,4 +117,16 @@ helm lint infra/helm/papervault
 helm template papervault infra/helm/papervault --namespace papervault > rendered.yaml
 kubectl apply --dry-run=server -f rendered.yaml --namespace papervault
 helm upgrade --install papervault infra/helm/papervault --namespace papervault --dry-run=server
+```
+
+After a deployed upgrade, run the chart smoke test:
+
+```bash
+helm test papervault --namespace papervault
+```
+
+For a public-route workflow smoke test:
+
+```bash
+python scripts/cluster_smoke.py --base-url https://papervault.example.com/api
 ```

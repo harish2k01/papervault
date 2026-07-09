@@ -6,11 +6,15 @@ metadata:
   labels:
     {{- include "papervault.labels" . | nindent 4 }}
     app.kubernetes.io/component: migration
+  {{- if .Values.migrations.useHelmHooks }}
   annotations:
-    "helm.sh/hook": pre-install,pre-upgrade
-    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+    "helm.sh/hook": {{ .Values.migrations.hookEvents | quote }}
+    "helm.sh/hook-delete-policy": {{ .Values.migrations.hookDeletePolicy | quote }}
+  {{- end }}
 spec:
   backoffLimit: {{ .Values.migrations.backoffLimit }}
+  activeDeadlineSeconds: {{ .Values.migrations.activeDeadlineSeconds }}
+  ttlSecondsAfterFinished: {{ .Values.migrations.ttlSecondsAfterFinished }}
   template:
     metadata:
       labels:
@@ -29,7 +33,14 @@ spec:
         - name: migrate
           image: "{{ .Values.image.api.repository }}:{{ .Values.image.api.tag }}"
           imagePullPolicy: {{ .Values.image.api.pullPolicy }}
+          {{- if .Values.migrations.waitForDatabase }}
+          command:
+            - sh
+            - -c
+            - python -m papervault_api.db.wait_for_database && alembic upgrade head
+          {{- else }}
           command: ["alembic", "upgrade", "head"]
+          {{- end }}
           securityContext:
             {{- toYaml .Values.containerSecurityContext.api | nindent 12 }}
           envFrom:
@@ -37,6 +48,11 @@ spec:
                 name: {{ include "papervault.configMapName" . }}
             - secretRef:
                 name: {{ include "papervault.secretName" . }}
+          env:
+            - name: PAPERVAULT_DATABASE_READY_TIMEOUT_SECONDS
+              value: {{ .Values.migrations.databaseReadyTimeoutSeconds | quote }}
+            - name: PAPERVAULT_DATABASE_READY_INTERVAL_SECONDS
+              value: {{ .Values.migrations.databaseReadyIntervalSeconds | quote }}
           resources:
             {{- toYaml .Values.resources.api | nindent 12 }}
 {{- end }}

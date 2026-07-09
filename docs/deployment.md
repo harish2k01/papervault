@@ -28,6 +28,7 @@ This guide covers the current production deployment boundary. The Helm chart dep
 - Tune `PAPERVAULT_OCR_MAX_PDF_PAGES`, `PAPERVAULT_OCR_TIMEOUT_SECONDS`, and worker concurrency based on CPU capacity.
 - Keep `OPENSEARCH_DOCUMENTS_INDEX` versioned, for example `papervault-documents-v1`, so mapping changes can be rolled out through a new index and reindex operation.
 - Monitor worker logs for `document_search_indexing_failed`; indexing is eventually consistent and does not fail document processing.
+- Keep `PAPERVAULT_SEARCH_QUERY_FALLBACK_ENABLED=true` unless you intentionally want OpenSearch outages to fail user-facing search.
 
 ## Container Images
 
@@ -98,9 +99,27 @@ reaches FastAPI. All other paths go to the web service.
 ## Lab Dependencies
 
 For single-node homelab testing, `labDependencies.enabled=true` deploys chart-managed
-PostgreSQL, Redis, and MinIO resources. This profile is intended for smoke tests and
-developer clusters, not long-lived production data. Production deployments should use
-operator-managed or external dependencies with explicit backup and restore procedures.
+PostgreSQL, Redis, and MinIO resources. It can also deploy OpenSearch with
+`labDependencies.opensearch.enabled=true`. This profile is intended for smoke tests
+and developer clusters, not long-lived production data. Production deployments should
+use operator-managed or external dependencies with explicit backup and restore
+procedures.
 
 The repository includes `infra/helm/papervault/values-cluster-test.yaml` as an example
 profile for GHCR images, Traefik Gateway API routing, and chart-managed lab services.
+
+## Smoke Tests
+
+The chart includes a Helm test pod that verifies the API service health endpoint from
+inside the cluster:
+
+```bash
+helm test papervault --namespace papervault
+```
+
+The public route can be verified with the workflow smoke script:
+
+```bash
+python scripts/cluster_smoke.py \
+  --base-url https://papervault.example.com/api
+```
