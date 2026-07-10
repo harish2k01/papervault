@@ -26,21 +26,26 @@ class NotificationService:
             return ()
 
         metadata = await self._get_current_metadata(document_id)
-        if metadata is None:
-            return ()
-
         notifications: list[Notification] = []
-        for field_name, kind in DATE_FIELD_KIND.items():
-            due_date = parse_date(metadata.data.get(field_name))
-            if due_date is None:
-                continue
-            notification = await self._upsert_notification(
-                document=document,
-                kind=kind,
-                due_date=due_date,
-                source_field=field_name,
-            )
-            notifications.append(notification)
+        expected_notifications: set[tuple[str, date]] = set()
+        if metadata is not None:
+            for field_name, kind in DATE_FIELD_KIND.items():
+                due_date = parse_date(metadata.data.get(field_name))
+                if due_date is None:
+                    continue
+                expected_notifications.add((kind.value, due_date))
+                notification = await self._upsert_notification(
+                    document=document,
+                    kind=kind,
+                    due_date=due_date,
+                    source_field=field_name,
+                )
+                notifications.append(notification)
+
+        await self._dismiss_stale_notifications(
+            document=document,
+            expected_notifications=expected_notifications,
+        )
 
         await self._session.commit()
         return tuple(notifications)
@@ -100,6 +105,12 @@ class NotificationService:
         )
         existing = result.scalar_one_or_none()
         if existing is not None:
+            existing.title = notification_title(kind, document.title)
+            existing.message = notification_message(kind, document.title, due_date)
+            existing.payload = {
+                "source_field": source_field,
+                "document_type": document.document_type,
+            }
             return existing
 
         notification = Notification(
@@ -114,6 +125,28 @@ class NotificationService:
         self._session.add(notification)
         await self._session.flush()
         return notification
+
+    async def _dismiss_stale_notifications(
+        self,
+        *,
+        document: Document,
+        expected_notifications: set[tuple[str, date]],
+    ) -> None:
+        managed_kinds = {kind.value for kind in DATE_FIELD_KIND.values()}
+        result = await self._session.execute(
+            select(Notification).where(
+                Notification.owner_id == document.owner_id,
+                Notification.document_id == document.id,
+                Notification.kind.in_(managed_kinds),
+            ),
+        )
+        for notification in result.scalars():
+            notification_key = (notification.kind, notification.due_date)
+            if (
+                notification_key not in expected_notifications
+                and notification.status != NotificationStatus.DISMISSED.value
+            ):
+                notification.status = NotificationStatus.DISMISSED.value
 
 
 def notification_title(kind: NotificationKind, document_title: str) -> str:

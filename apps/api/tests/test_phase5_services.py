@@ -25,6 +25,7 @@ from papervault_api.documents.infrastructure.models import (
 from papervault_api.identity.infrastructure.models import User
 from papervault_api.notifications.application.service import NotificationService
 from papervault_api.notifications.domain.enums import NotificationStatus
+from papervault_api.notifications.infrastructure.models import Notification
 from papervault_api.search.application.service import (
     DocumentSearchService,
     SearchFilters,
@@ -321,6 +322,57 @@ async def test_notification_service_generates_and_updates_due_date(session: Asyn
     assert notifications[0].due_date == date(2026, 12, 31)
     assert updated is not None
     assert updated.status == NotificationStatus.READ.value
+
+
+async def test_notification_service_dismisses_stale_due_dates(session: AsyncSession) -> None:
+    _user, document = await create_document_with_text(
+        session,
+        title="Warranty Invoice",
+        text="Warranty invoice",
+        document_type="invoice",
+    )
+    original_metadata = DocumentMetadataRecord(
+        document_id=document.id,
+        schema_name="invoice",
+        data={"warranty_expiry_date": "2026-12-31"},
+        source=MetadataSource.AI.value,
+        is_current=True,
+    )
+    session.add(original_metadata)
+    await session.commit()
+
+    service = NotificationService(session)
+    initial_notifications = await service.generate_for_document(document.id)
+
+    original_metadata.is_current = False
+    session.add(
+        DocumentMetadataRecord(
+            document_id=document.id,
+            schema_name="invoice",
+            data={"warranty_expiry_date": "2027-01-31"},
+            source=MetadataSource.MANUAL.value,
+            is_current=True,
+        ),
+    )
+    await session.commit()
+
+    refreshed_notifications = await service.generate_for_document(document.id)
+    all_notifications = (
+        await session.execute(
+            select(Notification).where(Notification.document_id == document.id),
+        )
+    ).scalars()
+
+    notifications_by_due_date = {
+        notification.due_date: notification for notification in all_notifications
+    }
+    assert len(initial_notifications) == 1
+    assert len(refreshed_notifications) == 1
+    assert refreshed_notifications[0].due_date == date(2027, 1, 31)
+    assert notifications_by_due_date[date(2026, 12, 31)].status == (
+        NotificationStatus.DISMISSED.value
+    )
+    assert notifications_by_due_date[date(2027, 1, 31)].status == (NotificationStatus.PENDING.value)
 
 
 async def create_document_with_text(

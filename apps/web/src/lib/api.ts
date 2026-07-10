@@ -177,14 +177,17 @@ export type DocumentDetail = {
   }>;
 };
 
+export type NotificationStatus = "pending" | "read" | "dismissed";
+
 export type NotificationItem = {
   id: string;
   document_id: string | null;
   kind: string;
-  status: string;
+  status: NotificationStatus;
   title: string;
   message: string;
   due_date: string;
+  payload: Record<string, unknown>;
   created_at: string;
 };
 
@@ -408,6 +411,23 @@ export async function archiveDocument(documentId: string) {
 
 export async function listNotifications() {
   return apiFetch<NotificationItem[]>("/notifications");
+}
+
+export async function syncDocumentNotifications(documentId: string) {
+  return apiFetch<NotificationItem[]>(`/notifications/sync/${documentId}`, {
+    method: "POST",
+    body: JSON.stringify({}),
+  });
+}
+
+export async function updateNotificationStatus(
+  notificationId: string,
+  status: NotificationStatus,
+) {
+  return apiFetch<NotificationItem>(`/notifications/${notificationId}`, {
+    method: "PATCH",
+    body: JSON.stringify({ status }),
+  });
 }
 
 export async function listTags() {

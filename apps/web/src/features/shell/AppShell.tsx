@@ -8,8 +8,10 @@ import {
   Clock3,
   FileSearch,
   FileText,
+  type LucideIcon,
   LogIn,
   LogOut,
+  RefreshCw,
   Search,
   ShieldCheck,
   Tags,
@@ -24,6 +26,8 @@ import {
   DocumentDetail,
   DocumentItem,
   DocumentTypeDefinition,
+  NotificationItem,
+  NotificationStatus,
   RecentSearch,
   SavedSearch,
   SearchFilters,
@@ -55,17 +59,32 @@ import {
   saveSearch,
   searchDocuments,
   storeAccessToken,
+  syncDocumentNotifications,
   updateDocument,
   updateDocumentMetadata,
+  updateNotificationStatus,
   uploadDocument,
 } from "../../lib/api";
 import { cn } from "../../lib/utils";
+import { NotificationsWorkspace } from "./NotificationsWorkspace";
+import { TagsWorkspace } from "./TagsWorkspace";
+import {
+  compareNotifications,
+  formatDateOnly,
+  getDueState,
+} from "./notification-utils";
+
+type WorkspaceView = "documents" | "tags" | "notifications";
 
 const navItems = [
-  { label: "Documents", icon: FileText, active: true },
-  { label: "Tags", icon: Tags, active: false },
-  { label: "Notifications", icon: Bell, active: false },
-];
+  { key: "documents", label: "Documents", icon: FileText },
+  { key: "tags", label: "Tags", icon: Tags },
+  { key: "notifications", label: "Notifications", icon: Bell },
+] satisfies Array<{
+  key: WorkspaceView;
+  label: string;
+  icon: LucideIcon;
+}>;
 
 type DocumentListEntry = Pick<
   DocumentItem,
@@ -94,6 +113,7 @@ export function AppShell() {
   );
   const [showAuthScreen, setShowAuthScreen] = useState(false);
   const [oidcError, setOidcError] = useState<string | null>(null);
+  const [activeView, setActiveView] = useState<WorkspaceView>("documents");
   const [query, setQuery] = useState("");
   const [searchMode, setSearchMode] = useState<SearchMode>("hybrid");
   const [filters, setFilters] = useState<SearchFilters>(defaultSearchFilters);
@@ -169,6 +189,7 @@ export function AppShell() {
   const uploadMutation = useMutation({
     mutationFn: (file: File) => uploadDocument(file),
     onSuccess: async (response) => {
+      setActiveView("documents");
       setSelectedDocumentId(response.document.id);
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["documents"] }),
@@ -189,6 +210,34 @@ export function AppShell() {
       ]);
     },
   });
+  const notificationStatusMutation = useMutation({
+    mutationFn: (input: {
+      notificationId: string;
+      status: NotificationStatus;
+    }) => updateNotificationStatus(input.notificationId, input.status),
+    onSuccess: async (notification) => {
+      const invalidations = [
+        queryClient.invalidateQueries({ queryKey: ["notifications"] }),
+      ];
+      if (notification.document_id) {
+        invalidations.push(
+          queryClient.invalidateQueries({
+            queryKey: ["document", notification.document_id],
+          }),
+        );
+      }
+      await Promise.all(invalidations);
+    },
+  });
+  const notificationSyncMutation = useMutation({
+    mutationFn: (documentId: string) => syncDocumentNotifications(documentId),
+    onSuccess: async (_notifications, documentId) => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["notifications"] }),
+        queryClient.invalidateQueries({ queryKey: ["document", documentId] }),
+      ]);
+    },
+  });
   const metadataUpdateMutation = useMutation({
     mutationFn: (input: {
       documentId: string;
@@ -202,6 +251,7 @@ export function AppShell() {
         queryClient.invalidateQueries({ queryKey: ["documents"] }),
         queryClient.invalidateQueries({ queryKey: ["search"] }),
       ]);
+      notificationSyncMutation.mutate(input.documentId);
     },
   });
   const archiveMutation = useMutation({
@@ -250,6 +300,12 @@ export function AppShell() {
       ]);
     },
   });
+  const tagCreateMutation = useMutation({
+    mutationFn: (name: string) => createTag({ name: name.trim() }),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["tags"] });
+    },
+  });
   const saveSearchMutation = useMutation({
     mutationFn: saveSearch,
     onSuccess: async () => {
@@ -274,6 +330,7 @@ export function AppShell() {
   function handleSignOut() {
     clearStoredAccessToken();
     setAccessToken(null);
+    setActiveView("documents");
     setSelectedDocumentId(null);
     queryClient.clear();
   }
@@ -317,6 +374,22 @@ export function AppShell() {
       mode: searchMode,
       filters: normalizeUiFilters(filters),
     });
+  }
+
+  function createVaultTag(name: string) {
+    const normalizedName = name.trim();
+    if (!normalizedName) {
+      return;
+    }
+    tagCreateMutation.mutate(normalizedName);
+  }
+
+  function openDocument(documentId: string | null) {
+    if (!documentId) {
+      return;
+    }
+    setSelectedDocumentId(documentId);
+    setActiveView("documents");
   }
 
   async function invalidateDocumentTags(documentId: string) {
@@ -392,6 +465,16 @@ export function AppShell() {
     documentCount === 0 &&
     submittedSearch === null;
   const duplicateGroups = duplicatesQuery.data?.length ?? 0;
+  const tagCreateError =
+    tagCreateMutation.error instanceof Error
+      ? tagCreateMutation.error.message
+      : null;
+  const notificationActionError =
+    notificationStatusMutation.error instanceof Error
+      ? notificationStatusMutation.error.message
+      : notificationSyncMutation.error instanceof Error
+        ? notificationSyncMutation.error.message
+        : null;
   const tagMutationError =
     [
       tagCreateAttachMutation.error,
@@ -440,31 +523,41 @@ export function AppShell() {
           </div>
 
           <nav aria-label="Primary navigation" className="space-y-1">
-            {navItems.map((item) => (
-              <a
-                className={cn(
-                  "flex items-center justify-between rounded-lg px-3 py-2.5 text-sm transition-colors",
-                  item.active
-                    ? "bg-primary text-primary-foreground shadow-sm"
-                    : "text-muted-foreground hover:bg-muted hover:text-foreground",
-                )}
-                href="/"
-                key={item.label}
-                aria-current={item.active ? "page" : undefined}
-              >
-                <span className="flex items-center gap-3">
-                  <item.icon className="h-4 w-4" aria-hidden="true" />
-                  {item.label}
-                </span>
-                {item.label === "Notifications" &&
-                pendingNotifications > 0 &&
-                !workspaceIsEmpty ? (
-                  <span className="rounded-full bg-background/20 px-2 py-0.5 text-xs">
-                    {pendingNotifications}
+            {navItems.map((item) => {
+              const active = activeView === item.key;
+              return (
+                <button
+                  className={cn(
+                    "flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-left text-sm transition-colors",
+                    active
+                      ? "bg-primary text-primary-foreground shadow-sm"
+                      : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                  )}
+                  key={item.label}
+                  type="button"
+                  aria-current={active ? "page" : undefined}
+                  onClick={() => setActiveView(item.key)}
+                >
+                  <span className="flex items-center gap-3">
+                    <item.icon className="h-4 w-4" aria-hidden="true" />
+                    {item.label}
                   </span>
-                ) : null}
-              </a>
-            ))}
+                  {item.label === "Notifications" &&
+                  pendingNotifications > 0 ? (
+                    <span
+                      className={cn(
+                        "rounded-full px-2 py-0.5 text-xs",
+                        active
+                          ? "bg-background/20"
+                          : "bg-primary/10 text-primary",
+                      )}
+                    >
+                      {pendingNotifications}
+                    </span>
+                  ) : null}
+                </button>
+              );
+            })}
           </nav>
 
           {!workspaceIsEmpty ? (
@@ -490,7 +583,27 @@ export function AppShell() {
           </div>
         </aside>
 
-        {workspaceIsEmpty ? (
+        {activeView === "notifications" ? (
+          <NotificationsWorkspace
+            notifications={notificationsQuery.data ?? []}
+            documents={documentsQuery.data ?? []}
+            isLoading={notificationsQuery.isLoading}
+            isUpdating={notificationStatusMutation.isPending}
+            error={notificationActionError}
+            onOpenDocument={openDocument}
+            onUpdateStatus={(notificationId, status) =>
+              notificationStatusMutation.mutate({ notificationId, status })
+            }
+          />
+        ) : activeView === "tags" ? (
+          <TagsWorkspace
+            tags={tagsQuery.data ?? []}
+            isLoading={tagsQuery.isLoading}
+            isCreating={tagCreateMutation.isPending}
+            error={tagCreateError}
+            onCreateTag={createVaultTag}
+          />
+        ) : workspaceIsEmpty ? (
           <EmptyWorkspace
             isUploading={uploadMutation.isPending}
             onUpload={(file) => uploadMutation.mutate(file)}
@@ -583,13 +696,21 @@ export function AppShell() {
                   metadataUpdateMutation.isPending ||
                   archiveMutation.isPending
                 }
+                isSyncingNotifications={notificationSyncMutation.isPending}
                 isTagUpdating={
                   tagCreateAttachMutation.isPending ||
                   tagAttachMutation.isPending ||
                   tagDetachMutation.isPending
                 }
                 tagError={tagMutationError}
+                notificationError={notificationActionError}
                 onArchive={(documentId) => archiveMutation.mutate(documentId)}
+                onSyncNotifications={(documentId) =>
+                  notificationSyncMutation.mutate(documentId)
+                }
+                onUpdateNotificationStatus={(notificationId, status) =>
+                  notificationStatusMutation.mutate({ notificationId, status })
+                }
                 onUpdateDocument={(documentId, updates) =>
                   documentUpdateMutation.mutate({ documentId, updates })
                 }
@@ -1588,9 +1709,13 @@ function DocumentPanel({
   tags,
   isLoading,
   isUpdating,
+  isSyncingNotifications,
   isTagUpdating,
   tagError,
+  notificationError,
   onArchive,
+  onSyncNotifications,
+  onUpdateNotificationStatus,
   onUpdateDocument,
   onUpdateMetadata,
   onAttachTag,
@@ -1599,13 +1724,20 @@ function DocumentPanel({
 }: {
   detail: DocumentDetail | undefined;
   duplicateGroups: number;
-  notifications: Array<{ id: string; title: string; due_date: string }>;
+  notifications: NotificationItem[];
   tags: TagItem[];
   isLoading: boolean;
   isUpdating: boolean;
+  isSyncingNotifications: boolean;
   isTagUpdating: boolean;
   tagError: string | null;
+  notificationError: string | null;
   onArchive: (documentId: string) => void;
+  onSyncNotifications: (documentId: string) => void;
+  onUpdateNotificationStatus: (
+    notificationId: string,
+    status: NotificationStatus,
+  ) => void;
   onUpdateDocument: (
     documentId: string,
     updates: Parameters<typeof updateDocument>[1],
@@ -1638,6 +1770,15 @@ function DocumentPanel({
   const documentDate =
     detail.document.document_date ?? formatDateTime(detail.document.created_at);
   const confidence = detail.ai_analysis?.confidence_score;
+  const documentNotifications = notifications
+    .filter((notification) => notification.document_id === detail.document.id)
+    .sort(compareNotifications);
+  const activeDocumentNotifications = documentNotifications.filter(
+    (notification) => notification.status !== "dismissed",
+  );
+  const pendingDocumentNotifications = documentNotifications.filter(
+    (notification) => notification.status === "pending",
+  );
 
   return (
     <article className="min-h-screen min-w-0 overflow-auto bg-background xl:h-full xl:min-h-0">
@@ -1813,11 +1954,55 @@ function DocumentPanel({
             </section>
 
             <section className="border-t border-border pt-5">
-              <h3 className="text-sm font-semibold">Signals</h3>
+              <div className="flex items-center justify-between gap-3">
+                <h3 className="text-sm font-semibold">Signals</h3>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  type="button"
+                  disabled={isSyncingNotifications}
+                  onClick={() => onSyncNotifications(detail.document.id)}
+                >
+                  <RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />
+                  Refresh
+                </Button>
+              </div>
               <div className="mt-3 grid grid-cols-2 gap-2">
                 <SignalItem label="Duplicates" value={duplicateGroups} />
-                <SignalItem label="Reminders" value={notifications.length} />
+                <SignalItem
+                  label="Reminders"
+                  value={pendingDocumentNotifications.length}
+                />
               </div>
+              {notificationError ? (
+                <p
+                  className="mt-3 rounded-md border border-rose-200 bg-rose-50 p-2 text-xs text-rose-900"
+                  role="alert"
+                >
+                  {notificationError}
+                </p>
+              ) : null}
+              {activeDocumentNotifications.length ? (
+                <div className="mt-3 space-y-2">
+                  {activeDocumentNotifications
+                    .slice(0, 3)
+                    .map((notification) => (
+                      <DocumentReminder
+                        key={notification.id}
+                        notification={notification}
+                        disabled={isSyncingNotifications}
+                        onUpdateStatus={(status) =>
+                          onUpdateNotificationStatus(notification.id, status)
+                        }
+                      />
+                    ))}
+                </div>
+              ) : (
+                <p className="mt-3 rounded-md border border-dashed border-border bg-background p-3 text-xs leading-5 text-muted-foreground">
+                  No active reminders for this document. Refresh after adding
+                  due, expiry, renewal, or warranty dates to metadata.
+                </p>
+              )}
               {detail.document.archived_at ? (
                 <p className="mt-3 rounded-md border border-border bg-muted p-2 text-xs text-muted-foreground">
                   Archived{" "}
@@ -1928,6 +2113,58 @@ function SignalItem({ label, value }: { label: string; value: number }) {
     <div className="rounded-lg border border-border bg-background px-3 py-2">
       <p className="text-xs text-muted-foreground">{label}</p>
       <p className="mt-1 text-lg font-semibold">{value}</p>
+    </div>
+  );
+}
+
+function DocumentReminder({
+  notification,
+  disabled,
+  onUpdateStatus,
+}: {
+  notification: NotificationItem;
+  disabled: boolean;
+  onUpdateStatus: (status: NotificationStatus) => void;
+}) {
+  const dueState = getDueState(notification.due_date);
+
+  return (
+    <div className="rounded-lg border border-border bg-background p-3 text-sm">
+      <div className="flex items-start gap-2">
+        <Clock3 className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+        <div className="min-w-0 flex-1">
+          <p className="break-words font-medium">{notification.title}</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {dueState.label} - {formatDateOnly(notification.due_date)}
+          </p>
+        </div>
+      </div>
+      <div className="mt-3 flex flex-wrap gap-2">
+        {notification.status === "pending" ? (
+          <Button
+            size="sm"
+            variant="secondary"
+            type="button"
+            disabled={disabled}
+            onClick={() => onUpdateStatus("read")}
+          >
+            Mark read
+          </Button>
+        ) : null}
+        <Button
+          size="sm"
+          variant={notification.status === "dismissed" ? "secondary" : "ghost"}
+          type="button"
+          disabled={disabled}
+          onClick={() =>
+            onUpdateStatus(
+              notification.status === "dismissed" ? "pending" : "dismissed",
+            )
+          }
+        >
+          {notification.status === "dismissed" ? "Reopen" : "Dismiss"}
+        </Button>
+      </div>
     </div>
   );
 }

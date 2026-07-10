@@ -9,7 +9,10 @@ import {
   getDocument,
   getDocumentFile,
   listDocuments,
+  listNotifications,
   listTags,
+  syncDocumentNotifications,
+  updateNotificationStatus,
 } from "../../lib/api";
 import { AppShell } from "./AppShell";
 
@@ -40,8 +43,10 @@ vi.mock("../../lib/api", () => ({
   saveSearch: vi.fn(),
   searchDocuments: vi.fn().mockResolvedValue([]),
   storeAccessToken: vi.fn(),
+  syncDocumentNotifications: vi.fn().mockResolvedValue([]),
   updateDocument: vi.fn(),
   updateDocumentMetadata: vi.fn(),
+  updateNotificationStatus: vi.fn(),
   uploadDocument: vi.fn(),
 }));
 
@@ -63,7 +68,9 @@ describe("AppShell", () => {
       oidc_configured: false,
     });
     vi.mocked(listDocuments).mockResolvedValue([]);
+    vi.mocked(listNotifications).mockResolvedValue([]);
     vi.mocked(listTags).mockResolvedValue([]);
+    vi.mocked(syncDocumentNotifications).mockResolvedValue([]);
   });
 
   it("renders the application shell", async () => {
@@ -166,7 +173,11 @@ describe("AppShell", () => {
     renderAppShell();
 
     fireEvent.click(
-      await screen.findByRole("button", { name: "Add warranty" }),
+      await screen.findByRole(
+        "button",
+        { name: "Add warranty" },
+        { timeout: 3000 },
+      ),
     );
 
     await waitFor(() => {
@@ -240,6 +251,122 @@ describe("AppShell", () => {
     expect(screen.getByText("Preview not ready")).toBeInTheDocument();
     expect(screen.queryByTitle(document.title)).not.toBeInTheDocument();
     expect(getDocumentFile).not.toHaveBeenCalled();
+  });
+
+  it("dismisses a notification from the notifications workspace", async () => {
+    const createdAt = "2026-07-09T17:21:39.000Z";
+    const document = {
+      id: "document-1",
+      owner_id: "user-1",
+      title: "Insurance Policy",
+      original_filename: "insurance-policy.pdf",
+      content_type: "application/pdf",
+      file_size_bytes: 67584,
+      sha256_hash: "c".repeat(64),
+      source_kind: "upload",
+      status: "ready",
+      document_type: "insurance_policy",
+      document_date: null,
+      issuer: null,
+      organization: null,
+      archived_at: null,
+      created_at: createdAt,
+      updated_at: createdAt,
+    };
+    const notification = {
+      id: "notification-1",
+      document_id: document.id,
+      kind: "expiry",
+      status: "pending" as const,
+      title: "Document expiry: Insurance Policy",
+      message: "Insurance Policy has expiry on 2026-12-31.",
+      due_date: "2026-12-31",
+      payload: { source_field: "expiry_date" },
+      created_at: createdAt,
+    };
+    vi.mocked(listDocuments).mockResolvedValueOnce([document]);
+    vi.mocked(listNotifications).mockResolvedValueOnce([notification]);
+    vi.mocked(getDocument).mockResolvedValueOnce({
+      document,
+      ai_analysis: null,
+      metadata: null,
+      text_extraction: null,
+      tags: [],
+      timeline_events: [],
+      versions: [],
+    });
+    vi.mocked(updateNotificationStatus).mockResolvedValueOnce({
+      ...notification,
+      status: "dismissed",
+    });
+
+    renderAppShell();
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: /Notifications/ }),
+    );
+    expect(
+      await screen.findByRole("heading", { name: "Notifications" }),
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Dismiss" }));
+
+    await waitFor(() => {
+      expect(updateNotificationStatus).toHaveBeenCalledWith(
+        "notification-1",
+        "dismissed",
+      );
+    });
+  });
+
+  it("refreshes document reminders from the selected document", async () => {
+    const createdAt = "2026-07-09T17:21:39.000Z";
+    const document = {
+      id: "document-1",
+      owner_id: "user-1",
+      title: "Insurance Policy",
+      original_filename: "insurance-policy.pdf",
+      content_type: "application/pdf",
+      file_size_bytes: 67584,
+      sha256_hash: "e".repeat(64),
+      source_kind: "upload",
+      status: "ready",
+      document_type: "insurance_policy",
+      document_date: null,
+      issuer: null,
+      organization: null,
+      archived_at: null,
+      created_at: createdAt,
+      updated_at: createdAt,
+    };
+    vi.mocked(listDocuments).mockResolvedValueOnce([document]);
+    vi.mocked(getDocument).mockResolvedValueOnce({
+      document,
+      ai_analysis: null,
+      metadata: {
+        schema_name: "insurance_policy",
+        schema_version: 1,
+        data: { expiry_date: "2026-12-31" },
+        confidence_score: null,
+      },
+      text_extraction: null,
+      tags: [],
+      timeline_events: [],
+      versions: [],
+    });
+    vi.mocked(syncDocumentNotifications).mockResolvedValueOnce([]);
+
+    renderAppShell();
+
+    expect(
+      await screen.findByRole("heading", { name: "Insurance Policy" }),
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
+
+    await waitFor(() => {
+      expect(syncDocumentNotifications).toHaveBeenCalledWith("document-1");
+    });
   });
 });
 

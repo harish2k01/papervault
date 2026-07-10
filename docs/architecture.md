@@ -93,6 +93,16 @@ Phase 14 makes tags an editable document workflow:
 - Tag assignment remains an owner-scoped backend use case that validates document and tag ownership and writes `tags_changed` timeline events.
 - Tag attach and detach operations refresh the OpenSearch document projection on a best-effort basis so tag filters remain consistent with PostgreSQL.
 
+## Notifications
+
+Phase 16 makes due-date and expiry reminders a user-facing workflow:
+
+- Notification records are owner-scoped PostgreSQL rows derived from current document metadata fields such as `due_date`, `expiry_date`, `renewal_date`, and `warranty_expiry_date`.
+- Notification sync is a projection refresh. It upserts currently valid reminders and dismisses stale reminders when metadata dates change or disappear.
+- The web app exposes a Notifications workspace with pending, all, read, and dismissed views plus overdue and due-soon counts.
+- Document detail shows only reminders for the selected document and can manually refresh reminders after metadata edits.
+- Notification status changes remain explicit user actions: pending, read, and dismissed.
+
 ## AI Processing
 
 Phase 4 adds provider interfaces for AI analysis and embeddings. The default providers are local and deterministic:
