@@ -129,3 +129,13 @@ class DuplicateCandidateDocumentResponse(BaseModel):
 class DuplicateCandidateGroupResponse(BaseModel):
     method: str
     documents: list[DuplicateCandidateDocumentResponse]
+
+
+class MergeDuplicateDocumentsRequest(BaseModel):
+    keep_document_id: UUID
+    duplicate_document_ids: list[UUID] = Field(min_length=1)
+
+
+class MergeDuplicateDocumentsResponse(BaseModel):
+    kept_document: DocumentResponse
+    archived_documents: list[DocumentResponse]

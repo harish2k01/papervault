@@ -23,6 +23,8 @@ from papervault_api.documents.api.schemas import (
     DocumentVersionResponse,
     DuplicateCandidateDocumentResponse,
     DuplicateCandidateGroupResponse,
+    MergeDuplicateDocumentsRequest,
+    MergeDuplicateDocumentsResponse,
     MetadataFieldDefinitionResponse,
     MetadataResponse,
     TextExtractionResponse,
@@ -34,6 +36,8 @@ from papervault_api.documents.api.schemas import (
 from papervault_api.documents.application.lifecycle import (
     DocumentLifecycleService,
     DocumentUpdateCommand,
+    DuplicateMergeCommand,
+    InvalidDuplicateMergeError,
     InvalidMetadataError,
     MetadataUpdateCommand,
 )
@@ -107,6 +111,59 @@ async def list_duplicate_candidates(
         )
         for group in groups
     ]
+
+
+@router.post(
+    "/duplicates/merge",
+    response_model=MergeDuplicateDocumentsResponse,
+)
+async def merge_duplicate_documents(
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    session: Annotated[AsyncSession, Depends(get_session)],
+    settings: Annotated[Settings, Depends(get_settings)],
+    request: MergeDuplicateDocumentsRequest,
+) -> MergeDuplicateDocumentsResponse:
+    try:
+        result = await DocumentLifecycleService(session).merge_duplicates(
+            DuplicateMergeCommand(
+                owner_id=current_user.id,
+                actor_id=current_user.id,
+                keep_document_id=request.keep_document_id,
+                duplicate_document_ids=tuple(request.duplicate_document_ids),
+            ),
+        )
+    except InvalidDuplicateMergeError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    if result is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
+
+    await reindex_document_best_effort(
+        session=session,
+        settings=settings,
+        document_id=result.kept_document.id,
+        reason="duplicates_merged",
+    )
+    for document in result.archived_documents:
+        await reindex_document_best_effort(
+            session=session,
+            settings=settings,
+            document_id=document.id,
+            reason="duplicate_archived",
+        )
+
+    return MergeDuplicateDocumentsResponse(
+        kept_document=DocumentResponse.model_validate(
+            document_record_from_orm(result.kept_document),
+            from_attributes=True,
+        ),
+        archived_documents=[
+            DocumentResponse.model_validate(
+                document_record_from_orm(document),
+                from_attributes=True,
+            )
+            for document in result.archived_documents
+        ],
+    )
 
 
 @router.get("/types", response_model=list[DocumentTypeResponse])

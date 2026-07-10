@@ -40,6 +40,7 @@ Additional document endpoints:
 - `GET /documents/{document_id}/file`: authenticated document file response for the built-in viewer
 - `GET /documents/{document_id}/timeline`: document timeline events
 - `GET /documents/duplicates/candidates`: exact-hash duplicate candidate groups
+- `POST /documents/duplicates/merge`: keep one exact-hash duplicate and archive selected redundant copies
 
 ## Search
 

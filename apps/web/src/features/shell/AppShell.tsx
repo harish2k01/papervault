@@ -54,6 +54,7 @@ import {
   listSavedSearches,
   listTags,
   loginAccount,
+  mergeDuplicateDocuments,
   parseOidcCallbackHash,
   registerAccount,
   saveSearch,
@@ -66,6 +67,7 @@ import {
   uploadDocument,
 } from "../../lib/api";
 import { cn } from "../../lib/utils";
+import { DuplicatesWorkspace } from "./DuplicatesWorkspace";
 import { NotificationsWorkspace } from "./NotificationsWorkspace";
 import { TagsWorkspace } from "./TagsWorkspace";
 import {
@@ -74,10 +76,11 @@ import {
   getDueState,
 } from "./notification-utils";
 
-type WorkspaceView = "documents" | "tags" | "notifications";
+type WorkspaceView = "documents" | "duplicates" | "tags" | "notifications";
 
 const navItems = [
   { key: "documents", label: "Documents", icon: FileText },
+  { key: "duplicates", label: "Duplicates", icon: FileSearch },
   { key: "tags", label: "Tags", icon: Tags },
   { key: "notifications", label: "Notifications", icon: Bell },
 ] satisfies Array<{
@@ -264,6 +267,25 @@ export function AppShell() {
         queryClient.invalidateQueries({ queryKey: ["search"] }),
         queryClient.invalidateQueries({ queryKey: ["duplicates"] }),
       ]);
+    },
+  });
+  const duplicateMergeMutation = useMutation({
+    mutationFn: (input: Parameters<typeof mergeDuplicateDocuments>[0]) =>
+      mergeDuplicateDocuments(input),
+    onSuccess: async (result) => {
+      const affectedDocumentIds = [
+        result.kept_document.id,
+        ...result.archived_documents.map((document) => document.id),
+      ];
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["documents"] }),
+        queryClient.invalidateQueries({ queryKey: ["duplicates"] }),
+        queryClient.invalidateQueries({ queryKey: ["search"] }),
+        ...affectedDocumentIds.map((documentId) =>
+          queryClient.invalidateQueries({ queryKey: ["document", documentId] }),
+        ),
+      ]);
+      setSelectedDocumentId(result.kept_document.id);
     },
   });
   const tagAttachMutation = useMutation({
@@ -469,6 +491,10 @@ export function AppShell() {
     tagCreateMutation.error instanceof Error
       ? tagCreateMutation.error.message
       : null;
+  const duplicateMergeError =
+    duplicateMergeMutation.error instanceof Error
+      ? duplicateMergeMutation.error.message
+      : null;
   const notificationActionError =
     notificationStatusMutation.error instanceof Error
       ? notificationStatusMutation.error.message
@@ -542,6 +568,18 @@ export function AppShell() {
                     <item.icon className="h-4 w-4" aria-hidden="true" />
                     {item.label}
                   </span>
+                  {item.label === "Duplicates" && duplicateGroups > 0 ? (
+                    <span
+                      className={cn(
+                        "rounded-full px-2 py-0.5 text-xs",
+                        active
+                          ? "bg-background/20"
+                          : "bg-primary/10 text-primary",
+                      )}
+                    >
+                      {duplicateGroups}
+                    </span>
+                  ) : null}
                   {item.label === "Notifications" &&
                   pendingNotifications > 0 ? (
                     <span
@@ -594,6 +632,15 @@ export function AppShell() {
             onUpdateStatus={(notificationId, status) =>
               notificationStatusMutation.mutate({ notificationId, status })
             }
+          />
+        ) : activeView === "duplicates" ? (
+          <DuplicatesWorkspace
+            groups={duplicatesQuery.data ?? []}
+            isLoading={duplicatesQuery.isLoading}
+            isResolving={duplicateMergeMutation.isPending}
+            error={duplicateMergeError}
+            onOpenDocument={openDocument}
+            onMerge={(input) => duplicateMergeMutation.mutate(input)}
           />
         ) : activeView === "tags" ? (
           <TagsWorkspace

@@ -19,6 +19,10 @@ class InvalidMetadataError(ValueError):
     pass
 
 
+class InvalidDuplicateMergeError(ValueError):
+    pass
+
+
 @dataclass(frozen=True, slots=True)
 class DocumentUpdateCommand:
     owner_id: UUID
@@ -37,6 +41,20 @@ class MetadataUpdateCommand:
     document_date: date | None = None
     issuer: str | None = None
     organization: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class DuplicateMergeCommand:
+    owner_id: UUID
+    actor_id: UUID
+    keep_document_id: UUID
+    duplicate_document_ids: tuple[UUID, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class DuplicateMergeResult:
+    kept_document: Document
+    archived_documents: tuple[Document, ...]
 
 
 class DocumentLifecycleService:
@@ -170,6 +188,81 @@ class DocumentLifecycleService:
         await self._session.commit()
         await self._session.refresh(document)
         return document
+
+    async def merge_duplicates(
+        self,
+        command: DuplicateMergeCommand,
+    ) -> DuplicateMergeResult | None:
+        duplicate_ids = tuple(dict.fromkeys(command.duplicate_document_ids))
+        if not duplicate_ids:
+            raise InvalidDuplicateMergeError("At least one duplicate document is required")
+        if command.keep_document_id in duplicate_ids:
+            raise InvalidDuplicateMergeError("Keep document cannot be archived")
+
+        requested_ids = {command.keep_document_id, *duplicate_ids}
+        documents = (
+            await self._session.execute(
+                select(Document).where(
+                    Document.owner_id == command.owner_id,
+                    Document.id.in_(requested_ids),
+                ),
+            )
+        ).scalars()
+        documents_by_id = {document.id: document for document in documents}
+        if set(documents_by_id) != requested_ids:
+            return None
+
+        kept_document = documents_by_id[command.keep_document_id]
+        duplicate_documents = tuple(documents_by_id[document_id] for document_id in duplicate_ids)
+        if kept_document.status == DocumentStatus.ARCHIVED.value or any(
+            document.status == DocumentStatus.ARCHIVED.value for document in duplicate_documents
+        ):
+            raise InvalidDuplicateMergeError("Archived documents cannot be merged")
+        if any(
+            document.sha256_hash != kept_document.sha256_hash for document in duplicate_documents
+        ):
+            raise InvalidDuplicateMergeError("Only exact-hash duplicate documents can be merged")
+
+        archived_at = datetime.now(UTC)
+        for document in duplicate_documents:
+            document.status = DocumentStatus.ARCHIVED.value
+            document.archived_at = archived_at
+            self._session.add(
+                TimelineEvent(
+                    owner_id=command.owner_id,
+                    actor_id=command.actor_id,
+                    document_id=document.id,
+                    event_type=TimelineEventType.DOCUMENT_ARCHIVED.value,
+                    payload={
+                        "action": "duplicate_merged",
+                        "kept_document_id": str(kept_document.id),
+                        "sha256_hash": kept_document.sha256_hash,
+                    },
+                ),
+            )
+
+        self._session.add(
+            TimelineEvent(
+                owner_id=command.owner_id,
+                actor_id=command.actor_id,
+                document_id=kept_document.id,
+                event_type=TimelineEventType.METADATA_EDITED.value,
+                payload={
+                    "action": "duplicates_merged",
+                    "archived_document_ids": [str(document.id) for document in duplicate_documents],
+                    "sha256_hash": kept_document.sha256_hash,
+                },
+            ),
+        )
+
+        await self._session.commit()
+        await self._session.refresh(kept_document)
+        for document in duplicate_documents:
+            await self._session.refresh(document)
+        return DuplicateMergeResult(
+            kept_document=kept_document,
+            archived_documents=duplicate_documents,
+        )
 
     async def _get_document(self, document_id: UUID, owner_id: UUID) -> Document | None:
         result = await self._session.execute(

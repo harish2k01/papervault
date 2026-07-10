@@ -202,6 +202,11 @@ export type DuplicateGroup = {
   }>;
 };
 
+export type DuplicateMergeResult = {
+  kept_document: DocumentItem;
+  archived_documents: DocumentItem[];
+};
+
 export function getDevUserId() {
   const existing = window.localStorage.getItem(DEV_USER_ID_KEY);
   if (existing) {
@@ -463,6 +468,16 @@ export async function detachTag(documentId: string, tagId: string) {
 
 export async function listDuplicates() {
   return apiFetch<DuplicateGroup[]>("/documents/duplicates/candidates");
+}
+
+export async function mergeDuplicateDocuments(input: {
+  keep_document_id: string;
+  duplicate_document_ids: string[];
+}) {
+  return apiFetch<DuplicateMergeResult>("/documents/duplicates/merge", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
 }
 
 async function apiFetch<T>(

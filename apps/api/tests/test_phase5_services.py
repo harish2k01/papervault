@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from papervault_api.documents.application.lifecycle import (
     DocumentLifecycleService,
     DocumentUpdateCommand,
+    DuplicateMergeCommand,
     MetadataUpdateCommand,
 )
 from papervault_api.documents.application.read import DocumentReadService
@@ -220,6 +221,56 @@ async def test_duplicate_candidates_group_by_sha256(session: AsyncSession) -> No
 
     assert len(groups) == 1
     assert {document.title for document in groups[0]} == {"Invoice 1", "Invoice 1 Copy"}
+
+
+async def test_duplicate_merge_archives_exact_hash_duplicates(
+    session: AsyncSession,
+) -> None:
+    user, first = await create_document_with_text(
+        session,
+        title="Invoice Copy A",
+        text="Invoice",
+        document_type="invoice",
+    )
+    duplicate = Document(
+        owner_id=user.id,
+        title="Invoice Copy B",
+        original_filename="invoice-copy-b.pdf",
+        content_type="application/pdf",
+        file_size_bytes=first.file_size_bytes,
+        sha256_hash=first.sha256_hash,
+        storage_bucket="documents",
+        storage_key="invoice-copy-b.pdf",
+        status=DocumentStatus.READY.value,
+        document_type="invoice",
+    )
+    session.add(duplicate)
+    await session.commit()
+
+    result = await DocumentLifecycleService(session).merge_duplicates(
+        DuplicateMergeCommand(
+            owner_id=user.id,
+            actor_id=user.id,
+            keep_document_id=first.id,
+            duplicate_document_ids=(duplicate.id,),
+        ),
+    )
+
+    groups = await DocumentReadService(session).get_duplicate_candidates(user.id)
+    timeline_events = tuple(
+        (
+            await session.execute(
+                select(TimelineEvent).where(TimelineEvent.document_id == duplicate.id),
+            )
+        ).scalars(),
+    )
+
+    assert result is not None
+    assert result.kept_document.id == first.id
+    assert result.archived_documents[0].id == duplicate.id
+    assert result.archived_documents[0].status == DocumentStatus.ARCHIVED.value
+    assert groups == ()
+    assert any(event.payload.get("action") == "duplicate_merged" for event in timeline_events)
 
 
 async def test_document_lifecycle_updates_metadata_archives_and_writes_timeline(

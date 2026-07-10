@@ -8,9 +8,11 @@ import {
   getAuthConfig,
   getDocument,
   getDocumentFile,
+  listDuplicates,
   listDocuments,
   listNotifications,
   listTags,
+  mergeDuplicateDocuments,
   syncDocumentNotifications,
   updateNotificationStatus,
 } from "../../lib/api";
@@ -38,6 +40,7 @@ vi.mock("../../lib/api", () => ({
   listSavedSearches: vi.fn().mockResolvedValue([]),
   listTags: vi.fn().mockResolvedValue([]),
   loginAccount: vi.fn(),
+  mergeDuplicateDocuments: vi.fn(),
   parseOidcCallbackHash: vi.fn().mockReturnValue(null),
   registerAccount: vi.fn(),
   saveSearch: vi.fn(),
@@ -68,6 +71,7 @@ describe("AppShell", () => {
       oidc_configured: false,
     });
     vi.mocked(listDocuments).mockResolvedValue([]);
+    vi.mocked(listDuplicates).mockResolvedValue([]);
     vi.mocked(listNotifications).mockResolvedValue([]);
     vi.mocked(listTags).mockResolvedValue([]);
     vi.mocked(syncDocumentNotifications).mockResolvedValue([]);
@@ -316,6 +320,83 @@ describe("AppShell", () => {
         "notification-1",
         "dismissed",
       );
+    });
+  });
+
+  it("resolves an exact duplicate group from the duplicates workspace", async () => {
+    const createdAt = "2026-07-09T17:21:39.000Z";
+    const keptDocument = {
+      id: "document-keep",
+      owner_id: "user-1",
+      title: "Invoice Original",
+      original_filename: "invoice-original.pdf",
+      content_type: "application/pdf",
+      file_size_bytes: 67584,
+      sha256_hash: "d".repeat(64),
+      source_kind: "upload",
+      status: "ready",
+      document_type: "invoice",
+      document_date: null,
+      issuer: null,
+      organization: null,
+      archived_at: null,
+      created_at: createdAt,
+      updated_at: createdAt,
+    };
+    const duplicateDocument = {
+      ...keptDocument,
+      id: "document-duplicate",
+      title: "Invoice Copy",
+      original_filename: "invoice-copy.pdf",
+    };
+    vi.mocked(listDuplicates).mockResolvedValueOnce([
+      {
+        method: "sha256_hash",
+        documents: [
+          {
+            id: keptDocument.id,
+            title: keptDocument.title,
+            original_filename: keptDocument.original_filename,
+            sha256_hash: keptDocument.sha256_hash,
+            created_at: keptDocument.created_at,
+          },
+          {
+            id: duplicateDocument.id,
+            title: duplicateDocument.title,
+            original_filename: duplicateDocument.original_filename,
+            sha256_hash: duplicateDocument.sha256_hash,
+            created_at: duplicateDocument.created_at,
+          },
+        ],
+      },
+    ]);
+    vi.mocked(mergeDuplicateDocuments).mockResolvedValueOnce({
+      kept_document: keptDocument,
+      archived_documents: [
+        {
+          ...duplicateDocument,
+          status: "archived",
+          archived_at: "2026-07-10T00:00:00.000Z",
+        },
+      ],
+    });
+
+    renderAppShell();
+
+    fireEvent.click(await screen.findByRole("button", { name: /Duplicates/ }));
+    expect(
+      await screen.findByRole("heading", { name: "Duplicates" }),
+    ).toBeInTheDocument();
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Archive 1 duplicate" }),
+    );
+
+    await waitFor(() => {
+      expect(mergeDuplicateDocuments).toHaveBeenCalledWith({
+        keep_document_id: "document-keep",
+        duplicate_document_ids: ["document-duplicate"],
+      });
     });
   });
 

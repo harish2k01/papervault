@@ -103,6 +103,17 @@ Phase 16 makes due-date and expiry reminders a user-facing workflow:
 - Document detail shows only reminders for the selected document and can manually refresh reminders after metadata edits.
 - Notification status changes remain explicit user actions: pending, read, and dismissed.
 
+## Duplicate Resolution
+
+Phase 17 turns exact duplicate detection into a resolution workflow:
+
+- Duplicate candidate groups are still generated from active documents with the same SHA-256 hash.
+- Merge is conservative: the user chooses one document to keep, and PaperVault archives the selected redundant copies.
+- Merge validation is owner-scoped and rejects archived documents, missing documents, the keep document appearing in the archive list, and non-matching hashes.
+- Archived duplicates keep their database rows, timeline, versions, and object-storage references. No source blobs are deleted during merge.
+- The web app exposes a Duplicates workspace with group counts, keeper selection, document open actions, and a single merge action per group.
+- Search projection refresh is best-effort for the kept document and archived duplicates after PostgreSQL commits.
+
 ## AI Processing
 
 Phase 4 adds provider interfaces for AI analysis and embeddings. The default providers are local and deterministic:
