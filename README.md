@@ -1,47 +1,98 @@
 # PaperVault
 
-PaperVault is a production-oriented, self-hostable personal document management system. It turns PDFs, scanned PDFs, and images into a searchable knowledge base with OCR, metadata extraction, AI summaries, semantic search, timelines, duplicate detection, and notifications.
+PaperVault is a self-hosted document management system for turning PDFs, scans, and images into a private searchable knowledge base. Original files remain in S3-compatible object storage while PostgreSQL stores metadata, audit history, tags, users, and processing state. OpenSearch provides full-text and vector search.
 
-This repository is being built iteratively. Phase 1 established the foundation. Phase 2 added the core domain registry, relational schema, migrations, and persistence boundaries. Phase 3 added uploads, object storage, processing jobs, and text-extraction records. Phase 4 added AI analysis and embedding provider boundaries. Phase 5 added the first usable knowledge-base layer. Phase 6 added local JWT authentication, password hashing, RBAC dependencies, admin user management, and a frontend auth gate. Phase 7 added a self-hosted OCR adapter for scanned PDFs and images. Phase 8 added OpenSearch indexing and reindexing infrastructure. Phase 9 added GHCR image publishing and a deployable Helm chart. Phase 10 moves user-facing search to OpenSearch with PostgreSQL fallback and adds deployment smoke tests.
+## What PaperVault Does
+
+- Upload PDFs, scanned PDFs, JPEGs, and PNGs.
+- Extract embedded text and fall back to Tesseract OCR for scans.
+- Classify common financial, employment, identity, medical, education, property, and purchase documents.
+- Generate summaries, keywords, entities, suggested tags, structured metadata, and embeddings.
+- Search by keyword, meaning, document type, date, tag, issuer, organization, or combined filters.
+- Save searches and revisit recent queries.
+- Read documents in a built-in page-aware PDF viewer with in-document highlighting.
+- Track metadata edits, tag changes, archive actions, versions, reminders, and duplicate resolution.
+- Use local accounts or OIDC providers such as Authentik and Keycloak.
+- Administer registration, user access, roles, and active runtime providers from the web app.
+
+The complete capability matrix and planned work are documented in [Product Scope](docs/product-scope.md).
 
 ## Architecture
 
-PaperVault starts as a modular monolith with explicit boundaries:
+PaperVault is a modular monolith with separate runtime processes:
 
-- `apps/api`: FastAPI HTTP API, configuration, observability, database setup, route composition, domain modules, and persistence adapters.
-- `apps/worker`: Celery worker container using the backend package.
-- `apps/web`: React, TypeScript, Vite, TanStack Router, TanStack Query, Tailwind, shadcn-style primitives.
-- `infra`: Docker Compose, Kubernetes, and Helm deployment assets.
-- `docs`: architecture documentation and ADRs.
+- `apps/api`: FastAPI, application services, SQLAlchemy models, provider adapters, and Alembic migrations.
+- `apps/worker`: Celery worker image built from the backend package.
+- `apps/web`: React, TypeScript, Vite, TanStack Query/Router, Tailwind, and reusable UI primitives.
+- `infra`: Docker Compose, Kubernetes, Helm, Gateway API, and deployment configuration.
+- `docs`: architecture, operations, API reference, and decision records.
 
-The first durable boundary is between orchestration and domain logic. HTTP routes and Celery tasks should remain thin. Business workflows belong in application services/use cases. Provider-specific integrations such as OCR, embeddings, object storage, and search should sit behind interfaces so implementations can be swapped.
+HTTP routes and Celery tasks are orchestration boundaries. Document, identity, administration, search, tagging, notification, and lifecycle behavior belongs to feature-owned application services. OCR, AI, embeddings, storage, OIDC, and search engines are accessed through provider interfaces.
 
-## Local Development
+See [Architecture](docs/architecture.md) for the system model and data flows.
 
-Copy the environment template:
+## Quick Start
+
+Prerequisites:
+
+- Docker with Docker Compose
+- At least 8 GB of available memory for the complete local stack
+
+Create local configuration and start the services:
 
 ```bash
 cp .env.example .env
-```
-
-Start the stack:
-
-```bash
 docker compose up --build
 ```
 
-Expected local services:
+Open:
 
-- API: `http://localhost:8000`
+- Web app: `http://localhost:5173`
 - API health: `http://localhost:8000/health`
-- Web: `http://localhost:5173`
 - MinIO console: `http://localhost:9001`
 - OpenSearch: `http://localhost:9200`
 
-## Current Status
+The first registered account becomes an administrator. Before exposing an instance publicly, replace every default secret, disable development identity headers, and decide whether open registration should remain enabled.
 
-Phase 10 includes OpenSearch-backed query execution, PostgreSQL fallback behavior, migration readiness hardening, Helm smoke tests, and a reusable public cluster smoke script. OIDC login, richer OCR language packs, and production backup/restore automation are planned for later phases after approval.
+## Production Deployment
+
+The Helm chart deploys the API, worker, web frontend, migration job, services, health probes, and an optional Gateway API `HTTPRoute`. Production deployments should use externally managed PostgreSQL, Redis, object storage, and OpenSearch with tested backups.
+
+Read [Deployment](docs/deployment.md) before installing outside a development environment.
+
+## Development
+
+Backend:
+
+```bash
+cd apps/api
+python -m venv .venv
+source .venv/bin/activate
+pip install -e ".[dev]"
+alembic upgrade head
+pytest
+```
+
+Frontend:
+
+```bash
+cd apps/web
+npm install
+npm run dev
+```
+
+Detailed setup, Windows commands, provider configuration, and validation steps are in [Developer Setup](docs/development.md).
+
+## Documentation
+
+- [Product scope and roadmap](docs/product-scope.md)
+- [Architecture](docs/architecture.md)
+- [Database](docs/database.md)
+- [API](docs/api.md)
+- [Deployment](docs/deployment.md)
+- [Contributing](CONTRIBUTING.md)
+- [Architecture decision records](docs/adr)
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
+PaperVault is available under the [MIT License](LICENSE).

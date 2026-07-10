@@ -1,203 +1,122 @@
-# PaperVault Architecture
+# Architecture
 
 ## System Context
 
-PaperVault stores personal documents as immutable binary objects and keeps metadata, timelines, tags, extraction results, search history, notifications, and user state in PostgreSQL. Searchable text and vector-ready document projections are indexed in OpenSearch while the API retains a database-backed query fallback. Long-running work runs outside the request path through Celery workers.
+PaperVault keeps document binaries in S3-compatible object storage and stores metadata, users, processing state, timelines, tags, notifications, and search history in PostgreSQL. OpenSearch is a rebuildable query projection. Redis transports background jobs to Celery workers.
 
 ```mermaid
 flowchart LR
-  User["User"] --> Web["React Web App"]
+  User["User"] --> Web["React web app"]
   Web --> API["FastAPI API"]
-  API --> Postgres["PostgreSQL metadata"]
-  API --> S3["MinIO/S3 document blobs"]
-  API --> Redis["Redis broker/cache"]
+  API --> Postgres["PostgreSQL"]
+  API --> Storage["MinIO / S3"]
+  API --> Redis["Redis"]
   API --> Search["OpenSearch"]
-  Redis --> Worker["Celery Worker"]
+  Redis --> Worker["Celery worker"]
   Worker --> Postgres
-  Worker --> S3
+  Worker --> Storage
   Worker --> Search
-  Worker --> Providers["OCR / AI / Embedding Providers"]
+  Worker --> Providers["OCR / AI / embedding providers"]
 ```
 
-## Backend Boundaries
+PostgreSQL and object storage are authoritative. OpenSearch can be rebuilt from those sources and is never the only copy of document metadata or extracted text.
 
-The backend follows clean architecture boundaries:
+## Code Boundaries
 
-- `api`: HTTP route composition, request/response models, dependency wiring.
-- `core`: configuration, logging, observability, cross-cutting runtime concerns.
-- `db`: SQLAlchemy engine/session and Alembic integration.
-- `worker`: Celery application and task registration.
-- Feature packages: `documents`, `timeline`, `tags`, `identity`, `search`, `notifications`.
+The backend is a modular monolith organized by feature:
 
-Feature packages should own their use cases, domain models, API schemas, and infrastructure adapters. Cross-feature imports should be deliberate and minimal.
+- `documents`: uploads, extraction, processing, metadata, versions, viewer data, retry, archive, and duplicate resolution.
+- `identity`: local authentication, OIDC, JWTs, RBAC, and user management.
+- `administration`: persisted instance policy and runtime administration views.
+- `search`: database and OpenSearch query/index adapters plus search history.
+- `tags`: tag ownership and document assignment.
+- `notifications`: reminder projection and user status.
+- `timeline`: append-only document activity.
+- `core`: configuration, logging, health, and observability.
 
-## Persistence Model
+HTTP routes validate transport data and call application services. Celery tasks compose provider adapters and use cases. Business rules do not belong in route handlers or task functions.
 
-Phase 2 adds the core relational schema:
+The frontend follows the same feature-first approach:
 
-- `users`
-- `documents`
-- `document_versions`
-- `document_metadata`
-- `tags`
-- `document_tags`
-- `timeline_events`
+- `app`: providers and routing.
+- `features`: documents, administration, tags, duplicates, notifications, and shell workflows.
+- `components/ui`: shared interaction primitives.
+- `lib`: typed API client, configuration, and small utilities.
 
-Document files are represented by object-storage bucket/key/version fields. Extracted metadata is stored as versioned JSON records, while searchable indexes and embeddings will be created in later phases.
-
-## Upload and Processing Flow
-
-Phase 3 separates upload from processing:
+## Upload And Processing
 
 ```mermaid
 sequenceDiagram
   participant Web
   participant API
-  participant S3 as "MinIO/S3"
-  participant DB as "PostgreSQL"
+  participant Storage as MinIO/S3
+  participant DB as PostgreSQL
   participant Redis
   participant Worker
+  participant Search as OpenSearch
 
-  Web->>API: POST /documents/uploads
-  API->>API: Validate, stage, hash
-  API->>S3: Store original object
+  Web->>API: Upload PDF or image
+  API->>API: Validate size/type, stage, hash
+  API->>Storage: Store original binary
   API->>DB: Create document, version, timeline event
-  API->>Redis: Enqueue processing task
-  Worker->>S3: Download original object
+  API->>Redis: Enqueue document id
+  Worker->>DB: Mark processing started
+  Worker->>Storage: Download original
   Worker->>Worker: Extract embedded text or OCR
-  Worker->>DB: Store text extraction result
-  Worker->>Worker: Analyze text and create embedding
-  Worker->>DB: Store AI outputs and embedding
+  Worker->>Worker: Normalize unsafe control characters
+  Worker->>DB: Store extraction and page text
+  Worker->>Worker: Analyze, classify, and embed
+  Worker->>DB: Store metadata, AI output, reminders, completion state
+  Worker->>Search: Update document projection
 ```
 
-OCR is an adapter behind the text extraction interface. Phase 7 adds a local Tesseract adapter for scanned PDFs and images. PDFs without embedded text are rendered to page images with Poppler before OCR. The unavailable OCR adapter remains available for deployments that intentionally disable OCR.
+Processing state is committed before expensive work starts. Expected extraction failures and unexpected worker failures end in a visible `failed` state with a user-safe diagnostic. Failed and stale queued documents can be re-enqueued without re-uploading the source file. Archive is terminal and cannot be overwritten by a late worker.
+
+## Extraction And Intelligence
+
+The extraction interface supports embedded PDF text and OCR adapters. The default composite implementation tries embedded text first and uses Poppler plus Tesseract when the PDF has no usable text. Extracted text is normalized at the persistence boundary so provider-specific control characters cannot invalidate a PostgreSQL transaction.
+
+Page text is stored as immutable children of each extraction. Flattened text remains available for summaries, metadata extraction, embeddings, and global search.
+
+AI analysis and embeddings use provider interfaces. The default local providers are deterministic and require no external service. Model-backed providers can be added without changing processing orchestration or storage contracts.
+
+## Search
+
+The worker projects owned document fields, current text, AI output, metadata, tags, and embeddings into OpenSearch. Keyword, semantic, and hybrid queries use OpenSearch when enabled. A PostgreSQL scorer remains available as a controlled fallback.
+
+Lifecycle and tag changes commit to PostgreSQL first and then refresh the search projection on a best-effort basis. Indexing failure is observable but does not roll back a successful metadata edit.
 
 ## Document Lifecycle
 
-Phase 12 adds command-side document lifecycle operations:
+- Source binaries are not stored in PostgreSQL.
+- Metadata updates create versioned current records rather than overwriting extraction history.
+- Archive hides documents from normal lists, duplicate candidates, notifications, and search without deleting source data.
+- Exact duplicate resolution archives redundant copies chosen by the user.
+- Version records hold immutable storage references; replacement and restore workflows remain planned.
+- Timeline events capture uploads, metadata edits, tag changes, archives, and related lifecycle actions.
 
-- Document fields such as title, type, date, issuer, and organization can be manually edited.
-- Structured metadata replacement creates a new current manual metadata record and keeps older records for audit/history.
-- Metadata updates derive searchable document fields from common metadata keys such as `vendor`, `provider`, `bank`, `employer`, `purchase_date`, and `expiry_date`.
-- Archive marks a document as `archived`, records a timeline event, and removes it from default document listing, duplicate detection, and search results.
-- Version history is exposed in document detail from the existing `document_versions` table.
+## Identity And Administration
 
-Lifecycle commands update PostgreSQL first and then refresh the OpenSearch projection on a best-effort basis. Search indexing failures are logged but do not reject the user's metadata edit or archive action.
+Local passwords use PBKDF2-SHA256 with per-password salts. JWT access tokens carry issuer, audience, expiry, subject, email, and role claims; each request also checks the current database user state. OIDC uses provider discovery, authorization code exchange, signed callback state, nonce verification, and JWKS-backed ID token validation.
 
-## Tags
+The first account becomes an administrator. Administrators can manage users and override the local-registration policy at runtime. The environment value remains the bootstrap default until a persisted instance setting is saved. Provider names and operational capability flags are visible to administrators, while secrets remain environment or secret-store configuration.
 
-Phase 14 makes tags an editable document workflow:
+## Viewer And UI
 
-- Users can attach an existing tag, create a new manual tag directly from document detail, detach an assigned tag, or accept an AI-suggested tag.
-- Suggested tags are treated as recommendations until the user accepts them. Accepted suggestions create or reuse manual tags and then attach them to the document.
-- Tag assignment remains an owner-scoped backend use case that validates document and tag ownership and writes `tags_changed` timeline events.
-- Tag attach and detach operations refresh the OpenSearch document projection on a best-effort basis so tag filters remain consistent with PostgreSQL.
+The PDF viewer is loaded only when a preview opens. PDF.js renders one responsive page at a time with zoom, page navigation, a text layer, and highlighted literal matches. OCR-only documents use stored page text for result navigation; precise image overlays require OCR geometry that is not yet persisted.
 
-## Notifications
+The application shell keeps primary navigation and search persistent while secondary editors, raw metadata, filters, and administration controls appear only when requested. Settings are visible only to administrators. Light and dark themes share the same semantic design tokens.
 
-Phase 16 makes due-date and expiry reminders a user-facing workflow:
+## Observability
 
-- Notification records are owner-scoped PostgreSQL rows derived from current document metadata fields such as `due_date`, `expiry_date`, `renewal_date`, and `warranty_expiry_date`.
-- Notification sync is a projection refresh. It upserts currently valid reminders and dismisses stale reminders when metadata dates change or disappear.
-- The web app exposes a Notifications workspace with pending, all, read, and dismissed views plus overdue and due-soon counts.
-- Document detail shows only reminders for the selected document and can manually refresh reminders after metadata edits.
-- Notification status changes remain explicit user actions: pending, read, and dismissed.
+- Structured application and worker logs.
+- Prometheus metrics at `/metrics`.
+- OpenTelemetry tracing when an OTLP endpoint is configured.
+- Liveness and database-backed readiness endpoints for orchestration.
+- User-safe processing diagnostics in PostgreSQL with detailed exceptions retained in worker logs.
 
-## Duplicate Resolution
+Readiness verifies the API database path. Deeper object-storage, Redis, and OpenSearch synthetic checks belong in external monitoring so transient optional-provider failures do not remove every API pod from service.
 
-Phase 17 turns exact duplicate detection into a resolution workflow:
+## Deployment
 
-- Duplicate candidate groups are still generated from active documents with the same SHA-256 hash.
-- Merge is conservative: the user chooses one document to keep, and PaperVault archives the selected redundant copies.
-- Merge validation is owner-scoped and rejects archived documents, missing documents, the keep document appearing in the archive list, and non-matching hashes.
-- Archived duplicates keep their database rows, timeline, versions, and object-storage references. No source blobs are deleted during merge.
-- Worker processing treats archive as terminal so a queued upload job cannot make a resolved duplicate active again.
-- The web app exposes a Duplicates workspace with group counts, keeper selection, document open actions, and a single merge action per group.
-- Search projection refresh is best-effort for the kept document and archived duplicates after PostgreSQL commits.
-
-## Page-Aware Document Search
-
-Phase 18 makes the built-in viewer and extracted text share one page model:
-
-- Embedded PDF extraction and OCR both emit ordered page text while retaining the flattened extraction text used by AI analysis and global search.
-- Page text is stored in `document_text_pages` as immutable children of a text extraction. Reprocessing creates a new current extraction and page set without rewriting previous extraction history.
-- The owner-scoped document text-search use case searches only the current extraction and returns bounded, structured excerpts. Result fragments are split into `before`, `match`, and `after` fields so clients never need to render backend-generated HTML.
-- The web viewer loads PDF.js only when a preview opens, renders one responsive page at a time, and highlights literal matches in the PDF text layer. OCR-only matches navigate to the correct scanned page and remain highlighted in the result excerpt.
-- Legacy extractions without page rows use their flattened text as a compatibility fallback and explicitly report that page navigation is unavailable.
-
-## AI Processing
-
-Phase 4 adds provider interfaces for AI analysis and embeddings. The default providers are local and deterministic:
-
-- Rule-based document analysis for summary, keywords, entities, suggested tags, category, confidence, and metadata.
-- Hashing-based embeddings for a self-hosted baseline.
-
-Provider outputs are stored in PostgreSQL. Phase 5 used those records for database-backed keyword, semantic, and hybrid search. Phase 10 keeps the database scorer as a fallback while moving the primary query path to OpenSearch when indexing is enabled.
-
-## Search Indexing
-
-Phase 8 adds OpenSearch indexing behind a provider boundary, and Phase 10 adds user-facing query execution:
-
-- The worker projects document metadata, current text extraction, current AI analysis, tags, metadata, and embeddings into a search document.
-- The OpenSearch adapter creates `papervault-documents-v1` with keyword, text, object, date, and `knn_vector` fields.
-- Indexing failures are logged and do not mark document processing as failed.
-- `/search/index/documents/{document_id}` and `/search/index/rebuild` allow owner-scoped reindexing.
-- `POST /search` uses OpenSearch for keyword, semantic, and hybrid queries when `PAPERVAULT_SEARCH_QUERY_BACKEND=opensearch` and indexing is enabled.
-- PostgreSQL remains the source of truth and the fallback query path when OpenSearch is unavailable or explicitly disabled.
-- Document lifecycle and tag mutations refresh an affected document's projection after the database transaction succeeds.
-- Phase 13 exposes advanced filters in the web app for document type, tag, issuer, organization, date range, and archived inclusion.
-- Saved and recent searches reuse the same typed search request shape, so applying a saved or recent search goes through the same query path as a manual search.
-
-## Identity and Access
-
-Phase 6 adds local authentication without moving auth logic into route handlers, and Phase 11
-adds OIDC authorization-code login:
-
-- Local account registration and login are handled by the identity application service.
-- Password hashes use PBKDF2-SHA256 with per-password salts and configurable iterations.
-- Bearer tokens are signed JWTs with issuer, audience, expiry, user id, email, and role claims.
-- `get_current_user` validates bearer tokens first and falls back to development headers only outside production when explicitly enabled.
-- RBAC is exposed through reusable dependencies such as admin-only user management.
-- OIDC discovery, authorization URL generation, token exchange, and JWKS-backed ID token verification live behind an infrastructure adapter.
-- OIDC callback state is signed with `JWT_SIGNING_KEY` and includes a nonce, expiry, and same-origin post-login redirect path.
-- OIDC users are created by provider subject. Existing local accounts are not automatically linked by email.
-
-## Frontend Boundaries
-
-The frontend is feature-first:
-
-- `app`: application composition, providers, routing.
-- `features`: user-facing workflows and feature-specific state.
-- `components/ui`: shared primitive components.
-- `lib`: small shared utilities and API client code.
-
-Phase 15 improves the production workspace shell without changing API contracts:
-
-- The document workspace uses a focused empty-vault mode first, then switches to three explicit regions: vault navigation, search/list, and document review.
-- Empty states are actionable but restrained: the first-run view has one primary upload action, while search recovery appears only when a search has no matches.
-- Search keeps the primary query path visible while advanced filters are grouped behind an expandable panel.
-- Saved and recent search shortcuts are shown only after they contain useful entries.
-- Populated vaults use a reader-first document review surface. Preview, summary, and extracted fields are primary; edit forms and raw metadata are behind disclosures.
-- Failed or still-processing files show bounded status panels instead of mounting the PDF viewer.
-- The desktop shell is viewport-bound: navigation, document list, and document review scroll independently instead of stretching one long page.
-- Secondary controls such as saved-search creation, manual tag management, document field editing, and raw JSON editing mount only when explicitly opened.
-- Shared styling remains small: design tokens, the button primitive, and local shell presentation components. A larger design-system extraction is deferred until repeated UI patterns justify it.
-
-## Data Storage
-
-Document files are never stored in PostgreSQL. The database stores metadata and object references. Object storage is responsible for original uploads, extracted page images if needed, and derived artifacts that are too large for relational storage.
-
-## Provider Strategy
-
-OCR, embeddings, LLM summaries, object storage, and search providers are implemented behind interfaces. The default self-hosted path works without proprietary services; hosted AI providers and remote OCR providers can be added as optional adapters.
-
-## Deployment Model
-
-Phase 9 adds a Kubernetes deployment boundary, and Phase 10 hardens deployment verification:
-
-- GitHub Actions builds API, worker, and web images and pushes them to GHCR.
-- The Helm chart deploys API, worker, web, services, config, secrets, an Alembic migration job, and a Helm smoke test.
-- PostgreSQL, Redis, S3-compatible object storage, and OpenSearch remain external production services.
-- Runtime secrets can be chart-managed for local labs or supplied through an existing Kubernetes Secret for production.
-- The lab profile can optionally deploy PostgreSQL, Redis, MinIO, and OpenSearch for smoke testing.
-- API and worker pods run with non-root, restricted-style security contexts. The web image now listens on port 8080 so it can run as non-root.
+Docker Compose provides a complete development stack. The Helm chart deploys the stateless application workloads, migration hook, probes, services, and optional Gateway API route. Lab dependencies are suitable for tests and homelabs; long-lived production installations should use managed or operator-owned stateful services with tested backup and restore procedures.

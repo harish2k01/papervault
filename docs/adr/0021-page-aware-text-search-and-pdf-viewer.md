@@ -22,4 +22,4 @@ Legacy extractions without page rows fall back to flattened-text matching and ad
 - The initial web bundle does not include PDF.js; the viewer and worker are loaded only when needed.
 - Search excerpts are safe to render because the API returns text segments rather than HTML.
 - Existing documents need reprocessing before page navigation becomes available.
-- Pixel-accurate highlights over scanned page images are not possible until OCR bounding boxes are stored; Phase 18 highlights the OCR result excerpt and navigates to the matching page instead.
+- Pixel-accurate highlights over scanned page images are not possible until OCR bounding boxes are stored; the viewer highlights the OCR result excerpt and navigates to the matching page instead.

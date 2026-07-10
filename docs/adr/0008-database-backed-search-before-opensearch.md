@@ -10,7 +10,7 @@ PaperVault needs keyword, semantic, and hybrid search. OpenSearch is part of the
 
 ## Decision
 
-Phase 5 implements search through PostgreSQL-backed records:
+The initial search implementation uses PostgreSQL-backed records:
 
 - keyword scoring over document title, filename, issuer, organization, summary, and extracted text
 - semantic scoring over stored document embeddings
@@ -18,7 +18,7 @@ Phase 5 implements search through PostgreSQL-backed records:
 - filters for document type, issuer, organization, tags, and dates
 - saved and recent searches
 
-OpenSearch indexing remains the production search target for a later hardening step. Phase 8 starts that transition by indexing document projections into OpenSearch while retaining database-backed query execution.
+OpenSearch indexing is the production search target. The transition starts by indexing document projections into OpenSearch while retaining database-backed query execution.
 
 ## Consequences
 

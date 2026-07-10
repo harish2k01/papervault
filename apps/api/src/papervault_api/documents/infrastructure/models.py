@@ -84,6 +84,9 @@ class Document(UuidPrimaryKeyMixin, TimestampMixin, Base):
     page_count: Mapped[int | None] = mapped_column(Integer)
     language: Mapped[str | None] = mapped_column(String(16))
     summary: Mapped[str | None] = mapped_column(Text)
+    processing_error: Mapped[str | None] = mapped_column(Text)
+    processing_started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    processing_completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     metadata_records: Mapped[list[DocumentMetadataRecord]] = relationship(
@@ -304,7 +307,11 @@ class DocumentTextPage(UuidPrimaryKeyMixin, Base):
     )
 
     text_extraction_id: Mapped[UUID] = mapped_column(
-        ForeignKey("document_text_extractions.id", ondelete="CASCADE"),
+        ForeignKey(
+            "document_text_extractions.id",
+            name="fk_text_pages_extraction",
+            ondelete="CASCADE",
+        ),
         nullable=False,
     )
     page_number: Mapped[int] = mapped_column(Integer, nullable=False)

@@ -138,7 +138,7 @@ export function NotificationsWorkspace({
 
           {error ? (
             <p
-              className="m-4 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-900"
+              className="m-4 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-900 dark:border-rose-900 dark:bg-rose-950 dark:text-rose-100"
               role="alert"
             >
               {error}
@@ -198,9 +198,9 @@ function NotificationStatCard({
           className={cn(
             "flex h-9 w-9 items-center justify-center rounded-lg",
             tone === "danger"
-              ? "bg-rose-50 text-rose-700"
+              ? "bg-rose-50 text-rose-700 dark:bg-rose-950 dark:text-rose-300"
               : tone === "warning"
-                ? "bg-amber-50 text-amber-700"
+                ? "bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-300"
                 : "bg-muted text-muted-foreground",
           )}
         >
@@ -241,9 +241,9 @@ function NotificationRow({
                 "rounded-full px-2.5 py-1 text-xs font-medium",
                 notification.status === "pending"
                   ? dueState.tone === "danger"
-                    ? "bg-rose-50 text-rose-800"
+                    ? "bg-rose-50 text-rose-800 dark:bg-rose-950 dark:text-rose-200"
                     : dueState.tone === "warning"
-                      ? "bg-amber-50 text-amber-800"
+                      ? "bg-amber-50 text-amber-800 dark:bg-amber-950 dark:text-amber-200"
                       : "bg-primary/10 text-primary"
                   : "bg-muted text-muted-foreground",
               )}

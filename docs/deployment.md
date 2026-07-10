@@ -1,6 +1,6 @@
 # Deployment Guide
 
-This guide covers the current production deployment boundary. The Helm chart deploys PaperVault application workloads and expects stateful dependencies to be provided separately.
+The Helm chart deploys PaperVault application workloads and expects production stateful dependencies to be provided separately.
 
 ## Required Services
 
@@ -133,8 +133,9 @@ and developer clusters, not long-lived production data. Production deployments s
 use operator-managed or external dependencies with explicit backup and restore
 procedures.
 
-The repository includes `infra/helm/papervault/values-cluster-test.yaml` as an example
-profile for GHCR images, Traefik Gateway API routing, and chart-managed lab services.
+The repository includes `infra/helm/papervault/values-lab.example.yaml` as a redacted
+starting point for GHCR images, Gateway API routing, and chart-managed lab services.
+Keep environment-specific values and secrets outside version control.
 
 ## Smoke Tests
 

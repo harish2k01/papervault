@@ -92,6 +92,9 @@ async def test_processing_service_records_current_text_extraction(session: Async
 
     assert refreshed_document is not None
     assert refreshed_document.status == DocumentStatus.READY.value
+    assert refreshed_document.processing_started_at is not None
+    assert refreshed_document.processing_completed_at is not None
+    assert refreshed_document.processing_error is None
     assert extraction.status == TextExtractionStatus.SUCCEEDED.value
     assert extraction.content_text == "Hello from a PDF"
     assert extraction.is_current is True

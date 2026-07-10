@@ -30,7 +30,7 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(
             ["text_extraction_id"],
             ["document_text_extractions.id"],
-            name="fk_document_text_pages_text_extraction_id_document_text_extractions",
+            name="fk_text_pages_extraction",
             ondelete="CASCADE",
         ),
         sa.PrimaryKeyConstraint("id", name="pk_document_text_pages"),

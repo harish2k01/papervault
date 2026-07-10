@@ -21,6 +21,9 @@ class DocumentResponse(BaseModel):
     document_date: date | None
     issuer: str | None
     organization: str | None
+    processing_error: str | None
+    processing_started_at: datetime | None
+    processing_completed_at: datetime | None
     archived_at: datetime | None
     created_at: datetime
     updated_at: datetime
@@ -29,6 +32,11 @@ class DocumentResponse(BaseModel):
 class UploadDocumentResponse(BaseModel):
     document: DocumentResponse
     processing_task_id: str | None
+
+
+class ReprocessDocumentResponse(BaseModel):
+    document: DocumentResponse
+    processing_task_id: str
 
 
 class MetadataFieldDefinitionResponse(BaseModel):

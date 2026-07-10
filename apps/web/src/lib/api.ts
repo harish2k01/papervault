@@ -56,6 +56,9 @@ export type DocumentItem = {
   document_date: string | null;
   issuer: string | null;
   organization: string | null;
+  processing_error?: string | null;
+  processing_started_at?: string | null;
+  processing_completed_at?: string | null;
   archived_at: string | null;
   created_at: string;
   updated_at: string;
@@ -219,6 +222,18 @@ export type DuplicateMergeResult = {
   archived_documents: DocumentItem[];
 };
 
+export type AdminSettings = {
+  local_registration_enabled: boolean;
+  local_auth_enabled: boolean;
+  oidc_configured: boolean;
+  ai_provider: string;
+  embedding_provider: string;
+  ocr_provider: string;
+  search_backend: string;
+  search_index_enabled: boolean;
+  max_upload_size_bytes: number;
+};
+
 export function getDevUserId() {
   const existing = window.localStorage.getItem(DEV_USER_ID_KEY);
   if (existing) {
@@ -284,6 +299,37 @@ export async function getAuthConfig() {
 
 export async function getMe() {
   return apiFetch<AuthUser>("/auth/me");
+}
+
+export async function listUsers() {
+  return apiFetch<AuthUser[]>("/users");
+}
+
+export async function updateUser(
+  userId: string,
+  input: Partial<{
+    display_name: string | null;
+    role: "admin" | "user";
+    is_active: boolean;
+  }>,
+) {
+  return apiFetch<AuthUser>(`/users/${userId}`, {
+    method: "PATCH",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function getAdminSettings() {
+  return apiFetch<AdminSettings>("/admin/settings");
+}
+
+export async function updateAdminSettings(input: {
+  local_registration_enabled: boolean;
+}) {
+  return apiFetch<AdminSettings>("/admin/settings", {
+    method: "PATCH",
+    body: JSON.stringify(input),
+  });
 }
 
 export async function registerAccount(input: {
@@ -428,6 +474,16 @@ export async function updateDocumentMetadata(
 
 export async function archiveDocument(documentId: string) {
   return apiFetch<DocumentItem>(`/documents/${documentId}/archive`, {
+    method: "POST",
+    body: JSON.stringify({}),
+  });
+}
+
+export async function reprocessDocument(documentId: string) {
+  return apiFetch<{
+    document: DocumentItem;
+    processing_task_id: string;
+  }>(`/documents/${documentId}/reprocess`, {
     method: "POST",
     body: JSON.stringify({}),
   });

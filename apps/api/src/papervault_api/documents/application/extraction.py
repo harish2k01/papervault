@@ -1,3 +1,4 @@
+import unicodedata
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
@@ -21,3 +22,13 @@ class TextExtractionResult:
 class TextExtractor(Protocol):
     def extract(self, file_path: Path, content_type: str) -> TextExtractionResult:
         raise NotImplementedError
+
+
+def sanitize_extracted_text(text: str) -> str:
+    normalized = unicodedata.normalize("NFC", text)
+    return "".join(
+        character
+        if character in {"\n", "\r", "\t"} or unicodedata.category(character) != "Cc"
+        else ""
+        for character in normalized
+    )

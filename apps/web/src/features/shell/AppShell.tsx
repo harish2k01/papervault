@@ -11,9 +11,12 @@ import {
   type LucideIcon,
   LogIn,
   LogOut,
+  Moon,
   RefreshCw,
   Search,
+  Settings2,
   ShieldCheck,
+  Sun,
   Tags,
   Upload,
   UserPlus,
@@ -42,6 +45,7 @@ import {
   createTag,
   detachTag,
   getAuthConfig,
+  getAdminSettings,
   getDocument,
   getMe,
   getStoredAccessToken,
@@ -49,6 +53,7 @@ import {
   listDocuments,
   listDuplicates,
   listNotifications,
+  listUsers,
   listRecentSearches,
   listSavedSearches,
   listTags,
@@ -56,16 +61,20 @@ import {
   mergeDuplicateDocuments,
   parseOidcCallbackHash,
   registerAccount,
+  reprocessDocument,
   saveSearch,
   searchDocuments,
   storeAccessToken,
   syncDocumentNotifications,
   updateDocument,
   updateDocumentMetadata,
+  updateAdminSettings,
   updateNotificationStatus,
+  updateUser,
   uploadDocument,
 } from "../../lib/api";
 import { cn } from "../../lib/utils";
+import { SettingsWorkspace } from "../administration/SettingsWorkspace";
 import { DuplicatesWorkspace } from "./DuplicatesWorkspace";
 import { NotificationsWorkspace } from "./NotificationsWorkspace";
 import { TagsWorkspace } from "./TagsWorkspace";
@@ -75,7 +84,8 @@ import {
   getDueState,
 } from "./notification-utils";
 
-type WorkspaceView = "documents" | "duplicates" | "tags" | "notifications";
+type WorkspaceView =
+  "documents" | "duplicates" | "tags" | "notifications" | "settings";
 
 const DocumentPreview = lazy(async () => {
   const module = await import("../documents/DocumentPreview");
@@ -92,6 +102,12 @@ const navItems = [
   label: string;
   icon: LucideIcon;
 }>;
+
+const settingsNavItem = {
+  key: "settings",
+  label: "Settings",
+  icon: Settings2,
+} satisfies { key: WorkspaceView; label: string; icon: LucideIcon };
 
 type DocumentListEntry = Pick<
   DocumentItem,
@@ -130,6 +146,9 @@ export function AppShell() {
   const [selectedDocumentId, setSelectedDocumentId] = useState<string | null>(
     null,
   );
+  const [darkMode, setDarkMode] = useState(
+    () => window.localStorage.getItem("papervault.theme") === "dark",
+  );
 
   const authConfigQuery = useQuery({
     queryKey: ["auth-config"],
@@ -143,6 +162,8 @@ export function AppShell() {
   const canUseDevIdentity = authConfigQuery.data?.dev_headers_enabled === true;
   const canAccessWorkspace = accessToken !== null || canUseDevIdentity;
   const workspaceEnabled = canAccessWorkspace && !showAuthScreen;
+  const isAdmin = meQuery.data?.role === "admin";
+  const visibleNavItems = isAdmin ? [...navItems, settingsNavItem] : navItems;
 
   const documentsQuery = useQuery({
     queryKey: ["documents"],
@@ -193,6 +214,16 @@ export function AppShell() {
     queryFn: () => getDocument(selectedDocumentId!),
     enabled: workspaceEnabled && selectedDocumentId !== null,
   });
+  const adminSettingsQuery = useQuery({
+    queryKey: ["admin", "settings"],
+    queryFn: getAdminSettings,
+    enabled: workspaceEnabled && isAdmin,
+  });
+  const usersQuery = useQuery({
+    queryKey: ["admin", "users"],
+    queryFn: listUsers,
+    enabled: workspaceEnabled && isAdmin,
+  });
   const uploadMutation = useMutation({
     mutationFn: (file: File) => uploadDocument(file),
     onSuccess: async (response) => {
@@ -215,6 +246,41 @@ export function AppShell() {
         queryClient.invalidateQueries({ queryKey: ["document", document.id] }),
         queryClient.invalidateQueries({ queryKey: ["search"] }),
       ]);
+    },
+  });
+  const reprocessingMutation = useMutation({
+    mutationFn: reprocessDocument,
+    onSuccess: async (response) => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["documents"] }),
+        queryClient.invalidateQueries({
+          queryKey: ["document", response.document.id],
+        }),
+      ]);
+    },
+  });
+  const adminSettingsMutation = useMutation({
+    mutationFn: updateAdminSettings,
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["admin", "settings"] }),
+        queryClient.invalidateQueries({ queryKey: ["auth-config"] }),
+      ]);
+    },
+  });
+  const userUpdateMutation = useMutation({
+    mutationFn: (input: {
+      userId: string;
+      updates: Parameters<typeof updateUser>[1];
+    }) => updateUser(input.userId, input.updates),
+    onSuccess: async (user) => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["admin", "users"] }),
+        queryClient.invalidateQueries({ queryKey: ["auth", "me"] }),
+      ]);
+      if (user.id === meQuery.data?.id && user.role !== "admin") {
+        setActiveView("documents");
+      }
     },
   });
   const notificationStatusMutation = useMutation({
@@ -453,6 +519,20 @@ export function AppShell() {
     void queryClient.invalidateQueries();
   }, [queryClient]);
 
+  useEffect(() => {
+    document.documentElement.classList.toggle("dark", darkMode);
+    window.localStorage.setItem(
+      "papervault.theme",
+      darkMode ? "dark" : "light",
+    );
+  }, [darkMode]);
+
+  useEffect(() => {
+    if (activeView === "settings" && !isAdmin) {
+      setActiveView("documents");
+    }
+  }, [activeView, isAdmin]);
+
   const visibleDocuments = useMemo<DocumentListEntry[]>(() => {
     if (submittedSearch) {
       return (searchQuery.data ?? []).map((result) => ({
@@ -480,12 +560,7 @@ export function AppShell() {
   const pendingNotifications =
     notificationsQuery.data?.filter((item) => item.status === "pending")
       .length ?? 0;
-  const pendingDocuments =
-    documentsQuery.data?.filter((item) => item.status.includes("processing"))
-      .length ?? 0;
   const documentCount = documentsQuery.data?.length ?? 0;
-  const readyDocuments =
-    documentsQuery.data?.filter((item) => item.status === "ready").length ?? 0;
   const workspaceIsEmpty =
     !documentsQuery.isLoading &&
     documentCount === 0 &&
@@ -511,6 +586,20 @@ export function AppShell() {
       tagAttachMutation.error,
       tagDetachMutation.error,
     ].find((error): error is Error => error instanceof Error)?.message ?? null;
+  const reprocessingError =
+    reprocessingMutation.error instanceof Error
+      ? reprocessingMutation.error.message
+      : null;
+  const administrationError =
+    adminSettingsMutation.error instanceof Error
+      ? adminSettingsMutation.error.message
+      : userUpdateMutation.error instanceof Error
+        ? userUpdateMutation.error.message
+        : adminSettingsQuery.error instanceof Error
+          ? adminSettingsQuery.error.message
+          : usersQuery.error instanceof Error
+            ? usersQuery.error.message
+            : null;
 
   if (!authConfigQuery.data && accessToken === null) {
     return <AuthLoading />;
@@ -552,31 +641,36 @@ export function AppShell() {
                 </p>
               </div>
             </div>
-            <Button
-              aria-label={accessToken === null ? "Sign in" : "Sign out"}
-              className="xl:hidden"
-              size="icon"
-              type="button"
-              variant="ghost"
-              onClick={
-                accessToken === null
-                  ? () => setShowAuthScreen(true)
-                  : handleSignOut
-              }
-            >
-              {accessToken === null ? (
-                <LogIn className="h-4 w-4" aria-hidden="true" />
-              ) : (
-                <LogOut className="h-4 w-4" aria-hidden="true" />
-              )}
-            </Button>
+            <div className="flex items-center xl:hidden">
+              <ThemeButton
+                darkMode={darkMode}
+                onToggle={() => setDarkMode(!darkMode)}
+              />
+              <Button
+                aria-label={accessToken === null ? "Sign in" : "Sign out"}
+                size="icon"
+                type="button"
+                variant="ghost"
+                onClick={
+                  accessToken === null
+                    ? () => setShowAuthScreen(true)
+                    : handleSignOut
+                }
+              >
+                {accessToken === null ? (
+                  <LogIn className="h-4 w-4" aria-hidden="true" />
+                ) : (
+                  <LogOut className="h-4 w-4" aria-hidden="true" />
+                )}
+              </Button>
+            </div>
           </div>
 
           <nav
             aria-label="Primary navigation"
-            className="grid grid-cols-4 gap-1 xl:block xl:space-y-1"
+            className="grid grid-flow-col auto-cols-fr gap-1 xl:block xl:space-y-1"
           >
-            {navItems.map((item) => {
+            {visibleNavItems.map((item) => {
               const active = activeView === item.key;
               return (
                 <button
@@ -625,20 +719,16 @@ export function AppShell() {
             })}
           </nav>
 
-          {!workspaceIsEmpty ? (
-            <section className="mt-7 hidden rounded-lg border border-border bg-background p-3 xl:block">
-              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                Vault
-              </p>
-              <div className="mt-3 space-y-2">
-                <SidebarStat label="Ready" value={readyDocuments} />
-                <SidebarStat label="Processing" value={pendingDocuments} />
-                <SidebarStat label="Due soon" value={pendingNotifications} />
-              </div>
-            </section>
-          ) : null}
-
           <div className="mt-auto hidden xl:block">
+            <div className="mb-3 flex items-center justify-between border-t border-border pt-3">
+              <span className="text-xs text-muted-foreground">
+                {documentCount} documents · {pendingNotifications} due
+              </span>
+              <ThemeButton
+                darkMode={darkMode}
+                onToggle={() => setDarkMode(!darkMode)}
+              />
+            </div>
             <AuthStatus
               user={meQuery.data}
               usingDevIdentity={accessToken === null}
@@ -648,7 +738,26 @@ export function AppShell() {
           </div>
         </aside>
 
-        {activeView === "notifications" ? (
+        {activeView === "settings" && isAdmin ? (
+          <SettingsWorkspace
+            settings={adminSettingsQuery.data}
+            users={usersQuery.data ?? []}
+            currentUser={meQuery.data}
+            isLoading={adminSettingsQuery.isLoading || usersQuery.isLoading}
+            isUpdating={
+              adminSettingsMutation.isPending || userUpdateMutation.isPending
+            }
+            error={administrationError}
+            onRegistrationChange={(enabled) =>
+              adminSettingsMutation.mutate({
+                local_registration_enabled: enabled,
+              })
+            }
+            onUpdateUser={(userId, updates) =>
+              userUpdateMutation.mutate({ userId, updates })
+            }
+          />
+        ) : activeView === "notifications" ? (
           <NotificationsWorkspace
             notifications={notificationsQuery.data ?? []}
             documents={documentsQuery.data ?? []}
@@ -684,20 +793,12 @@ export function AppShell() {
           />
         ) : (
           <section className="flex min-w-0 flex-col bg-background xl:h-screen xl:min-h-0">
-            <header className="border-b border-border bg-card px-5 py-5 xl:px-7">
-              <div className="flex flex-col gap-5">
+            <header className="border-b border-border bg-card px-5 py-4 xl:px-6">
+              <div className="flex flex-col gap-4">
                 <div className="flex flex-wrap items-start justify-between gap-4">
-                  <div>
-                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                      Document workspace
-                    </p>
-                    <h1 className="mt-1 text-2xl font-semibold tracking-normal">
-                      Documents
-                    </h1>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      Search, upload, classify, and review extracted knowledge.
-                    </p>
-                  </div>
+                  <h1 className="text-xl font-semibold tracking-normal">
+                    Documents
+                  </h1>
                   <UploadButton
                     disabled={uploadMutation.isPending}
                     onUpload={(file) => uploadMutation.mutate(file)}
@@ -771,6 +872,7 @@ export function AppShell() {
                   archiveMutation.isPending
                 }
                 isSyncingNotifications={notificationSyncMutation.isPending}
+                isReprocessing={reprocessingMutation.isPending}
                 isTagUpdating={
                   tagCreateAttachMutation.isPending ||
                   tagAttachMutation.isPending ||
@@ -778,7 +880,11 @@ export function AppShell() {
                 }
                 tagError={tagMutationError}
                 notificationError={notificationActionError}
+                processingError={reprocessingError}
                 onArchive={(documentId) => archiveMutation.mutate(documentId)}
+                onReprocess={(documentId) =>
+                  reprocessingMutation.mutate(documentId)
+                }
                 onSyncNotifications={(documentId) =>
                   notificationSyncMutation.mutate(documentId)
                 }
@@ -993,13 +1099,13 @@ function AuthScreen({
             </label>
 
             {errorMessage ? (
-              <p className="rounded-md border border-rose-200 bg-rose-50 p-3 text-sm text-rose-900">
+              <p className="rounded-md border border-rose-200 bg-rose-50 p-3 text-sm text-rose-900 dark:border-rose-900 dark:bg-rose-950 dark:text-rose-100">
                 {errorMessage}
               </p>
             ) : null}
 
             {oidcError ? (
-              <p className="rounded-md border border-rose-200 bg-rose-50 p-3 text-sm text-rose-900">
+              <p className="rounded-md border border-rose-200 bg-rose-50 p-3 text-sm text-rose-900 dark:border-rose-900 dark:bg-rose-950 dark:text-rose-100">
                 {oidcError}
               </p>
             ) : null}
@@ -1043,6 +1149,31 @@ function AuthFeature({ label }: { label: string }) {
       <CheckCircle2 className="h-4 w-4 text-primary" aria-hidden="true" />
       <span className="text-muted-foreground">{label}</span>
     </div>
+  );
+}
+
+function ThemeButton({
+  darkMode,
+  onToggle,
+}: {
+  darkMode: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <Button
+      aria-label={darkMode ? "Use light theme" : "Use dark theme"}
+      size="icon"
+      title={darkMode ? "Use light theme" : "Use dark theme"}
+      type="button"
+      variant="ghost"
+      onClick={onToggle}
+    >
+      {darkMode ? (
+        <Sun className="h-4 w-4" aria-hidden="true" />
+      ) : (
+        <Moon className="h-4 w-4" aria-hidden="true" />
+      )}
+    </Button>
   );
 }
 
@@ -1094,15 +1225,6 @@ function AuthStatus({
         </div>
       )}
     </section>
-  );
-}
-
-function SidebarStat({ label, value }: { label: string; value: number }) {
-  return (
-    <div className="flex items-center justify-between text-sm">
-      <span className="text-muted-foreground">{label}</span>
-      <span className="font-semibold">{value}</span>
-    </div>
   );
 }
 
@@ -1295,9 +1417,12 @@ function StatusBadge({ status }: { status: string }) {
     <span
       className={cn(
         "inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-1 text-xs font-medium capitalize",
-        ready && "bg-emerald-50 text-emerald-700",
-        processing && "bg-amber-50 text-amber-700",
-        failed && "bg-rose-50 text-rose-700",
+        ready &&
+          "bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300",
+        processing &&
+          "bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-300",
+        failed &&
+          "bg-rose-50 text-rose-700 dark:bg-rose-950 dark:text-rose-300",
         archived && "bg-slate-100 text-slate-600",
         !ready &&
           !processing &&
@@ -1784,10 +1909,13 @@ function DocumentPanel({
   isLoading,
   isUpdating,
   isSyncingNotifications,
+  isReprocessing,
   isTagUpdating,
   tagError,
   notificationError,
+  processingError,
   onArchive,
+  onReprocess,
   onSyncNotifications,
   onUpdateNotificationStatus,
   onUpdateDocument,
@@ -1803,10 +1931,13 @@ function DocumentPanel({
   isLoading: boolean;
   isUpdating: boolean;
   isSyncingNotifications: boolean;
+  isReprocessing: boolean;
   isTagUpdating: boolean;
   tagError: string | null;
   notificationError: string | null;
+  processingError: string | null;
   onArchive: (documentId: string) => void;
+  onReprocess: (documentId: string) => void;
   onSyncNotifications: (documentId: string) => void;
   onUpdateNotificationStatus: (
     notificationId: string,
@@ -1886,7 +2017,13 @@ function DocumentPanel({
 
       <div className="grid min-w-0 2xl:grid-cols-[minmax(0,1fr)_340px]">
         <main className="min-w-0 space-y-6 p-5 xl:p-7">
-          <DocumentStatusNotice document={detail.document} />
+          <DocumentStatusNotice
+            document={detail.document}
+            extractionError={detail.text_extraction?.error_message}
+            mutationError={processingError}
+            isRetrying={isReprocessing}
+            onRetry={() => onReprocess(detail.document.id)}
+          />
 
           <section>
             <div className="mb-3">
@@ -2052,7 +2189,7 @@ function DocumentPanel({
               </div>
               {notificationError ? (
                 <p
-                  className="mt-3 rounded-md border border-rose-200 bg-rose-50 p-2 text-xs text-rose-900"
+                  className="mt-3 rounded-md border border-rose-200 bg-rose-50 p-2 text-xs text-rose-900 dark:border-rose-900 dark:bg-rose-950 dark:text-rose-100"
                   role="alert"
                 >
                   {notificationError}
@@ -2087,46 +2224,55 @@ function DocumentPanel({
               ) : null}
             </section>
 
-            <section className="border-t border-border pt-5">
-              <h3 className="text-sm font-semibold">Timeline</h3>
-              {detail.timeline_events.length ? (
-                <div className="mt-3 space-y-3">
-                  {detail.timeline_events.slice(0, 6).map((event) => (
-                    <div className="text-sm" key={event.id}>
-                      <p>{event.event_type.replaceAll("_", " ")}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {new Date(event.occurred_at).toLocaleString()}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="mt-2 text-sm text-muted-foreground">
-                  No timeline events yet.
-                </p>
-              )}
-            </section>
+            <details className="border-t border-border pt-5">
+              <summary className="cursor-pointer text-sm font-semibold hover:text-primary">
+                Activity and versions
+              </summary>
+              <section className="mt-4">
+                <h3 className="text-xs font-medium uppercase text-muted-foreground">
+                  Timeline
+                </h3>
+                {detail.timeline_events.length ? (
+                  <div className="mt-3 space-y-3">
+                    {detail.timeline_events.slice(0, 6).map((event) => (
+                      <div className="text-sm" key={event.id}>
+                        <p>{event.event_type.replaceAll("_", " ")}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {new Date(event.occurred_at).toLocaleString()}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    No timeline events yet.
+                  </p>
+                )}
+              </section>
 
-            <section className="border-t border-border pt-5">
-              <h3 className="text-sm font-semibold">Versions</h3>
-              {detail.versions.length ? (
-                <div className="mt-3 space-y-3 text-sm">
-                  {detail.versions.map((version) => (
-                    <div key={version.id}>
-                      <p>Version {version.version_number}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {new Date(version.created_at).toLocaleString()} -{" "}
-                        {Math.round(version.file_size_bytes / 1024)} KB
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="mt-2 text-sm text-muted-foreground">
-                  No versions recorded.
-                </p>
-              )}
-            </section>
+              <section className="mt-5 border-t border-border pt-4">
+                <h3 className="text-xs font-medium uppercase text-muted-foreground">
+                  Versions
+                </h3>
+                {detail.versions.length ? (
+                  <div className="mt-3 space-y-3 text-sm">
+                    {detail.versions.map((version) => (
+                      <div key={version.id}>
+                        <p>Version {version.version_number}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {new Date(version.created_at).toLocaleString()} -{" "}
+                          {Math.round(version.file_size_bytes / 1024)} KB
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    No versions recorded.
+                  </p>
+                )}
+              </section>
+            </details>
           </div>
         </aside>
       </div>
@@ -2134,31 +2280,69 @@ function DocumentPanel({
   );
 }
 
-function DocumentStatusNotice({ document }: { document: DocumentItem }) {
+function DocumentStatusNotice({
+  document,
+  extractionError,
+  mutationError,
+  isRetrying,
+  onRetry,
+}: {
+  document: DocumentItem;
+  extractionError: string | null | undefined;
+  mutationError: string | null;
+  isRetrying: boolean;
+  onRetry: () => void;
+}) {
   if (document.status === "ready") {
     return null;
   }
   const failed = document.status.includes("failed");
+  const queuedTooLong =
+    document.status === "pending_processing" &&
+    Date.now() - new Date(document.updated_at).getTime() > 2 * 60 * 1000;
+  const canRetry = failed || queuedTooLong;
+  const detail =
+    document.processing_error ||
+    extractionError ||
+    (failed
+      ? "The source file is safe, but processing did not complete."
+      : queuedTooLong
+        ? "This document has been queued longer than expected."
+        : "Text extraction, analysis, and indexing are still running.");
   return (
     <div
       className={cn(
         "rounded-lg border px-4 py-3 text-sm",
         failed
-          ? "border-rose-200 bg-rose-50 text-rose-900"
-          : "border-amber-200 bg-amber-50 text-amber-900",
+          ? "border-rose-200 bg-rose-50 text-rose-900 dark:border-rose-900 dark:bg-rose-950 dark:text-rose-100"
+          : "border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-100",
       )}
     >
       <div className="flex items-start gap-3">
         <AlertCircle className="mt-0.5 h-4 w-4" aria-hidden="true" />
-        <div>
+        <div className="min-w-0 flex-1">
           <p className="font-medium">
             {failed ? "Processing failed" : "Processing in progress"}
           </p>
-          <p className="mt-1 text-xs opacity-80">
-            {failed
-              ? "The file is stored, but text extraction or preview generation did not complete. Password-protected PDFs need a follow-up unlock workflow."
-              : "PaperVault will update extracted text, metadata, summary, and search index when processing finishes."}
-          </p>
+          <p className="mt-1 text-xs opacity-80">{detail}</p>
+          {mutationError ? (
+            <p className="mt-2 text-xs font-medium" role="alert">
+              {mutationError}
+            </p>
+          ) : null}
+          {canRetry ? (
+            <Button
+              className="mt-3"
+              disabled={isRetrying}
+              size="sm"
+              type="button"
+              variant="outline"
+              onClick={onRetry}
+            >
+              <RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />
+              {isRetrying ? "Queueing..." : "Retry processing"}
+            </Button>
+          ) : null}
         </div>
       </div>
     </div>

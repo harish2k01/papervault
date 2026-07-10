@@ -15,7 +15,7 @@ Define provider interfaces for:
 - document AI analysis
 - embeddings
 
-Phase 4 ships deterministic local providers:
+The default implementation ships deterministic local providers:
 
 - `LocalDocumentAIProvider`: rule-based summary, keyword/entity extraction, document classification, suggested tags, and metadata extraction.
 - `HashingEmbeddingProvider`: deterministic local embeddings for development and self-hosted baseline behavior.

@@ -1,0 +1,1 @@
+"""Administration persistence models."""

@@ -22,7 +22,7 @@ Run migrations:
 alembic upgrade head
 ```
 
-Upload API requests currently require development identity headers:
+When development identity headers are enabled, upload API requests can use:
 
 ```bash
 curl -X POST http://localhost:8000/documents/uploads \
@@ -67,7 +67,7 @@ The worker indexes documents after text extraction, AI processing, and notificat
 
 The frontend uses the same temporary development identity headers as the API. A generated development user id is stored in browser `localStorage` under `papervault.devUserId`.
 
-Phase 6 adds local JWT authentication. The frontend stores the current bearer token in browser `localStorage` under `papervault.accessToken`. Development headers remain available only when:
+The frontend stores the current bearer token in browser `localStorage` under `papervault.accessToken`. Development headers remain available only when:
 
 ```env
 PAPERVAULT_AUTH_ALLOW_DEV_HEADERS=true

@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import RedirectResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from papervault_api.administration.application.service import InstanceSettingsService
 from papervault_api.core.config import Settings, get_settings
 from papervault_api.db.session import get_session
 from papervault_api.identity.api.dependencies import (
@@ -48,11 +49,13 @@ router = APIRouter(tags=["identity"])
 
 @router.get("/auth/config", response_model=AuthConfigResponse)
 async def get_auth_config(
+    session: Annotated[AsyncSession, Depends(get_session)],
     settings: Annotated[Settings, Depends(get_settings)],
 ) -> AuthConfigResponse:
+    instance_settings = await InstanceSettingsService(session, settings).get_effective()
     return AuthConfigResponse(
         local_auth_enabled=settings.local_auth_enabled,
-        local_registration_enabled=settings.local_registration_enabled,
+        local_registration_enabled=instance_settings.local_registration_enabled,
         dev_headers_enabled=settings.dev_auth_enabled,
         oidc_configured=settings.oidc_login_enabled,
     )
@@ -65,11 +68,13 @@ async def register(
     settings: Annotated[Settings, Depends(get_settings)],
 ) -> TokenResponse:
     service = IdentityService(session, settings)
+    instance_settings = await InstanceSettingsService(session, settings).get_effective()
     try:
         user = await service.register_local_user(
             email=request.email,
             password=request.password,
             display_name=request.display_name,
+            registration_enabled=instance_settings.local_registration_enabled,
         )
     except (LocalAuthDisabledError, RegistrationDisabledError) as exc:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc

@@ -11,6 +11,7 @@ from starlette.background import BackgroundTask
 from papervault_api.core.config import Settings, get_settings
 from papervault_api.db.session import get_session
 from papervault_api.documents.api.dependencies import (
+    get_document_processing_queue,
     get_document_upload_service,
     get_object_storage,
 )
@@ -29,6 +30,7 @@ from papervault_api.documents.api.schemas import (
     MergeDuplicateDocumentsResponse,
     MetadataFieldDefinitionResponse,
     MetadataResponse,
+    ReprocessDocumentResponse,
     TextExtractionResponse,
     TimelineEventResponse,
     UpdateDocumentRequest,
@@ -43,7 +45,14 @@ from papervault_api.documents.application.lifecycle import (
     InvalidMetadataError,
     MetadataUpdateCommand,
 )
+from papervault_api.documents.application.queues import DocumentProcessingQueue
 from papervault_api.documents.application.read import DocumentReadService
+from papervault_api.documents.application.reprocessing import (
+    DocumentReprocessingService,
+    InvalidReprocessingRequestError,
+    ReprocessingCommand,
+    ReprocessingQueueError,
+)
 from papervault_api.documents.application.storage import ObjectStorage
 from papervault_api.documents.application.text_search import DocumentTextSearchService
 from papervault_api.documents.application.uploads import (
@@ -233,6 +242,42 @@ async def upload_document(
     return UploadDocumentResponse(
         document=DocumentResponse.model_validate(uploaded.document, from_attributes=True),
         processing_task_id=uploaded.processing_task_id,
+    )
+
+
+@router.post("/{document_id}/reprocess", response_model=ReprocessDocumentResponse)
+async def reprocess_document(
+    document_id: UUID,
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    session: Annotated[AsyncSession, Depends(get_session)],
+    processing_queue: Annotated[
+        DocumentProcessingQueue,
+        Depends(get_document_processing_queue),
+    ],
+) -> ReprocessDocumentResponse:
+    try:
+        result = await DocumentReprocessingService(session, processing_queue).request(
+            ReprocessingCommand(
+                owner_id=current_user.id,
+                actor_id=current_user.id,
+                document_id=document_id,
+            )
+        )
+    except InvalidReprocessingRequestError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    except ReprocessingQueueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=str(exc),
+        ) from exc
+    if result is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
+    return ReprocessDocumentResponse(
+        document=DocumentResponse.model_validate(
+            document_record_from_orm(result.document),
+            from_attributes=True,
+        ),
+        processing_task_id=result.processing_task_id,
     )
 
 
@@ -527,6 +572,9 @@ def document_record_from_orm(document: Document) -> DocumentRecord:
         document_date=document.document_date,
         issuer=document.issuer,
         organization=document.organization,
+        processing_error=document.processing_error,
+        processing_started_at=document.processing_started_at,
+        processing_completed_at=document.processing_completed_at,
         archived_at=document.archived_at,
         created_at=document.created_at,
         updated_at=document.updated_at,

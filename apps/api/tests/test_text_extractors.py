@@ -1,6 +1,7 @@
 from collections.abc import Sequence
 from pathlib import Path
 
+from papervault_api.documents.application.extraction import sanitize_extracted_text
 from papervault_api.documents.domain.enums import TextExtractionSource, TextExtractionStatus
 from papervault_api.documents.infrastructure.text_extractors import (
     CommandResult,
@@ -34,6 +35,10 @@ class FakeOcrCommandRunner:
 class MissingCommandRunner:
     def run(self, args: Sequence[str], *, timeout_seconds: int) -> CommandResult:
         raise OcrCommandError(f"OCR command not found: {args[0]}")
+
+
+def test_extracted_text_sanitizer_removes_database_unsafe_control_characters() -> None:
+    assert sanitize_extracted_text("Commuta\x00on\nNet pay") == "Commutaon\nNet pay"
 
 
 def test_tesseract_cli_extractor_reads_image_text(tmp_path: Path) -> None:

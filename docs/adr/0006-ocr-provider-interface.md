@@ -10,13 +10,13 @@ OCR can be implemented in several ways: local Tesseract, OCRmyPDF, cloud OCR, or
 
 ## Decision
 
-Represent OCR as a `TextExtractor` implementation. Phase 3 includes:
+Represent OCR as a `TextExtractor` implementation. The interface includes:
 
 - `PypdfTextExtractor` for embedded PDF text.
 - `UnavailableOcrTextExtractor` as an explicit fallback when OCR is not configured.
 - `CompositeTextExtractor` that attempts embedded PDF text first and then falls back to OCR.
 
-Phase 7 adds `TesseractCliTextExtractor`, which uses Poppler `pdftoppm` for scanned PDF page rendering and Tesseract for image OCR.
+`TesseractCliTextExtractor` uses Poppler `pdftoppm` for scanned PDF page rendering and Tesseract for image OCR.
 
 ## Consequences
 

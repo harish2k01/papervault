@@ -10,7 +10,7 @@ PaperVault must process scanned PDFs and uploaded images. OCR can be local, remo
 
 ## Decision
 
-Phase 7 adds a local OCR adapter behind the existing `TextExtractor` interface:
+The local OCR adapter sits behind the existing `TextExtractor` interface:
 
 - `TesseractCliTextExtractor` runs Tesseract through a command runner.
 - Scanned PDFs are rendered to page images with Poppler `pdftoppm`.

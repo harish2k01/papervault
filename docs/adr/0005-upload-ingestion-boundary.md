@@ -19,7 +19,7 @@ The upload API performs only request-bound work:
 - Persist `documents`, `document_versions`, and a `timeline_events` row.
 - Enqueue asynchronous document processing.
 
-Celery workers own post-upload processing. Phase 3 workers download the stored file and create a `document_text_extractions` record.
+Celery workers own post-upload processing. Workers download the stored file and create a `document_text_extractions` record.
 
 ## Consequences
 

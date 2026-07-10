@@ -22,7 +22,17 @@ def test_core_schema_metadata_contains_expected_tables() -> None:
         "tags",
         "document_tags",
         "timeline_events",
+        "instance_settings",
     }.issubset(table_names)
+
+
+def test_postgresql_schema_identifiers_fit_the_platform_limit() -> None:
+    names = []
+    for table in Base.metadata.tables.values():
+        names.extend(constraint.name for constraint in table.constraints if constraint.name)
+        names.extend(index.name for index in table.indexes if index.name)
+
+    assert all(len(name) <= 63 for name in names)
 
 
 async def test_schema_can_be_created(session: AsyncSession) -> None:

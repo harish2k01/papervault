@@ -94,7 +94,7 @@ export function DuplicatesWorkspace({
 
         {error ? (
           <p
-            className="mt-5 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-900"
+            className="mt-5 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-900 dark:border-rose-900 dark:bg-rose-950 dark:text-rose-100"
             role="alert"
           >
             {error}

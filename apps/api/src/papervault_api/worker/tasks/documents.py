@@ -7,7 +7,10 @@ from papervault_api.core.config import get_settings
 from papervault_api.db import models as _models  # noqa: F401
 from papervault_api.db.session import AsyncSessionFactory, engine
 from papervault_api.documents.application.ai import DocumentAIProcessingService
-from papervault_api.documents.application.processing import DocumentProcessingService
+from papervault_api.documents.application.processing import (
+    DocumentProcessingService,
+    mark_document_processing_failed,
+)
 from papervault_api.documents.infrastructure.ai import (
     build_document_ai_provider,
     build_embedding_provider,
@@ -31,6 +34,28 @@ def process_document(document_id: str) -> str:
 async def _run_process_document_task(document_id: UUID) -> None:
     try:
         await _process_document(document_id)
+    except Exception as exc:
+        logger.exception(
+            "document_processing_failed",
+            document_id=str(document_id),
+            error_type=type(exc).__name__,
+        )
+        try:
+            async with AsyncSessionFactory() as session:
+                await mark_document_processing_failed(
+                    session,
+                    document_id,
+                    message=(
+                        "Document processing failed unexpectedly. Retry the document or "
+                        "inspect the worker logs."
+                    ),
+                )
+        except Exception:
+            logger.exception(
+                "document_processing_failure_status_update_failed",
+                document_id=str(document_id),
+            )
+        raise
     finally:
         await engine.dispose()
 

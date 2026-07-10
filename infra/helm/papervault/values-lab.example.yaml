@@ -1,0 +1,49 @@
+image:
+  api:
+    repository: ghcr.io/owner/papervault/api
+    tag: latest
+    pullPolicy: Always
+  worker:
+    repository: ghcr.io/owner/papervault/worker
+    tag: latest
+    pullPolicy: Always
+  web:
+    repository: ghcr.io/owner/papervault/web
+    tag: latest
+    pullPolicy: Always
+
+config:
+  environment: production
+  corsOrigins: https://papervault.example.com
+  webAppUrl: https://papervault.example.com
+  localRegistrationEnabled: "true"
+  searchIndexEnabled: "true"
+  searchQueryBackend: opensearch
+  searchQueryFallbackEnabled: "true"
+  s3EndpointUrl: http://papervault-minio:9000
+  opensearchUrl: http://papervault-opensearch:9200
+
+secret:
+  values:
+    databaseUrl: postgresql+asyncpg://papervault:change-me@papervault-postgres:5432/papervault
+    redisUrl: redis://papervault-redis:6379/0
+    s3AccessKeyId: change-me
+    s3SecretAccessKey: change-me
+    jwtSigningKey: change-me
+
+gateway:
+  httpRoute:
+    enabled: true
+    gatewayName: gateway-name
+    gatewayNamespace: gateway-namespace
+    sectionName: websecure
+    hostnames:
+      - papervault.example.com
+
+labDependencies:
+  enabled: true
+  opensearch:
+    enabled: true
+
+migrations:
+  enabled: true

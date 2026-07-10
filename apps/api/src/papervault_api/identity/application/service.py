@@ -50,10 +50,15 @@ class IdentityService:
         email: str,
         password: str,
         display_name: str | None,
+        registration_enabled: bool | None = None,
     ) -> User:
         if not self._settings.local_auth_enabled:
             raise LocalAuthDisabledError("Local authentication is disabled")
-        if not self._settings.local_registration_enabled:
+        if not (
+            self._settings.local_registration_enabled
+            if registration_enabled is None
+            else registration_enabled
+        ):
             raise RegistrationDisabledError("Local registration is disabled")
         self._validate_password(password)
 

@@ -1,3 +1,4 @@
+from datetime import UTC, datetime
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from uuid import UUID
@@ -5,7 +6,10 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from papervault_api.documents.application.extraction import TextExtractor
+from papervault_api.documents.application.extraction import (
+    TextExtractor,
+    sanitize_extracted_text,
+)
 from papervault_api.documents.application.storage import ObjectStorage
 from papervault_api.documents.domain.enums import DocumentStatus, TextExtractionStatus
 from papervault_api.documents.infrastructure.models import (
@@ -34,7 +38,10 @@ class DocumentProcessingService:
             return
 
         document.status = DocumentStatus.PROCESSING.value
-        await self._session.flush()
+        document.processing_error = None
+        document.processing_started_at = datetime.now(UTC)
+        document.processing_completed_at = None
+        await self._session.commit()
 
         with TemporaryDirectory(prefix="papervault-process-") as temp_dir:
             file_path = Path(temp_dir) / "source"
@@ -45,12 +52,19 @@ class DocumentProcessingService:
             )
             result = self._text_extractor.extract(file_path, document.content_type)
 
+        content_text = (
+            sanitize_extracted_text(result.content_text)
+            if result.content_text is not None
+            else None
+        )
+        page_texts = tuple(sanitize_extracted_text(text) for text in result.page_texts)
+
         await self._mark_existing_extractions_not_current(document.id)
         extraction = DocumentTextExtraction(
             document_id=document.id,
             source=result.source.value,
             status=result.status.value,
-            content_text=result.content_text,
+            content_text=content_text,
             page_count=result.page_count,
             language=result.language,
             confidence_score=result.confidence_score,
@@ -66,7 +80,7 @@ class DocumentProcessingService:
                 page_number=page_number,
                 content_text=content_text,
             )
-            for page_number, content_text in enumerate(result.page_texts, start=1)
+            for page_number, content_text in enumerate(page_texts, start=1)
         )
         await self._session.refresh(document, attribute_names=["status", "archived_at"])
         document.page_count = result.page_count or document.page_count
@@ -76,6 +90,12 @@ class DocumentProcessingService:
                 if result.status is TextExtractionStatus.SUCCEEDED
                 else DocumentStatus.FAILED.value
             )
+            document.processing_error = (
+                result.error_message
+                if result.status is not TextExtractionStatus.SUCCEEDED
+                else None
+            )
+            document.processing_completed_at = datetime.now(UTC)
         await self._session.commit()
 
     async def _mark_existing_extractions_not_current(self, document_id: UUID) -> None:
@@ -91,3 +111,20 @@ class DocumentProcessingService:
             ),
         )
         return list(result.scalars())
+
+
+async def mark_document_processing_failed(
+    session: AsyncSession,
+    document_id: UUID,
+    *,
+    message: str,
+) -> None:
+    document = await session.get(Document, document_id)
+    if document is None:
+        return
+    if document.status == DocumentStatus.ARCHIVED.value or document.archived_at is not None:
+        return
+    document.status = DocumentStatus.FAILED.value
+    document.processing_error = message[:2000]
+    document.processing_completed_at = datetime.now(UTC)
+    await session.commit()

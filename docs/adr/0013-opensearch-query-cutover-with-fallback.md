@@ -6,14 +6,14 @@ Accepted
 
 ## Context
 
-Phase 8 made OpenSearch an eventually consistent projection but kept query execution in
+OpenSearch began as an eventually consistent projection while query execution remained in
 PostgreSQL. That reduced rollout risk, but large document libraries need OpenSearch
 scoring, text search, and vector search before PaperVault can scale beyond the
 database-backed baseline.
 
 ## Decision
 
-Phase 10 makes OpenSearch the primary query path for `POST /search` when
+OpenSearch is the primary query path for `POST /search` when
 `PAPERVAULT_SEARCH_QUERY_BACKEND=opensearch` and search indexing is enabled. The search
 application service records recent searches, asks the OpenSearch query adapter first,
 and falls back to the PostgreSQL scorer if OpenSearch fails and

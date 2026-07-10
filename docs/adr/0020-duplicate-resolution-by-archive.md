@@ -6,7 +6,7 @@ Accepted
 
 ## Context
 
-PaperVault can detect exact duplicate files by SHA-256 hash. Users need a way to resolve those candidates, but deleting document rows or object-storage blobs is risky for a long-lived personal archive. Future phases may add content or OCR similarity, but Phase 17 only has exact-hash confidence.
+PaperVault can detect exact duplicate files by SHA-256 hash. Users need a way to resolve those candidates, but deleting document rows or object-storage blobs is risky for a long-lived personal archive. Content and OCR similarity require separate confidence models; this decision covers exact-hash confidence only.
 
 ## Decision
 

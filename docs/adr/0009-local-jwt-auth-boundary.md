@@ -10,7 +10,7 @@ PaperVault needs OIDC, local login, JWTs, and RBAC. Earlier phases used developm
 
 ## Decision
 
-Phase 6 adds a local authentication boundary:
+The local authentication boundary includes:
 
 - local registration and login endpoints
 - first-user administrator bootstrap

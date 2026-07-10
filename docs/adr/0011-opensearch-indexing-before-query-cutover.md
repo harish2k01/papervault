@@ -6,11 +6,11 @@ Accepted
 
 ## Context
 
-PaperVault needs full text, semantic, and hybrid search at production scale. Phase 5 delivered useful database-backed search while the document, AI, tag, notification, and auth contracts were still stabilizing. Replacing query execution and indexing in one step would make failures harder to isolate.
+PaperVault needs full text, semantic, and hybrid search at production scale. Database-backed search remained useful while the document, AI, tag, notification, and auth contracts stabilized. Replacing query execution and indexing in one step would make failures harder to isolate.
 
 ## Decision
 
-Phase 8 introduces OpenSearch indexing before moving user-facing query execution:
+Introduce OpenSearch indexing before moving user-facing query execution:
 
 - document search projections are built in an application service
 - the worker indexes documents after extraction, AI processing, and notification generation

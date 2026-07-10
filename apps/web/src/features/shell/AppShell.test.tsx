@@ -5,14 +5,19 @@ import { vi } from "vitest";
 import {
   attachTag,
   createTag,
+  getAdminSettings,
   getAuthConfig,
   getDocument,
   getDocumentFile,
+  getMe,
+  getStoredAccessToken,
   listDuplicates,
   listDocuments,
   listNotifications,
   listTags,
+  listUsers,
   mergeDuplicateDocuments,
+  reprocessDocument,
   searchDocumentText,
   syncDocumentNotifications,
   updateNotificationStatus,
@@ -39,6 +44,7 @@ vi.mock("../../lib/api", () => ({
   createTag: vi.fn(),
   detachTag: vi.fn(),
   getAuthConfig: vi.fn(),
+  getAdminSettings: vi.fn(),
   getDocument: vi.fn(),
   getDocumentFile: vi.fn().mockResolvedValue(new Blob(["preview"])),
   getMe: vi.fn(),
@@ -50,10 +56,12 @@ vi.mock("../../lib/api", () => ({
   listRecentSearches: vi.fn().mockResolvedValue([]),
   listSavedSearches: vi.fn().mockResolvedValue([]),
   listTags: vi.fn().mockResolvedValue([]),
+  listUsers: vi.fn().mockResolvedValue([]),
   loginAccount: vi.fn(),
   mergeDuplicateDocuments: vi.fn(),
   parseOidcCallbackHash: vi.fn().mockReturnValue(null),
   registerAccount: vi.fn(),
+  reprocessDocument: vi.fn(),
   saveSearch: vi.fn(),
   searchDocuments: vi.fn().mockResolvedValue([]),
   searchDocumentText: vi.fn().mockResolvedValue({
@@ -66,7 +74,9 @@ vi.mock("../../lib/api", () => ({
   syncDocumentNotifications: vi.fn().mockResolvedValue([]),
   updateDocument: vi.fn(),
   updateDocumentMetadata: vi.fn(),
+  updateAdminSettings: vi.fn(),
   updateNotificationStatus: vi.fn(),
+  updateUser: vi.fn(),
   uploadDocument: vi.fn(),
 }));
 
@@ -271,6 +281,10 @@ describe("AppShell", () => {
         },
       ],
     });
+    vi.mocked(reprocessDocument).mockResolvedValueOnce({
+      document: { ...document, status: "pending_processing" },
+      processing_task_id: "task-retry",
+    });
 
     renderAppShell();
 
@@ -278,6 +292,51 @@ describe("AppShell", () => {
     expect(screen.getByText("Preview not ready")).toBeInTheDocument();
     expect(screen.queryByTitle(document.title)).not.toBeInTheDocument();
     expect(getDocumentFile).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: "Retry processing" }));
+    await waitFor(() => {
+      expect(reprocessDocument).toHaveBeenCalledWith(
+        "document-failed",
+        expect.any(Object),
+      );
+    });
+  });
+
+  it("shows administration settings only to administrators", async () => {
+    vi.mocked(getStoredAccessToken).mockReturnValueOnce("admin-token");
+    vi.mocked(getMe).mockResolvedValueOnce({
+      id: "admin-1",
+      email: "owner@example.com",
+      display_name: "Owner",
+      role: "admin",
+      auth_provider: "local",
+      is_active: true,
+      created_at: "2026-07-11T00:00:00Z",
+      last_login_at: null,
+    });
+    vi.mocked(getAdminSettings).mockResolvedValueOnce({
+      local_registration_enabled: true,
+      local_auth_enabled: true,
+      oidc_configured: false,
+      ai_provider: "local",
+      embedding_provider: "local",
+      ocr_provider: "tesseract",
+      search_backend: "opensearch",
+      search_index_enabled: true,
+      max_upload_size_bytes: 104857600,
+    });
+    vi.mocked(listUsers).mockResolvedValueOnce([]);
+
+    renderAppShell();
+
+    const settingsButton = await screen.findByRole("button", {
+      name: "Settings",
+    });
+    fireEvent.click(settingsButton);
+
+    expect(
+      await screen.findByRole("heading", { name: "Settings" }),
+    ).toBeInTheDocument();
   });
 
   it("dismisses a notification from the notifications workspace", async () => {

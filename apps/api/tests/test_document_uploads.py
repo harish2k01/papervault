@@ -1,4 +1,5 @@
 import asyncio
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from uuid import UUID, uuid4
 
@@ -17,6 +18,7 @@ from papervault_api.documents.api.dependencies import (
 from papervault_api.documents.application.queues import DocumentProcessingQueue
 from papervault_api.documents.application.storage import StoredObject
 from papervault_api.documents.infrastructure.models import (
+    Document,
     DocumentTextExtraction,
     DocumentTextPage,
 )
@@ -113,6 +115,45 @@ def test_upload_rejects_unsupported_content_type() -> None:
         )
 
     assert response.status_code == 415
+    asyncio.run(engine.dispose())
+
+
+def test_only_stale_pending_document_can_be_requeued() -> None:
+    app, _storage, engine = build_upload_test_app()
+    user_id = uuid4()
+    headers = {
+        "X-PaperVault-User-Id": str(user_id),
+        "X-PaperVault-User-Email": "person@example.com",
+    }
+
+    with TestClient(app) as client:
+        upload_response = client.post(
+            "/documents/uploads",
+            headers=headers,
+            files={"file": ("statement.pdf", b"%PDF-1.4\n", "application/pdf")},
+        )
+        document_id = upload_response.json()["document"]["id"]
+
+        queued_response = client.post(f"/documents/{document_id}/reprocess", headers=headers)
+
+    assert queued_response.status_code == 409
+
+    async def make_document_stale() -> None:
+        session_factory = async_sessionmaker(engine, expire_on_commit=False)
+        async with session_factory() as session:
+            document = await session.get(Document, UUID(document_id))
+            assert document is not None
+            document.updated_at = datetime.now(UTC) - timedelta(minutes=3)
+            await session.commit()
+
+    asyncio.run(make_document_stale())
+
+    with TestClient(app) as client:
+        response = client.post(f"/documents/{document_id}/reprocess", headers=headers)
+
+    assert response.status_code == 200
+    assert response.json()["document"]["status"] == "pending_processing"
+    assert response.json()["processing_task_id"] == f"task-{document_id}"
     asyncio.run(engine.dispose())
 
 

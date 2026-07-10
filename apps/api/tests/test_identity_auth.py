@@ -127,6 +127,37 @@ def test_admin_user_listing_requires_admin_role() -> None:
     asyncio.run(engine.dispose())
 
 
+def test_admin_can_disable_runtime_local_registration() -> None:
+    app, engine = build_identity_test_app(lambda: identity_test_settings())
+
+    with TestClient(app) as client:
+        admin_token = register_and_get_token(client, "admin@example.com")
+        headers = {"Authorization": f"Bearer {admin_token}"}
+
+        update_response = client.patch(
+            "/admin/settings",
+            headers=headers,
+            json={"local_registration_enabled": False},
+        )
+        assert update_response.status_code == 200
+        assert update_response.json()["local_registration_enabled"] is False
+
+        config_response = client.get("/auth/config")
+        assert config_response.status_code == 200
+        assert config_response.json()["local_registration_enabled"] is False
+
+        registration_response = client.post(
+            "/auth/register",
+            json={
+                "email": "blocked@example.com",
+                "password": "correct horse battery staple",
+            },
+        )
+        assert registration_response.status_code == 403
+
+    asyncio.run(engine.dispose())
+
+
 def test_dev_headers_can_be_disabled() -> None:
     app, engine = build_identity_test_app(
         lambda: identity_test_settings(auth_allow_dev_headers=False),

@@ -167,7 +167,12 @@ class DocumentUploadService:
         try:
             task_id = self._processing_queue.enqueue_document_processing(document.id)
         except Exception:
-            await self._session.rollback()
+            document.status = DocumentStatus.FAILED.value
+            document.processing_error = (
+                "Document processing could not be queued. Check the worker and retry."
+            )
+            await self._session.commit()
+            await self._session.refresh(document)
             return None
         document.status = DocumentStatus.PENDING_PROCESSING.value
         await self._session.commit()

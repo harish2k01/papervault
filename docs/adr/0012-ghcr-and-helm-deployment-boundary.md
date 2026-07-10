@@ -10,7 +10,7 @@ PaperVault needs a repeatable self-hosted deployment path. Docker Compose is use
 
 ## Decision
 
-Phase 9 adds:
+Deployment automation includes:
 
 - GitHub Actions workflow for API, worker, and web image publishing to GHCR
 - Helm chart resources for API, worker, web, services, config, secrets, and migration jobs

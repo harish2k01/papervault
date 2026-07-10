@@ -26,6 +26,7 @@ apps/web/dist/
 .data/
 .tmp/
 tmp/
+infra/helm/papervault/values-cluster-test.yaml
 
 # Editors
 .idea/

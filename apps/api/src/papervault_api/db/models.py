@@ -1,3 +1,4 @@
+from papervault_api.administration.infrastructure.models import InstanceSettings
 from papervault_api.documents.infrastructure.models import (
     Document,
     DocumentAIAnalysis,
@@ -22,6 +23,7 @@ __all__ = [
     "DocumentTextExtraction",
     "DocumentTextPage",
     "DocumentVersion",
+    "InstanceSettings",
     "Notification",
     "RecentSearch",
     "SavedSearch",
