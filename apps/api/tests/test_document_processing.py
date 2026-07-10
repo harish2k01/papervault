@@ -1,3 +1,4 @@
+from datetime import UTC, datetime
 from pathlib import Path
 from uuid import uuid4
 
@@ -12,7 +13,11 @@ from papervault_api.documents.domain.enums import (
     TextExtractionSource,
     TextExtractionStatus,
 )
-from papervault_api.documents.infrastructure.models import Document, DocumentTextExtraction
+from papervault_api.documents.infrastructure.models import (
+    Document,
+    DocumentTextExtraction,
+    DocumentTextPage,
+)
 from papervault_api.identity.infrastructure.models import User
 
 
@@ -41,6 +46,7 @@ class StaticTextExtractor(TextExtractor):
             source=TextExtractionSource.EMBEDDED_TEXT,
             status=TextExtractionStatus.SUCCEEDED,
             content_text="Hello from a PDF",
+            page_texts=("Hello from a PDF",),
             page_count=1,
             extractor="static",
         )
@@ -78,9 +84,57 @@ async def test_processing_service_records_current_text_extraction(session: Async
         select(DocumentTextExtraction).where(DocumentTextExtraction.document_id == document.id),
     )
     extraction = result.scalar_one()
+    page = (
+        await session.execute(
+            select(DocumentTextPage).where(DocumentTextPage.text_extraction_id == extraction.id)
+        )
+    ).scalar_one()
 
     assert refreshed_document is not None
     assert refreshed_document.status == DocumentStatus.READY.value
     assert extraction.status == TextExtractionStatus.SUCCEEDED.value
     assert extraction.content_text == "Hello from a PDF"
     assert extraction.is_current is True
+    assert page.page_number == 1
+    assert page.content_text == "Hello from a PDF"
+
+
+async def test_processing_service_does_not_resurrect_archived_document(
+    session: AsyncSession,
+) -> None:
+    user = User(email="archived-reader@example.com")
+    session.add(user)
+    await session.flush()
+    document = Document(
+        owner_id=user.id,
+        title="Archived duplicate",
+        original_filename="duplicate.pdf",
+        content_type="application/pdf",
+        file_size_bytes=8,
+        sha256_hash="c" * 64,
+        storage_bucket="documents",
+        storage_key=f"{uuid4()}/duplicate.pdf",
+        document_type="generic_pdf",
+        status=DocumentStatus.ARCHIVED.value,
+        archived_at=datetime.now(UTC),
+    )
+    session.add(document)
+    await session.commit()
+
+    service = DocumentProcessingService(
+        session=session,
+        storage=FakeObjectStorage(),
+        text_extractor=StaticTextExtractor(),
+    )
+    await service.process_document(document.id)
+
+    refreshed_document = await session.get(Document, document.id)
+    extractions = (
+        await session.execute(
+            select(DocumentTextExtraction).where(DocumentTextExtraction.document_id == document.id)
+        )
+    ).scalars()
+
+    assert refreshed_document is not None
+    assert refreshed_document.status == DocumentStatus.ARCHIVED.value
+    assert tuple(extractions) == ()

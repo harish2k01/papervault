@@ -16,6 +16,10 @@ from papervault_api.documents.api.dependencies import (
 )
 from papervault_api.documents.application.queues import DocumentProcessingQueue
 from papervault_api.documents.application.storage import StoredObject
+from papervault_api.documents.infrastructure.models import (
+    DocumentTextExtraction,
+    DocumentTextPage,
+)
 from papervault_api.main import create_app
 
 
@@ -170,3 +174,85 @@ def test_document_lifecycle_routes_update_metadata_and_archive() -> None:
         assert list_response.json() == []
 
     asyncio.run(engine.dispose())
+
+
+def test_document_text_search_returns_page_aware_matches() -> None:
+    app, _storage, engine = build_upload_test_app()
+    user_id = uuid4()
+    headers = {
+        "X-PaperVault-User-Id": str(user_id),
+        "X-PaperVault-User-Email": "reader@example.com",
+    }
+
+    with TestClient(app) as client:
+        upload_response = client.post(
+            "/documents/uploads",
+            headers=headers,
+            files={"file": ("salary.pdf", b"%PDF-1.4\n", "application/pdf")},
+        )
+        document_id = UUID(upload_response.json()["document"]["id"])
+        asyncio.run(seed_text_pages(engine, document_id))
+
+        response = client.get(
+            f"/documents/{document_id}/text-search",
+            headers=headers,
+            params={"query": "salary"},
+        )
+        invalid_response = client.get(
+            f"/documents/{document_id}/text-search",
+            headers=headers,
+            params={"query": "  "},
+        )
+
+    assert response.status_code == 200
+    assert invalid_response.status_code == 422
+    assert response.json() == {
+        "query": "salary",
+        "total_matches": 2,
+        "page_mapping_available": True,
+        "matches": [
+            {
+                "page_number": 1,
+                "before": "January",
+                "match": "salary",
+                "after": "was 1000",
+            },
+            {
+                "page_number": 2,
+                "before": "February",
+                "match": "salary",
+                "after": "was 1100",
+            },
+        ],
+    }
+    asyncio.run(engine.dispose())
+
+
+async def seed_text_pages(engine: AsyncEngine, document_id: UUID) -> None:
+    session_factory = async_sessionmaker(engine, expire_on_commit=False)
+    async with session_factory() as session:
+        extraction = DocumentTextExtraction(
+            document_id=document_id,
+            source="embedded_text",
+            status="succeeded",
+            content_text="January salary was 1000\n\nFebruary salary was 1100",
+            page_count=2,
+            is_current=True,
+        )
+        session.add(extraction)
+        await session.flush()
+        session.add_all(
+            (
+                DocumentTextPage(
+                    text_extraction_id=extraction.id,
+                    page_number=1,
+                    content_text="January salary was 1000",
+                ),
+                DocumentTextPage(
+                    text_extraction_id=extraction.id,
+                    page_number=2,
+                    content_text="February salary was 1100",
+                ),
+            )
+        )
+        await session.commit()

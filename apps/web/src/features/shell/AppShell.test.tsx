@@ -13,10 +13,21 @@ import {
   listNotifications,
   listTags,
   mergeDuplicateDocuments,
+  searchDocumentText,
   syncDocumentNotifications,
   updateNotificationStatus,
 } from "../../lib/api";
 import { AppShell } from "./AppShell";
+
+vi.mock("react-pdf", () => ({
+  Document: ({ children }: { children: React.ReactNode }) => (
+    <div data-testid="pdf-document">{children}</div>
+  ),
+  Page: ({ pageNumber }: { pageNumber: number }) => (
+    <div data-testid="pdf-page">Page {pageNumber}</div>
+  ),
+  pdfjs: { GlobalWorkerOptions: { workerSrc: "" } },
+}));
 
 vi.mock("../../lib/api", () => ({
   archiveDocument: vi.fn(),
@@ -45,6 +56,12 @@ vi.mock("../../lib/api", () => ({
   registerAccount: vi.fn(),
   saveSearch: vi.fn(),
   searchDocuments: vi.fn().mockResolvedValue([]),
+  searchDocumentText: vi.fn().mockResolvedValue({
+    query: "",
+    total_matches: 0,
+    page_mapping_available: true,
+    matches: [],
+  }),
   storeAccessToken: vi.fn(),
   syncDocumentNotifications: vi.fn().mockResolvedValue([]),
   updateDocument: vi.fn(),
@@ -75,6 +92,12 @@ describe("AppShell", () => {
     vi.mocked(listNotifications).mockResolvedValue([]);
     vi.mocked(listTags).mockResolvedValue([]);
     vi.mocked(syncDocumentNotifications).mockResolvedValue([]);
+    vi.mocked(searchDocumentText).mockResolvedValue({
+      query: "",
+      total_matches: 0,
+      page_mapping_available: true,
+      matches: [],
+    });
   });
 
   it("renders the application shell", async () => {

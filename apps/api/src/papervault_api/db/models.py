@@ -4,6 +4,7 @@ from papervault_api.documents.infrastructure.models import (
     DocumentEmbedding,
     DocumentMetadataRecord,
     DocumentTextExtraction,
+    DocumentTextPage,
     DocumentVersion,
 )
 from papervault_api.identity.infrastructure.models import User
@@ -19,6 +20,7 @@ __all__ = [
     "DocumentMetadataRecord",
     "DocumentTag",
     "DocumentTextExtraction",
+    "DocumentTextPage",
     "DocumentVersion",
     "Notification",
     "RecentSearch",

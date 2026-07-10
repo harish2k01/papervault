@@ -52,6 +52,7 @@ def test_tesseract_cli_extractor_reads_image_text(tmp_path: Path) -> None:
     assert result.source == TextExtractionSource.OCR
     assert result.status == TextExtractionStatus.SUCCEEDED
     assert result.content_text == "Text from receipt.png"
+    assert result.page_texts == ("Text from receipt.png",)
     assert result.page_count == 1
     assert runner.calls == [
         ["tesseract", str(source), "stdout", "-l", "eng", "--psm", "6"],
@@ -75,6 +76,7 @@ def test_tesseract_cli_extractor_renders_pdf_pages_before_ocr(tmp_path: Path) ->
     assert result.status == TextExtractionStatus.SUCCEEDED
     assert result.page_count == 2
     assert result.content_text == "Text from page-1.png\n\nText from page-2.png"
+    assert result.page_texts == ("Text from page-1.png", "Text from page-2.png")
     assert runner.calls[0][:8] == ["pdftoppm", "-png", "-r", "200", "-f", "1", "-l", "3"]
     assert runner.calls[1][0] == "tesseract"
     assert runner.calls[2][0] == "tesseract"

@@ -111,8 +111,19 @@ Phase 17 turns exact duplicate detection into a resolution workflow:
 - Merge is conservative: the user chooses one document to keep, and PaperVault archives the selected redundant copies.
 - Merge validation is owner-scoped and rejects archived documents, missing documents, the keep document appearing in the archive list, and non-matching hashes.
 - Archived duplicates keep their database rows, timeline, versions, and object-storage references. No source blobs are deleted during merge.
+- Worker processing treats archive as terminal so a queued upload job cannot make a resolved duplicate active again.
 - The web app exposes a Duplicates workspace with group counts, keeper selection, document open actions, and a single merge action per group.
 - Search projection refresh is best-effort for the kept document and archived duplicates after PostgreSQL commits.
+
+## Page-Aware Document Search
+
+Phase 18 makes the built-in viewer and extracted text share one page model:
+
+- Embedded PDF extraction and OCR both emit ordered page text while retaining the flattened extraction text used by AI analysis and global search.
+- Page text is stored in `document_text_pages` as immutable children of a text extraction. Reprocessing creates a new current extraction and page set without rewriting previous extraction history.
+- The owner-scoped document text-search use case searches only the current extraction and returns bounded, structured excerpts. Result fragments are split into `before`, `match`, and `after` fields so clients never need to render backend-generated HTML.
+- The web viewer loads PDF.js only when a preview opens, renders one responsive page at a time, and highlights literal matches in the PDF text layer. OCR-only matches navigate to the correct scanned page and remain highlighted in the result excerpt.
+- Legacy extractions without page rows use their flattened text as a compatibility fallback and explicitly report that page navigation is unavailable.
 
 ## AI Processing
 

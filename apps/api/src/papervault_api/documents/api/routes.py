@@ -3,7 +3,7 @@ from tempfile import NamedTemporaryFile
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
 from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.background import BackgroundTask
@@ -19,6 +19,8 @@ from papervault_api.documents.api.schemas import (
     DocumentDetailResponse,
     DocumentResponse,
     DocumentTagResponse,
+    DocumentTextMatchResponse,
+    DocumentTextSearchResponse,
     DocumentTypeResponse,
     DocumentVersionResponse,
     DuplicateCandidateDocumentResponse,
@@ -43,6 +45,7 @@ from papervault_api.documents.application.lifecycle import (
 )
 from papervault_api.documents.application.read import DocumentReadService
 from papervault_api.documents.application.storage import ObjectStorage
+from papervault_api.documents.application.text_search import DocumentTextSearchService
 from papervault_api.documents.application.uploads import (
     DocumentUploadService,
     EmptyUploadError,
@@ -316,6 +319,44 @@ async def get_document_detail(
             )
             for version in detail.versions
         ],
+    )
+
+
+@router.get("/{document_id}/text-search", response_model=DocumentTextSearchResponse)
+async def search_document_text(
+    document_id: UUID,
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    session: Annotated[AsyncSession, Depends(get_session)],
+    query: Annotated[str, Query(min_length=2, max_length=200)],
+    limit: Annotated[int, Query(ge=1, le=100)] = 50,
+) -> DocumentTextSearchResponse:
+    normalized_query = query.strip()
+    if len(normalized_query) < 2:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="Search query must contain at least 2 non-whitespace characters",
+        )
+    result = await DocumentTextSearchService(session).search(
+        owner_id=current_user.id,
+        document_id=document_id,
+        query=normalized_query,
+        limit=limit,
+    )
+    if result is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
+    return DocumentTextSearchResponse(
+        query=result.query,
+        total_matches=result.total_matches,
+        matches=[
+            DocumentTextMatchResponse(
+                page_number=match.page_number,
+                before=match.before,
+                match=match.match,
+                after=match.after,
+            )
+            for match in result.matches
+        ],
+        page_mapping_available=result.page_mapping_available,
     )
 
 

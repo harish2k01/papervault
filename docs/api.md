@@ -38,9 +38,12 @@ Additional document endpoints:
 - `PUT /documents/{document_id}/metadata`: replace current structured metadata with a manual metadata version
 - `POST /documents/{document_id}/archive`: archive a document and hide it from default list/search results
 - `GET /documents/{document_id}/file`: authenticated document file response for the built-in viewer
+- `GET /documents/{document_id}/text-search?query=salary&limit=50`: owner-scoped literal search over the current extracted text, returning bounded excerpts and page numbers when available
 - `GET /documents/{document_id}/timeline`: document timeline events
 - `GET /documents/duplicates/candidates`: exact-hash duplicate candidate groups
 - `POST /documents/duplicates/merge`: keep one exact-hash duplicate and archive selected redundant copies
+
+Document text search accepts a case-insensitive literal query between 2 and 200 characters and returns at most 100 matches. `total_matches` reports the complete count even when the response is limited. Documents processed before Phase 18 remain searchable, but return `page_mapping_available=false` until they are reprocessed.
 
 ## Search
 

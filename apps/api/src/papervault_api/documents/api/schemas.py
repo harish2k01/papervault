@@ -92,6 +92,20 @@ class TextExtractionResponse(BaseModel):
     error_message: str | None
 
 
+class DocumentTextMatchResponse(BaseModel):
+    page_number: int | None
+    before: str
+    match: str
+    after: str
+
+
+class DocumentTextSearchResponse(BaseModel):
+    query: str
+    total_matches: int
+    matches: list[DocumentTextMatchResponse]
+    page_mapping_available: bool
+
+
 class DocumentDetailResponse(BaseModel):
     document: DocumentResponse
     ai_analysis: AIAnalysisResponse | None

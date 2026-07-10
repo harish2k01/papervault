@@ -177,6 +177,18 @@ export type DocumentDetail = {
   }>;
 };
 
+export type DocumentTextSearchResult = {
+  query: string;
+  total_matches: number;
+  page_mapping_available: boolean;
+  matches: Array<{
+    page_number: number | null;
+    before: string;
+    match: string;
+    after: string;
+  }>;
+};
+
 export type NotificationStatus = "pending" | "read" | "dismissed";
 
 export type NotificationItem = {
@@ -317,6 +329,13 @@ export async function getDocumentFile(documentId: string) {
     throw new Error(`Failed to fetch document file: ${response.status}`);
   }
   return response.blob();
+}
+
+export async function searchDocumentText(documentId: string, query: string) {
+  const params = new URLSearchParams({ query });
+  return apiFetch<DocumentTextSearchResult>(
+    `/documents/${documentId}/text-search?${params.toString()}`,
+  );
 }
 
 export async function searchDocuments(input: SearchRequestInput) {

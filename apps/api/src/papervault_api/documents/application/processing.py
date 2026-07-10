@@ -8,7 +8,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from papervault_api.documents.application.extraction import TextExtractor
 from papervault_api.documents.application.storage import ObjectStorage
 from papervault_api.documents.domain.enums import DocumentStatus, TextExtractionStatus
-from papervault_api.documents.infrastructure.models import Document, DocumentTextExtraction
+from papervault_api.documents.infrastructure.models import (
+    Document,
+    DocumentTextExtraction,
+    DocumentTextPage,
+)
 
 
 class DocumentProcessingService:
@@ -26,6 +30,8 @@ class DocumentProcessingService:
         document = await self._session.get(Document, document_id)
         if document is None:
             return
+        if document.status == DocumentStatus.ARCHIVED.value or document.archived_at is not None:
+            return
 
         document.status = DocumentStatus.PROCESSING.value
         await self._session.flush()
@@ -40,26 +46,36 @@ class DocumentProcessingService:
             result = self._text_extractor.extract(file_path, document.content_type)
 
         await self._mark_existing_extractions_not_current(document.id)
-        self._session.add(
-            DocumentTextExtraction(
-                document_id=document.id,
-                source=result.source.value,
-                status=result.status.value,
-                content_text=result.content_text,
-                page_count=result.page_count,
-                language=result.language,
-                confidence_score=result.confidence_score,
-                extractor=result.extractor,
-                error_message=result.error_message,
-                is_current=True,
-            ),
+        extraction = DocumentTextExtraction(
+            document_id=document.id,
+            source=result.source.value,
+            status=result.status.value,
+            content_text=result.content_text,
+            page_count=result.page_count,
+            language=result.language,
+            confidence_score=result.confidence_score,
+            extractor=result.extractor,
+            error_message=result.error_message,
+            is_current=True,
         )
+        self._session.add(extraction)
+        await self._session.flush()
+        self._session.add_all(
+            DocumentTextPage(
+                text_extraction_id=extraction.id,
+                page_number=page_number,
+                content_text=content_text,
+            )
+            for page_number, content_text in enumerate(result.page_texts, start=1)
+        )
+        await self._session.refresh(document, attribute_names=["status", "archived_at"])
         document.page_count = result.page_count or document.page_count
-        document.status = (
-            DocumentStatus.READY.value
-            if result.status is TextExtractionStatus.SUCCEEDED
-            else DocumentStatus.FAILED.value
-        )
+        if document.status != DocumentStatus.ARCHIVED.value and document.archived_at is None:
+            document.status = (
+                DocumentStatus.READY.value
+                if result.status is TextExtractionStatus.SUCCEEDED
+                else DocumentStatus.FAILED.value
+            )
         await self._session.commit()
 
     async def _mark_existing_extractions_not_current(self, document_id: UUID) -> None:

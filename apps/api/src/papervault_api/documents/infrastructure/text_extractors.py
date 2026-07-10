@@ -56,7 +56,8 @@ class PypdfTextExtractor(TextExtractor):
                 error_message=str(exc),
             )
 
-        content_text = "\n\n".join(page_text.strip() for page_text in pages).strip()
+        page_texts = tuple(page_text.strip() for page_text in pages)
+        content_text = "\n\n".join(page_texts).strip()
         if not content_text:
             return TextExtractionResult(
                 source=TextExtractionSource.EMBEDDED_TEXT,
@@ -70,6 +71,7 @@ class PypdfTextExtractor(TextExtractor):
             source=TextExtractionSource.EMBEDDED_TEXT,
             status=TextExtractionStatus.SUCCEEDED,
             content_text=content_text,
+            page_texts=page_texts,
             page_count=len(pages),
             extractor="pypdf",
         )
@@ -195,8 +197,7 @@ class TesseractCliTextExtractor(TextExtractor):
             if isinstance(result, TextExtractionResult):
                 return result
             text = result.stdout.strip()
-            if text:
-                page_texts.append(text)
+            page_texts.append(text)
 
         content_text = "\n\n".join(page_texts).strip()
         if not content_text:
@@ -213,6 +214,7 @@ class TesseractCliTextExtractor(TextExtractor):
             source=TextExtractionSource.OCR,
             status=TextExtractionStatus.SUCCEEDED,
             content_text=content_text,
+            page_texts=tuple(page_texts),
             page_count=page_count,
             language=self._languages,
             extractor="tesseract_cli",

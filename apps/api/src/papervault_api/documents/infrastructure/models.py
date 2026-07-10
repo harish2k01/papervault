@@ -283,3 +283,31 @@ class DocumentTextExtraction(UuidPrimaryKeyMixin, TimestampMixin, Base):
     is_current: Mapped[bool] = mapped_column(nullable=False, default=True, server_default="true")
 
     document: Mapped[Document] = relationship(back_populates="text_extractions")
+    pages: Mapped[list[DocumentTextPage]] = relationship(
+        back_populates="text_extraction",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        order_by="DocumentTextPage.page_number",
+    )
+
+
+class DocumentTextPage(UuidPrimaryKeyMixin, Base):
+    __tablename__ = "document_text_pages"
+    __table_args__ = (
+        CheckConstraint("page_number > 0", name="document_text_page_number_positive"),
+        UniqueConstraint(
+            "text_extraction_id",
+            "page_number",
+            name="uq_document_text_pages_extraction_page",
+        ),
+        Index("ix_document_text_pages_extraction_page", "text_extraction_id", "page_number"),
+    )
+
+    text_extraction_id: Mapped[UUID] = mapped_column(
+        ForeignKey("document_text_extractions.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    page_number: Mapped[int] = mapped_column(Integer, nullable=False)
+    content_text: Mapped[str] = mapped_column(Text, nullable=False)
+
+    text_extraction: Mapped[DocumentTextExtraction] = relationship(back_populates="pages")

@@ -14,6 +14,8 @@ Add an owner-scoped duplicate merge use case for exact-hash groups. The user cho
 
 Archived duplicate documents keep their metadata, timeline, versions, and object-storage references. Merge writes timeline events and refreshes the search projection on a best-effort basis.
 
+Document processing treats archive as terminal. A queued worker exits without processing an already archived document and never replaces an archived status with a processing outcome.
+
 ## Consequences
 
 - Duplicate cleanup is reversible at the data level because rows and blobs are retained.

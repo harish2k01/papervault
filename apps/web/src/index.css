@@ -53,3 +53,9 @@
     border-color: hsl(var(--border));
   }
 }
+
+.papervault-pdf-highlight {
+  border-radius: 2px;
+  background: rgb(253 230 138 / 0.85);
+  color: rgb(69 26 3);
+}

@@ -10,6 +10,7 @@ class TextExtractionResult:
     source: TextExtractionSource
     status: TextExtractionStatus
     content_text: str | None = None
+    page_texts: tuple[str, ...] = ()
     page_count: int | None = None
     language: str | None = None
     confidence_score: float | None = None

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   AlertCircle,
@@ -43,7 +43,6 @@ import {
   detachTag,
   getAuthConfig,
   getDocument,
-  getDocumentFile,
   getMe,
   getStoredAccessToken,
   listDocumentTypes,
@@ -77,6 +76,11 @@ import {
 } from "./notification-utils";
 
 type WorkspaceView = "documents" | "duplicates" | "tags" | "notifications";
+
+const DocumentPreview = lazy(async () => {
+  const module = await import("../documents/DocumentPreview");
+  return { default: module.DocumentPreview };
+});
 
 const navItems = [
   { key: "documents", label: "Documents", icon: FileText },
@@ -535,26 +539,49 @@ export function AppShell() {
             : "xl:grid-cols-[252px_minmax(0,1fr)]",
         )}
       >
-        <aside className="flex flex-col border-b border-border bg-card px-4 py-4 xl:h-screen xl:border-b-0 xl:border-r xl:py-5">
-          <div className="mb-7 flex items-center gap-3 px-1">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm">
-              <FileText className="h-5 w-5" aria-hidden="true" />
+        <aside className="flex flex-col border-b border-border bg-card px-4 py-3 xl:h-screen xl:border-b-0 xl:border-r xl:py-5">
+          <div className="mb-3 flex items-center justify-between gap-3 px-1 xl:mb-7 xl:justify-start">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm">
+                <FileText className="h-5 w-5" aria-hidden="true" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold">PaperVault</p>
+                <p className="text-xs text-muted-foreground">
+                  Document intelligence
+                </p>
+              </div>
             </div>
-            <div>
-              <p className="text-sm font-semibold">PaperVault</p>
-              <p className="text-xs text-muted-foreground">
-                Document intelligence
-              </p>
-            </div>
+            <Button
+              aria-label={accessToken === null ? "Sign in" : "Sign out"}
+              className="xl:hidden"
+              size="icon"
+              type="button"
+              variant="ghost"
+              onClick={
+                accessToken === null
+                  ? () => setShowAuthScreen(true)
+                  : handleSignOut
+              }
+            >
+              {accessToken === null ? (
+                <LogIn className="h-4 w-4" aria-hidden="true" />
+              ) : (
+                <LogOut className="h-4 w-4" aria-hidden="true" />
+              )}
+            </Button>
           </div>
 
-          <nav aria-label="Primary navigation" className="space-y-1">
+          <nav
+            aria-label="Primary navigation"
+            className="grid grid-cols-4 gap-1 xl:block xl:space-y-1"
+          >
             {navItems.map((item) => {
               const active = activeView === item.key;
               return (
                 <button
                   className={cn(
-                    "flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-left text-sm transition-colors",
+                    "flex min-w-0 w-full flex-col items-center justify-center gap-1 rounded-lg px-1.5 py-2 text-center text-xs transition-colors xl:flex-row xl:justify-between xl:px-3 xl:py-2.5 xl:text-left xl:text-sm",
                     active
                       ? "bg-primary text-primary-foreground shadow-sm"
                       : "text-muted-foreground hover:bg-muted hover:text-foreground",
@@ -564,9 +591,9 @@ export function AppShell() {
                   aria-current={active ? "page" : undefined}
                   onClick={() => setActiveView(item.key)}
                 >
-                  <span className="flex items-center gap-3">
+                  <span className="flex min-w-0 flex-col items-center gap-1 xl:flex-row xl:gap-3">
                     <item.icon className="h-4 w-4" aria-hidden="true" />
-                    {item.label}
+                    <span className="truncate">{item.label}</span>
                   </span>
                   {item.label === "Duplicates" && duplicateGroups > 0 ? (
                     <span
@@ -599,7 +626,7 @@ export function AppShell() {
           </nav>
 
           {!workspaceIsEmpty ? (
-            <section className="mt-7 rounded-lg border border-border bg-background p-3">
+            <section className="mt-7 hidden rounded-lg border border-border bg-background p-3 xl:block">
               <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                 Vault
               </p>
@@ -611,7 +638,7 @@ export function AppShell() {
             </section>
           ) : null}
 
-          <div className="mt-auto">
+          <div className="mt-auto hidden xl:block">
             <AuthStatus
               user={meQuery.data}
               usingDevIdentity={accessToken === null}
@@ -1868,7 +1895,9 @@ function DocumentPanel({
                 Source file stays separate from metadata.
               </p>
             </div>
-            <DocumentPreview document={detail.document} />
+            <Suspense fallback={<PreviewLoadingState />}>
+              <DocumentPreview document={detail.document} />
+            </Suspense>
           </section>
 
           <section className="border-t border-border pt-5">
@@ -2132,6 +2161,14 @@ function DocumentStatusNotice({ document }: { document: DocumentItem }) {
           </p>
         </div>
       </div>
+    </div>
+  );
+}
+
+function PreviewLoadingState() {
+  return (
+    <div className="flex min-h-64 items-center justify-center rounded-lg border border-border bg-card p-5 text-sm text-muted-foreground">
+      Loading viewer...
     </div>
   );
 }
@@ -2604,70 +2641,5 @@ function MetadataEditor({
         Save metadata
       </Button>
     </form>
-  );
-}
-
-function DocumentPreview({ document }: { document: DocumentItem }) {
-  const canLoadPreview = document.status === "ready";
-  const fileQuery = useQuery({
-    queryKey: ["document-file", document.id],
-    queryFn: async () =>
-      URL.createObjectURL(await getDocumentFile(document.id)),
-    enabled: canLoadPreview,
-  });
-
-  useEffect(() => {
-    return () => {
-      if (fileQuery.data) {
-        URL.revokeObjectURL(fileQuery.data);
-      }
-    };
-  }, [fileQuery.data]);
-
-  if (!canLoadPreview) {
-    return (
-      <div className="flex min-h-64 items-center justify-center rounded-lg border border-dashed border-border bg-muted/40 p-8 text-center">
-        <div className="max-w-sm">
-          <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-lg bg-background text-muted-foreground">
-            <FileText className="h-5 w-5" aria-hidden="true" />
-          </div>
-          <p className="mt-4 text-sm font-medium">Preview not ready</p>
-          <p className="mt-2 text-sm leading-6 text-muted-foreground">
-            The original file is saved, but a clean preview is available only
-            after processing completes successfully.
-          </p>
-        </div>
-      </div>
-    );
-  }
-  if (fileQuery.isLoading) {
-    return (
-      <div className="flex min-h-64 items-center justify-center rounded-lg border border-border bg-card p-5 text-sm text-muted-foreground">
-        Loading preview...
-      </div>
-    );
-  }
-  if (!fileQuery.data || fileQuery.isError) {
-    return (
-      <div className="flex min-h-64 items-center justify-center rounded-lg border border-border bg-card p-5 text-sm text-muted-foreground">
-        Preview unavailable.
-      </div>
-    );
-  }
-  if (document.content_type.startsWith("image/")) {
-    return (
-      <img
-        alt={document.title}
-        className="max-h-[520px] w-full rounded-lg border border-border bg-card object-contain p-4"
-        src={fileQuery.data}
-      />
-    );
-  }
-  return (
-    <iframe
-      className="h-[520px] w-full rounded-lg border border-border bg-card"
-      src={fileQuery.data}
-      title={document.title}
-    />
   );
 }
