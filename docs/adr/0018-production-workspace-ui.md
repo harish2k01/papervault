@@ -24,8 +24,18 @@ Refresh the workspace UI while preserving the existing frontend data flow:
 - Keep search focused on one primary query input, with advanced filters behind an
   expandable panel.
 - Hide saved and recent search shortcuts until there are useful entries to show.
-- Replace the blank document detail placeholder with a quiet selection state for
-  populated vaults.
+- Replace the populated document view with a reader-first surface: identity,
+  bounded preview/status, summary, extracted fields, tags, signals, timeline,
+  and versions.
+- Keep edit forms and raw metadata available, but place them behind disclosure
+  controls so they do not dominate normal review.
+- Failed or processing documents render a bounded status panel instead of
+  embedding the PDF viewer.
+- Keep the desktop workspace viewport-bound so navigation, the document list,
+  and document review remain stable while their own content scrolls.
+- Mount advanced controls only after explicit user intent, including saved
+  search creation, manual tag management, document field editing, and raw JSON
+  editing.
 - Improve design tokens and the button primitive, but keep most presentation
   components local to the shell for now.
 

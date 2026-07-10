@@ -1,15 +1,13 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   AlertCircle,
   Bell,
-  CalendarClock,
   CheckCircle2,
   ChevronDown,
   Clock3,
   FileSearch,
   FileText,
-  FolderOpen,
   LogIn,
   LogOut,
   Search,
@@ -419,16 +417,16 @@ export function AppShell() {
   }
 
   return (
-    <main className="min-h-screen bg-background text-foreground">
+    <main className="min-h-screen bg-background text-foreground xl:h-screen xl:overflow-hidden">
       <div
         className={cn(
-          "grid min-h-screen",
+          "grid min-h-screen xl:h-screen",
           workspaceIsEmpty
             ? "xl:grid-cols-[252px_minmax(0,1fr)]"
-            : "xl:grid-cols-[252px_minmax(430px,500px)_minmax(0,1fr)]",
+            : "xl:grid-cols-[252px_minmax(0,1fr)]",
         )}
       >
-        <aside className="flex flex-col border-b border-border bg-card px-4 py-4 xl:min-h-screen xl:border-b-0 xl:border-r xl:py-5">
+        <aside className="flex flex-col border-b border-border bg-card px-4 py-4 xl:h-screen xl:border-b-0 xl:border-r xl:py-5">
           <div className="mb-7 flex items-center gap-3 px-1">
             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm">
               <FileText className="h-5 w-5" aria-hidden="true" />
@@ -498,10 +496,10 @@ export function AppShell() {
             onUpload={(file) => uploadMutation.mutate(file)}
           />
         ) : (
-          <>
-            <section className="flex min-w-0 flex-col border-r border-border bg-card/80">
-              <header className="border-b border-border bg-card px-6 py-5">
-                <div className="mb-5 flex items-start justify-between gap-4">
+          <section className="flex min-w-0 flex-col bg-background xl:h-screen xl:min-h-0">
+            <header className="border-b border-border bg-card px-5 py-5 xl:px-7">
+              <div className="flex flex-col gap-5">
+                <div className="flex flex-wrap items-start justify-between gap-4">
                   <div>
                     <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                       Document workspace
@@ -538,58 +536,42 @@ export function AppShell() {
                   onSave={saveCurrentSearch}
                   onApplySearch={submitSearch}
                 />
-              </header>
-
-              <div className="grid grid-cols-3 gap-3 border-b border-border bg-background/70 p-4">
-                <Metric
-                  label="Documents"
-                  value={documentCount}
-                  icon={FolderOpen}
-                  detail="In vault"
-                  tone="primary"
-                />
-                <Metric
-                  label="Processing"
-                  value={pendingDocuments}
-                  icon={Clock3}
-                  detail="In queue"
-                  tone="warning"
-                />
-                <Metric
-                  label="Due"
-                  value={pendingNotifications}
-                  icon={CalendarClock}
-                  detail="Reminders"
-                  tone="danger"
-                />
               </div>
+            </header>
 
-              <div className="min-h-0 flex-1 overflow-auto bg-background/60 p-4">
-                {documentsQuery.isLoading ? (
-                  <DocumentListSkeleton />
-                ) : visibleDocuments.length === 0 ? (
-                  <DocumentListEmptyState
-                    hasSearch={submittedSearch !== null}
-                    isUploading={uploadMutation.isPending}
-                    onClear={clearSearch}
-                    onUpload={(file) => uploadMutation.mutate(file)}
-                  />
-                ) : (
-                  <div className="space-y-2">
-                    {visibleDocuments.map((document) => (
-                      <DocumentListItem
-                        document={document}
-                        key={document.id}
-                        selected={selectedDocumentId === document.id}
-                        onSelect={() => setSelectedDocumentId(document.id)}
-                      />
-                    ))}
-                  </div>
-                )}
-              </div>
-            </section>
+            <div className="grid min-h-0 flex-1 xl:grid-cols-[390px_minmax(0,1fr)] xl:overflow-hidden">
+              <section className="min-h-0 border-b border-border bg-background/70 p-4 xl:flex xl:flex-col xl:border-b-0 xl:border-r">
+                <div className="mb-3 flex items-center justify-between">
+                  <h2 className="text-sm font-semibold">Documents</h2>
+                  <span className="text-xs text-muted-foreground">
+                    {visibleDocuments.length} shown
+                  </span>
+                </div>
+                <div className="min-h-0 xl:flex-1 xl:overflow-auto">
+                  {documentsQuery.isLoading ? (
+                    <DocumentListSkeleton />
+                  ) : visibleDocuments.length === 0 ? (
+                    <DocumentListEmptyState
+                      hasSearch={submittedSearch !== null}
+                      isUploading={uploadMutation.isPending}
+                      onClear={clearSearch}
+                      onUpload={(file) => uploadMutation.mutate(file)}
+                    />
+                  ) : (
+                    <div className="space-y-2">
+                      {visibleDocuments.map((document) => (
+                        <DocumentListItem
+                          document={document}
+                          key={document.id}
+                          selected={selectedDocumentId === document.id}
+                          onSelect={() => setSelectedDocumentId(document.id)}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </section>
 
-            <section className="min-w-0 overflow-auto bg-background">
               <DocumentPanel
                 detail={detailQuery.data}
                 duplicateGroups={duplicateGroups}
@@ -624,8 +606,8 @@ export function AppShell() {
                   tagDetachMutation.mutate({ documentId, tagId })
                 }
               />
-            </section>
-          </>
+            </div>
+          </section>
         )}
       </div>
     </main>
@@ -680,146 +662,192 @@ function AuthScreen({
   const oidcEnabled = authConfig?.oidc_configured === true;
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-background px-4 text-foreground">
-      <section className="w-full max-w-md rounded-md border border-border bg-card p-6">
-        <div className="mb-6 flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-md bg-primary text-primary-foreground">
-            <ShieldCheck className="h-5 w-5" aria-hidden="true" />
+    <main className="flex min-h-screen items-center justify-center bg-background px-4 py-10 text-foreground">
+      <section className="grid w-full max-w-4xl overflow-hidden rounded-xl border border-border bg-card shadow-sm lg:grid-cols-[minmax(0,1fr)_420px]">
+        <div className="hidden border-r border-border bg-muted/40 p-8 lg:block">
+          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm">
+            <FileText className="h-5 w-5" aria-hidden="true" />
           </div>
-          <div>
-            <h1 className="text-lg font-semibold">PaperVault</h1>
-            <p className="text-sm text-muted-foreground">
-              Sign in to your document vault.
+          <h1 className="mt-8 max-w-sm text-3xl font-semibold tracking-normal">
+            Your private document intelligence workspace.
+          </h1>
+          <p className="mt-4 max-w-sm text-sm leading-6 text-muted-foreground">
+            Upload personal records, extract searchable knowledge, and keep the
+            source files separate from metadata.
+          </p>
+          <div className="mt-8 grid gap-3 text-sm">
+            <AuthFeature label="OCR and metadata extraction" />
+            <AuthFeature label="Keyword, semantic, and filtered search" />
+            <AuthFeature label="Self-hosted storage and identity controls" />
+          </div>
+        </div>
+
+        <div className="p-6 sm:p-8">
+          <div className="mb-7 flex items-center gap-3 lg:hidden">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+              <ShieldCheck className="h-5 w-5" aria-hidden="true" />
+            </div>
+            <div>
+              <h1 className="text-lg font-semibold">PaperVault</h1>
+              <p className="text-sm text-muted-foreground">
+                Sign in to your document vault.
+              </p>
+            </div>
+          </div>
+
+          <div className="mb-6">
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              Secure access
+            </p>
+            <h2 className="mt-2 text-2xl font-semibold tracking-normal">
+              {mode === "login" ? "Welcome back" : "Create your vault"}
+            </h2>
+            <p className="mt-2 text-sm text-muted-foreground">
+              {mode === "login"
+                ? "Use local login or your configured identity provider."
+                : "Local registration creates the first account for this instance."}
             </p>
           </div>
-        </div>
 
-        <div className="mb-4 grid grid-cols-2 rounded-md bg-muted p-1">
-          <button
-            className={`rounded px-3 py-2 text-sm ${
-              mode === "login"
-                ? "bg-background shadow-sm"
-                : "text-muted-foreground"
-            }`}
-            type="button"
-            onClick={() => setMode("login")}
-          >
-            Sign in
-          </button>
-          <button
-            className={`rounded px-3 py-2 text-sm ${
-              mode === "register"
-                ? "bg-background shadow-sm"
-                : "text-muted-foreground"
-            }`}
-            type="button"
-            disabled={!registrationEnabled}
-            onClick={() => setMode("register")}
-          >
-            Register
-          </button>
-        </div>
+          <div className="mb-4 grid grid-cols-2 rounded-lg bg-muted p-1">
+            <button
+              className={cn(
+                "rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                mode === "login"
+                  ? "bg-card text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
+              type="button"
+              onClick={() => setMode("login")}
+            >
+              Sign in
+            </button>
+            <button
+              className={cn(
+                "rounded-md px-3 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50",
+                mode === "register"
+                  ? "bg-card text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
+              type="button"
+              disabled={!registrationEnabled}
+              onClick={() => setMode("register")}
+            >
+              Register
+            </button>
+          </div>
 
-        {oidcEnabled ? (
-          <Button
-            className="mb-4 w-full"
-            variant="secondary"
-            type="button"
-            onClick={onOidcSignIn}
-          >
-            <ShieldCheck className="h-4 w-4" aria-hidden="true" />
-            Sign in with OIDC
-          </Button>
-        ) : null}
+          {oidcEnabled ? (
+            <Button
+              className="mb-4 w-full"
+              variant="secondary"
+              type="button"
+              onClick={onOidcSignIn}
+            >
+              <ShieldCheck className="h-4 w-4" aria-hidden="true" />
+              Sign in with OIDC
+            </Button>
+          ) : null}
 
-        <form
-          className="space-y-4"
-          onSubmit={(event) => {
-            event.preventDefault();
-            authMutation.mutate();
-          }}
-        >
-          {mode === "register" ? (
+          <form
+            className="space-y-4"
+            onSubmit={(event) => {
+              event.preventDefault();
+              authMutation.mutate();
+            }}
+          >
+            {mode === "register" ? (
+              <label className="block text-sm">
+                <span className="mb-1 block text-muted-foreground">
+                  Display name
+                </span>
+                <input
+                  className="h-10 w-full rounded-md border border-input bg-background px-3 outline-none transition-shadow focus-visible:ring-2 focus-visible:ring-ring"
+                  autoComplete="name"
+                  value={displayName}
+                  onChange={(event) => setDisplayName(event.target.value)}
+                />
+              </label>
+            ) : null}
+
             <label className="block text-sm">
-              <span className="mb-1 block text-muted-foreground">
-                Display name
-              </span>
+              <span className="mb-1 block text-muted-foreground">Email</span>
               <input
-                className="h-10 w-full rounded-md border border-input bg-background px-3 outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                autoComplete="name"
-                value={displayName}
-                onChange={(event) => setDisplayName(event.target.value)}
+                className="h-10 w-full rounded-md border border-input bg-background px-3 outline-none transition-shadow focus-visible:ring-2 focus-visible:ring-ring"
+                autoComplete="email"
+                type="email"
+                required
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
               />
             </label>
-          ) : null}
 
-          <label className="block text-sm">
-            <span className="mb-1 block text-muted-foreground">Email</span>
-            <input
-              className="h-10 w-full rounded-md border border-input bg-background px-3 outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              autoComplete="email"
-              type="email"
-              required
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-            />
-          </label>
+            <label className="block text-sm">
+              <span className="mb-1 block text-muted-foreground">Password</span>
+              <input
+                className="h-10 w-full rounded-md border border-input bg-background px-3 outline-none transition-shadow focus-visible:ring-2 focus-visible:ring-ring"
+                autoComplete={
+                  mode === "register" ? "new-password" : "current-password"
+                }
+                type="password"
+                required
+                minLength={mode === "register" ? 12 : 1}
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+              />
+            </label>
 
-          <label className="block text-sm">
-            <span className="mb-1 block text-muted-foreground">Password</span>
-            <input
-              className="h-10 w-full rounded-md border border-input bg-background px-3 outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              autoComplete={
-                mode === "register" ? "new-password" : "current-password"
+            {errorMessage ? (
+              <p className="rounded-md border border-rose-200 bg-rose-50 p-3 text-sm text-rose-900">
+                {errorMessage}
+              </p>
+            ) : null}
+
+            {oidcError ? (
+              <p className="rounded-md border border-rose-200 bg-rose-50 p-3 text-sm text-rose-900">
+                {oidcError}
+              </p>
+            ) : null}
+
+            <Button
+              className="w-full"
+              disabled={
+                authMutation.isPending ||
+                authConfig?.local_auth_enabled !== true
               }
-              type="password"
-              required
-              minLength={mode === "register" ? 12 : 1}
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-            />
-          </label>
+              type="submit"
+            >
+              {mode === "login" ? (
+                <LogIn className="h-4 w-4" aria-hidden="true" />
+              ) : (
+                <UserPlus className="h-4 w-4" aria-hidden="true" />
+              )}
+              {mode === "login" ? "Sign in" : "Create account"}
+            </Button>
+          </form>
 
-          {errorMessage ? (
-            <p className="rounded-md border border-border bg-muted p-3 text-sm text-foreground">
-              {errorMessage}
-            </p>
+          {allowDevIdentity ? (
+            <Button
+              className="mt-3 w-full"
+              variant="secondary"
+              type="button"
+              onClick={onDevIdentity}
+            >
+              Continue with development identity
+            </Button>
           ) : null}
-
-          {oidcError ? (
-            <p className="rounded-md border border-border bg-muted p-3 text-sm text-foreground">
-              {oidcError}
-            </p>
-          ) : null}
-
-          <Button
-            className="w-full"
-            disabled={
-              authMutation.isPending || authConfig?.local_auth_enabled !== true
-            }
-            type="submit"
-          >
-            {mode === "login" ? (
-              <LogIn className="h-4 w-4" aria-hidden="true" />
-            ) : (
-              <UserPlus className="h-4 w-4" aria-hidden="true" />
-            )}
-            {mode === "login" ? "Sign in" : "Create account"}
-          </Button>
-        </form>
-
-        {allowDevIdentity ? (
-          <Button
-            className="mt-3 w-full"
-            variant="secondary"
-            type="button"
-            onClick={onDevIdentity}
-          >
-            Continue with development identity
-          </Button>
-        ) : null}
+        </div>
       </section>
     </main>
+  );
+}
+
+function AuthFeature({ label }: { label: string }) {
+  return (
+    <div className="flex items-center gap-3">
+      <CheckCircle2 className="h-4 w-4 text-primary" aria-hidden="true" />
+      <span className="text-muted-foreground">{label}</span>
+    </div>
   );
 }
 
@@ -835,44 +863,40 @@ function AuthStatus({
   onSignOut: () => void;
 }) {
   return (
-    <section className="rounded-lg border border-border bg-background p-4">
-      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-        Account
-      </p>
+    <section className="border-t border-border pt-4">
       {usingDevIdentity ? (
-        <>
-          <p className="mt-2 text-sm font-semibold">Development identity</p>
-          <p className="mt-1 text-xs text-muted-foreground">
-            Header fallback is active for local development.
-          </p>
-          <Button
-            className="mt-3 w-full"
-            size="sm"
-            type="button"
-            onClick={onSignIn}
-          >
+        <div className="space-y-3">
+          <div>
+            <p className="text-sm font-semibold">Development identity</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Header fallback is active.
+            </p>
+          </div>
+          <Button size="sm" type="button" onClick={onSignIn}>
             Sign in
           </Button>
-        </>
+        </div>
       ) : (
-        <>
-          <p className="mt-2 truncate text-sm font-semibold">
-            {user?.email ?? "Signed in"}
-          </p>
-          <p className="mt-1 text-xs text-muted-foreground">
-            {user?.role ?? "Loading account"}
-          </p>
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <p className="truncate text-sm font-semibold">
+              {user?.email ?? "Signed in"}
+            </p>
+            <p className="mt-0.5 text-xs capitalize text-muted-foreground">
+              {user?.role ?? "Loading account"}
+            </p>
+          </div>
           <Button
-            className="mt-3 w-full"
             size="sm"
-            variant="secondary"
+            variant="ghost"
             type="button"
+            title="Sign out"
+            aria-label="Sign out"
             onClick={onSignOut}
           >
             <LogOut className="h-4 w-4" aria-hidden="true" />
-            Sign out
           </Button>
-        </>
+        </div>
       )}
     </section>
   );
@@ -1034,8 +1058,8 @@ function DocumentListItem({
   return (
     <button
       className={cn(
-        "group w-full rounded-lg border bg-card p-4 text-left text-sm shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md",
-        selected ? "border-primary/60 bg-primary/5 shadow-md" : "border-border",
+        "group w-full rounded-lg border bg-card p-4 text-left text-sm transition-colors hover:border-primary/40 hover:bg-primary/5",
+        selected ? "border-primary/60 bg-primary/5" : "border-border",
       )}
       type="button"
       onClick={onSelect}
@@ -1070,39 +1094,28 @@ function StatusBadge({ status }: { status: string }) {
   const normalizedStatus = status.replaceAll("_", " ");
   const ready = status === "ready";
   const processing = status.includes("processing");
+  const failed = status.includes("failed") || status === "error";
+  const archived = status === "archived";
   return (
     <span
       className={cn(
         "inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-1 text-xs font-medium capitalize",
         ready && "bg-emerald-50 text-emerald-700",
         processing && "bg-amber-50 text-amber-700",
-        !ready && !processing && "bg-muted text-muted-foreground",
+        failed && "bg-rose-50 text-rose-700",
+        archived && "bg-slate-100 text-slate-600",
+        !ready &&
+          !processing &&
+          !failed &&
+          !archived &&
+          "bg-muted text-muted-foreground",
       )}
     >
       {ready ? <CheckCircle2 className="h-3 w-3" aria-hidden="true" /> : null}
       {processing ? <Clock3 className="h-3 w-3" aria-hidden="true" /> : null}
+      {failed ? <AlertCircle className="h-3 w-3" aria-hidden="true" /> : null}
       {normalizedStatus}
     </span>
-  );
-}
-
-function MiniMetric({
-  label,
-  value,
-  icon: Icon,
-}: {
-  label: string;
-  value: number;
-  icon: typeof FileText;
-}) {
-  return (
-    <div className="rounded-lg border border-border bg-background p-3">
-      <div className="flex items-center justify-between gap-2">
-        <p className="text-xs text-muted-foreground">{label}</p>
-        <Icon className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
-      </div>
-      <p className="mt-2 text-lg font-semibold">{value}</p>
-    </div>
   );
 }
 
@@ -1144,6 +1157,7 @@ function SearchControls({
   onApplySearch: (search: SearchRequestInput) => void;
 }) {
   const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [saveOpen, setSaveOpen] = useState(false);
   const activeFilterCount = countActiveFilters(filters);
   const canSaveSearch = query.trim().length > 0 || activeFilterCount > 0;
   const hasSearchShortcuts =
@@ -1165,7 +1179,7 @@ function SearchControls({
           onSubmit();
         }}
       >
-        <div className="flex gap-2">
+        <div className="flex flex-col gap-2 sm:flex-row">
           <div className="relative min-w-0 flex-1">
             <Search
               className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
@@ -1173,13 +1187,15 @@ function SearchControls({
             />
             <input
               className="h-11 w-full rounded-md border border-input bg-card pl-10 pr-4 text-sm outline-none ring-offset-background placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring"
-              placeholder="Search documents, tags, issuers, or questions"
+              placeholder="Search documents, issuers, tags, or questions"
               type="search"
               value={query}
               onChange={(event) => onQueryChange(event.target.value)}
             />
           </div>
-          <Button type="submit">Search</Button>
+          <Button className="sm:w-auto" type="submit">
+            Search
+          </Button>
         </div>
 
         <div className="flex flex-wrap items-center justify-between gap-2">
@@ -1202,20 +1218,15 @@ function SearchControls({
               aria-hidden="true"
             />
           </button>
-          <div className="flex items-center gap-2">
-            <Button
-              size="sm"
-              variant="secondary"
-              type="button"
-              onClick={onClear}
-            >
+          {canSaveSearch ? (
+            <Button size="sm" variant="ghost" type="button" onClick={onClear}>
               Clear
             </Button>
-          </div>
+          ) : null}
         </div>
 
         {advancedOpen ? (
-          <div className="grid grid-cols-2 gap-2 rounded-lg border border-border bg-card p-3 text-sm">
+          <div className="grid gap-2 rounded-lg border border-border bg-card p-3 text-sm sm:grid-cols-2">
             <label>
               <span className="mb-1 block text-xs text-muted-foreground">
                 Mode
@@ -1334,22 +1345,33 @@ function SearchControls({
       </form>
 
       {canSaveSearch ? (
-        <div className="mt-3 flex gap-2 border-t border-border pt-3">
-          <input
-            className="h-9 min-w-0 flex-1 rounded-md border border-input bg-card px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            placeholder="Saved search name"
-            value={saveSearchName}
-            onChange={(event) => onSaveNameChange(event.target.value)}
-          />
-          <Button
-            size="sm"
-            variant="secondary"
+        <div className="mt-3 border-t border-border pt-3">
+          <button
+            className="text-xs font-medium text-muted-foreground hover:text-foreground"
             type="button"
-            disabled={isSaving || !saveSearchName.trim()}
-            onClick={onSave}
+            onClick={() => setSaveOpen((current) => !current)}
           >
-            Save
-          </Button>
+            Save this search
+          </button>
+          {saveOpen ? (
+            <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+              <input
+                className="h-9 min-w-0 flex-1 rounded-md border border-input bg-card px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                placeholder="Saved search name"
+                value={saveSearchName}
+                onChange={(event) => onSaveNameChange(event.target.value)}
+              />
+              <Button
+                size="sm"
+                variant="secondary"
+                type="button"
+                disabled={isSaving || !saveSearchName.trim()}
+                onClick={onSave}
+              >
+                Save
+              </Button>
+            </div>
+          ) : null}
         </div>
       ) : null}
 
@@ -1596,6 +1618,9 @@ function DocumentPanel({
   onCreateAndAttachTag: (documentId: string, name: string) => void;
   onDetachTag: (documentId: string, tagId: string) => void;
 }) {
+  const [fieldsEditorOpen, setFieldsEditorOpen] = useState(false);
+  const [metadataEditorOpen, setMetadataEditorOpen] = useState(false);
+
   if (isLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center p-8">
@@ -1609,156 +1634,315 @@ function DocumentPanel({
     return <DocumentOverviewEmptyState />;
   }
 
+  const metadataEntries = Object.entries(detail.metadata?.data ?? {});
+  const documentDate =
+    detail.document.document_date ?? formatDateTime(detail.document.created_at);
+  const confidence = detail.ai_analysis?.confidence_score;
+
   return (
-    <div className="grid min-h-screen xl:grid-cols-[minmax(0,1fr)_400px]">
-      <div className="flex min-h-screen flex-col bg-muted/50">
-        <div className="flex items-center justify-between border-b border-border bg-card px-5 py-3">
-          <div>
-            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              Preview
-            </p>
-            <p className="mt-0.5 truncate text-sm font-medium">
+    <article className="min-h-screen min-w-0 overflow-auto bg-background xl:h-full xl:min-h-0">
+      <header className="border-b border-border bg-card px-5 py-5 xl:px-7">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="min-w-0">
+            <div className="mb-2 flex flex-wrap items-center gap-2">
+              <span className="rounded-md bg-muted px-2 py-1 text-xs font-medium capitalize text-muted-foreground">
+                {detail.document.document_type.replaceAll("_", " ")}
+              </span>
+              <StatusBadge status={detail.document.status} />
+            </div>
+            <h2 className="max-w-full break-words text-2xl font-semibold tracking-normal">
+              {detail.document.title}
+            </h2>
+            <p className="mt-1 max-w-3xl truncate text-sm text-muted-foreground">
               {detail.document.original_filename}
             </p>
           </div>
-          <StatusBadge status={detail.document.status} />
+          <Button
+            size="sm"
+            variant="secondary"
+            type="button"
+            disabled={detail.document.status === "archived" || isUpdating}
+            onClick={() => onArchive(detail.document.id)}
+          >
+            Archive
+          </Button>
         </div>
-        <DocumentPreview document={detail.document} />
-      </div>
-      <aside className="border-l border-border bg-card">
-        <div className="sticky top-0 z-10 border-b border-border bg-card px-5 py-5">
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                {detail.document.document_type.replaceAll("_", " ")}
-              </p>
-              <h2 className="mt-1 line-clamp-2 text-xl font-semibold">
-                {detail.document.title}
-              </h2>
-              <p className="mt-1 truncate text-sm text-muted-foreground">
-                {detail.document.original_filename}
+      </header>
+
+      <div className="grid min-w-0 2xl:grid-cols-[minmax(0,1fr)_340px]">
+        <main className="min-w-0 space-y-6 p-5 xl:p-7">
+          <DocumentStatusNotice document={detail.document} />
+
+          <section>
+            <div className="mb-3">
+              <h3 className="text-sm font-semibold">Preview</h3>
+              <p className="text-xs text-muted-foreground">
+                Source file stays separate from metadata.
               </p>
             </div>
-            <Button
-              size="sm"
-              variant="secondary"
-              type="button"
-              disabled={detail.document.status === "archived" || isUpdating}
-              onClick={() => onArchive(detail.document.id)}
-            >
-              Archive
-            </Button>
-          </div>
-          <div className="mt-4 grid grid-cols-2 gap-3">
-            <MiniMetric
-              label="Duplicates"
-              value={duplicateGroups}
-              icon={AlertCircle}
-            />
-            <MiniMetric
-              label="Reminders"
-              value={notifications.length}
-              icon={CalendarClock}
-            />
-          </div>
-          {detail.document.archived_at ? (
-            <p className="mt-2 rounded-md border border-border bg-muted p-2 text-xs text-muted-foreground">
-              Archived {new Date(detail.document.archived_at).toLocaleString()}
-            </p>
-          ) : null}
-        </div>
+            <DocumentPreview document={detail.document} />
+          </section>
 
-        <div className="space-y-5 p-5">
-          <Panel title="Document Fields">
-            <DocumentFieldsEditor
-              document={detail.document}
-              disabled={isUpdating}
-              onSave={(updates) =>
-                onUpdateDocument(detail.document.id, updates)
-              }
-            />
-          </Panel>
-
-          <Panel title="AI Summary">
-            <p className="text-sm text-muted-foreground">
-              {detail.ai_analysis?.summary ?? "No summary generated yet."}
-            </p>
-            {detail.ai_analysis?.suggested_tags?.length ? (
-              <div className="mt-3 flex flex-wrap gap-2">
-                {detail.ai_analysis.suggested_tags.map((tag) => (
+          <section className="border-t border-border pt-5">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div>
+                <h3 className="text-sm font-semibold">AI Summary</h3>
+                <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">
+                  {detail.ai_analysis?.summary ?? "No summary generated yet."}
+                </p>
+              </div>
+              {confidence !== null && confidence !== undefined ? (
+                <span className="rounded-full bg-muted px-3 py-1 text-xs text-muted-foreground">
+                  {Math.round(confidence * 100)}% confidence
+                </span>
+              ) : null}
+            </div>
+            {detail.ai_analysis?.keywords?.length ? (
+              <div className="mt-4 flex flex-wrap gap-2">
+                {detail.ai_analysis.keywords.slice(0, 8).map((keyword) => (
                   <span
-                    className="rounded-md bg-muted px-2 py-1 text-xs"
-                    key={tag}
+                    className="rounded-full border border-border px-2.5 py-1 text-xs text-muted-foreground"
+                    key={keyword}
                   >
-                    {tag}
+                    {keyword}
                   </span>
                 ))}
               </div>
             ) : null}
-          </Panel>
+          </section>
 
-          <Panel title="Metadata">
-            <MetadataEditor
-              metadata={detail.metadata}
-              document={detail.document}
-              disabled={isUpdating}
-              onSave={(metadata) =>
-                onUpdateMetadata(detail.document.id, metadata)
-              }
-            />
-          </Panel>
-
-          <Panel title="Tags">
-            <TagEditor
-              assignedTags={detail.tags}
-              availableTags={tags}
-              disabled={isTagUpdating}
-              error={tagError}
-              suggestedTags={detail.ai_analysis?.suggested_tags ?? []}
-              onAttachTag={(tagId) => onAttachTag(detail.document.id, tagId)}
-              onCreateAndAttachTag={(name) =>
-                onCreateAndAttachTag(detail.document.id, name)
-              }
-              onDetachTag={(tagId) => onDetachTag(detail.document.id, tagId)}
-            />
-          </Panel>
-
-          <Panel title="Timeline">
-            <div className="space-y-3">
-              {detail.timeline_events.slice(0, 6).map((event) => (
-                <div className="text-sm" key={event.id}>
-                  <p>{event.event_type.replaceAll("_", " ")}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {new Date(event.occurred_at).toLocaleString()}
-                  </p>
-                </div>
-              ))}
+          <section className="border-t border-border pt-5">
+            <h3 className="text-sm font-semibold">Document Details</h3>
+            <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              <ReadOnlyField
+                label="Type"
+                value={detail.document.document_type.replaceAll("_", " ")}
+              />
+              <ReadOnlyField label="Date" value={documentDate} />
+              <ReadOnlyField label="Issuer" value={detail.document.issuer} />
+              <ReadOnlyField
+                label="Organization"
+                value={detail.document.organization}
+              />
             </div>
-          </Panel>
 
-          <Panel title="Versions">
-            {detail.versions.length ? (
-              <div className="space-y-3 text-sm">
-                {detail.versions.map((version) => (
-                  <div key={version.id}>
-                    <p>Version {version.version_number}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {new Date(version.created_at).toLocaleString()} -{" "}
-                      {Math.round(version.file_size_bytes / 1024)} KB
-                    </p>
-                  </div>
-                ))}
+            {metadataEntries.length ? (
+              <div className="mt-5">
+                <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  Extracted metadata
+                </p>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {metadataEntries.slice(0, 8).map(([key, value]) => (
+                    <ReadOnlyField
+                      key={key}
+                      label={key.replaceAll("_", " ")}
+                      value={formatMetadataValue(value)}
+                    />
+                  ))}
+                </div>
               </div>
-            ) : (
-              <p className="text-sm text-muted-foreground">
-                No versions recorded.
-              </p>
-            )}
-          </Panel>
+            ) : null}
+          </section>
+
+          <section className="border-t border-border pt-5">
+            <button
+              className="text-sm font-semibold hover:text-primary"
+              type="button"
+              onClick={() => setFieldsEditorOpen((current) => !current)}
+            >
+              Edit document fields
+            </button>
+            {fieldsEditorOpen ? (
+              <div className="mt-4 max-w-2xl">
+                <DocumentFieldsEditor
+                  document={detail.document}
+                  disabled={isUpdating}
+                  onSave={(updates) =>
+                    onUpdateDocument(detail.document.id, updates)
+                  }
+                />
+              </div>
+            ) : null}
+          </section>
+
+          <section className="border-t border-border pt-5">
+            <button
+              className="text-sm font-semibold hover:text-primary"
+              type="button"
+              onClick={() => setMetadataEditorOpen((current) => !current)}
+            >
+              Raw metadata JSON
+            </button>
+            {metadataEditorOpen ? (
+              <div className="mt-4 max-w-2xl">
+                <MetadataEditor
+                  metadata={detail.metadata}
+                  document={detail.document}
+                  disabled={isUpdating}
+                  onSave={(metadata) =>
+                    onUpdateMetadata(detail.document.id, metadata)
+                  }
+                />
+              </div>
+            ) : null}
+          </section>
+        </main>
+
+        <aside className="min-w-0 border-t border-border bg-card/70 p-5 2xl:border-l 2xl:border-t-0">
+          <div className="space-y-6">
+            <section>
+              <h3 className="text-sm font-semibold">Tags</h3>
+              <div className="mt-3">
+                <TagEditor
+                  assignedTags={detail.tags}
+                  availableTags={tags}
+                  disabled={isTagUpdating}
+                  error={tagError}
+                  suggestedTags={detail.ai_analysis?.suggested_tags ?? []}
+                  onAttachTag={(tagId) =>
+                    onAttachTag(detail.document.id, tagId)
+                  }
+                  onCreateAndAttachTag={(name) =>
+                    onCreateAndAttachTag(detail.document.id, name)
+                  }
+                  onDetachTag={(tagId) =>
+                    onDetachTag(detail.document.id, tagId)
+                  }
+                />
+              </div>
+            </section>
+
+            <section className="border-t border-border pt-5">
+              <h3 className="text-sm font-semibold">Signals</h3>
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                <SignalItem label="Duplicates" value={duplicateGroups} />
+                <SignalItem label="Reminders" value={notifications.length} />
+              </div>
+              {detail.document.archived_at ? (
+                <p className="mt-3 rounded-md border border-border bg-muted p-2 text-xs text-muted-foreground">
+                  Archived{" "}
+                  {new Date(detail.document.archived_at).toLocaleString()}
+                </p>
+              ) : null}
+            </section>
+
+            <section className="border-t border-border pt-5">
+              <h3 className="text-sm font-semibold">Timeline</h3>
+              {detail.timeline_events.length ? (
+                <div className="mt-3 space-y-3">
+                  {detail.timeline_events.slice(0, 6).map((event) => (
+                    <div className="text-sm" key={event.id}>
+                      <p>{event.event_type.replaceAll("_", " ")}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {new Date(event.occurred_at).toLocaleString()}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="mt-2 text-sm text-muted-foreground">
+                  No timeline events yet.
+                </p>
+              )}
+            </section>
+
+            <section className="border-t border-border pt-5">
+              <h3 className="text-sm font-semibold">Versions</h3>
+              {detail.versions.length ? (
+                <div className="mt-3 space-y-3 text-sm">
+                  {detail.versions.map((version) => (
+                    <div key={version.id}>
+                      <p>Version {version.version_number}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {new Date(version.created_at).toLocaleString()} -{" "}
+                        {Math.round(version.file_size_bytes / 1024)} KB
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="mt-2 text-sm text-muted-foreground">
+                  No versions recorded.
+                </p>
+              )}
+            </section>
+          </div>
+        </aside>
+      </div>
+    </article>
+  );
+}
+
+function DocumentStatusNotice({ document }: { document: DocumentItem }) {
+  if (document.status === "ready") {
+    return null;
+  }
+  const failed = document.status.includes("failed");
+  return (
+    <div
+      className={cn(
+        "rounded-lg border px-4 py-3 text-sm",
+        failed
+          ? "border-rose-200 bg-rose-50 text-rose-900"
+          : "border-amber-200 bg-amber-50 text-amber-900",
+      )}
+    >
+      <div className="flex items-start gap-3">
+        <AlertCircle className="mt-0.5 h-4 w-4" aria-hidden="true" />
+        <div>
+          <p className="font-medium">
+            {failed ? "Processing failed" : "Processing in progress"}
+          </p>
+          <p className="mt-1 text-xs opacity-80">
+            {failed
+              ? "The file is stored, but text extraction or preview generation did not complete. Password-protected PDFs need a follow-up unlock workflow."
+              : "PaperVault will update extracted text, metadata, summary, and search index when processing finishes."}
+          </p>
         </div>
-      </aside>
+      </div>
     </div>
   );
+}
+
+function ReadOnlyField({
+  label,
+  value,
+}: {
+  label: string;
+  value: string | number | null | undefined;
+}) {
+  return (
+    <div className="rounded-lg border border-border bg-card px-3 py-2">
+      <p className="text-xs capitalize text-muted-foreground">{label}</p>
+      <p className="mt-1 truncate text-sm font-medium">
+        {value === null || value === undefined || value === ""
+          ? "Not set"
+          : value}
+      </p>
+    </div>
+  );
+}
+
+function SignalItem({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="rounded-lg border border-border bg-background px-3 py-2">
+      <p className="text-xs text-muted-foreground">{label}</p>
+      <p className="mt-1 text-lg font-semibold">{value}</p>
+    </div>
+  );
+}
+
+function formatMetadataValue(value: unknown) {
+  if (value === null || value === undefined || value === "") {
+    return "Not set";
+  }
+  if (typeof value === "string" || typeof value === "number") {
+    return String(value);
+  }
+  if (typeof value === "boolean") {
+    return value ? "Yes" : "No";
+  }
+  return JSON.stringify(value);
 }
 
 function TagEditor({
@@ -1782,6 +1966,7 @@ function TagEditor({
 }) {
   const [selectedTagId, setSelectedTagId] = useState("");
   const [tagName, setTagName] = useState("");
+  const [manageTagsOpen, setManageTagsOpen] = useState(false);
   const assignedTagIds = useMemo(
     () => new Set(assignedTags.map((tag) => tag.id)),
     [assignedTags],
@@ -1845,71 +2030,6 @@ function TagEditor({
         <p className="text-sm text-muted-foreground">No tags assigned.</p>
       )}
 
-      <div className="space-y-2">
-        <label className="block">
-          <span className="mb-1 block text-muted-foreground">Existing tag</span>
-          <div className="flex gap-2">
-            <select
-              className="h-9 min-w-0 flex-1 rounded-md border border-input bg-background px-3 outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              value={selectedTagId}
-              disabled={disabled || attachableTags.length === 0}
-              onChange={(event) => setSelectedTagId(event.target.value)}
-            >
-              <option value="">Select a tag</option>
-              {attachableTags.map((tag) => (
-                <option key={tag.id} value={tag.id}>
-                  {tag.name}
-                </option>
-              ))}
-            </select>
-            <Button
-              size="sm"
-              type="button"
-              disabled={disabled || !selectedTagId}
-              onClick={() => {
-                onAttachTag(selectedTagId);
-                setSelectedTagId("");
-              }}
-            >
-              Attach
-            </Button>
-          </div>
-        </label>
-      </div>
-
-      <form
-        className="space-y-2"
-        onSubmit={(event) => {
-          event.preventDefault();
-          const normalizedName = tagName.trim();
-          if (!normalizedName) {
-            return;
-          }
-          onCreateAndAttachTag(normalizedName);
-          setTagName("");
-        }}
-      >
-        <label className="block">
-          <span className="mb-1 block text-muted-foreground">New tag</span>
-          <div className="flex gap-2">
-            <input
-              className="h-9 min-w-0 flex-1 rounded-md border border-input bg-background px-3 outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              placeholder="e.g. tax, warranty, payroll"
-              value={tagName}
-              disabled={disabled}
-              onChange={(event) => setTagName(event.target.value)}
-            />
-            <Button
-              size="sm"
-              type="submit"
-              disabled={disabled || !tagName.trim()}
-            >
-              Create
-            </Button>
-          </div>
-        </label>
-      </form>
-
       {attachableSuggestedTags.length ? (
         <div>
           <p className="mb-2 text-xs uppercase text-muted-foreground">
@@ -1931,6 +2051,86 @@ function TagEditor({
           </div>
         </div>
       ) : null}
+
+      <div>
+        <button
+          className="text-xs font-medium text-muted-foreground hover:text-foreground"
+          type="button"
+          onClick={() => setManageTagsOpen((current) => !current)}
+        >
+          Manage tags
+        </button>
+        {manageTagsOpen ? (
+          <div className="mt-3 space-y-3">
+            <label className="block">
+              <span className="mb-1 block text-muted-foreground">
+                Existing tag
+              </span>
+              <div className="flex gap-2">
+                <select
+                  className="h-9 min-w-0 flex-1 rounded-md border border-input bg-background px-3 outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  value={selectedTagId}
+                  disabled={disabled || attachableTags.length === 0}
+                  onChange={(event) => setSelectedTagId(event.target.value)}
+                >
+                  <option value="">Select a tag</option>
+                  {attachableTags.map((tag) => (
+                    <option key={tag.id} value={tag.id}>
+                      {tag.name}
+                    </option>
+                  ))}
+                </select>
+                <Button
+                  size="sm"
+                  type="button"
+                  disabled={disabled || !selectedTagId}
+                  onClick={() => {
+                    onAttachTag(selectedTagId);
+                    setSelectedTagId("");
+                  }}
+                >
+                  Attach
+                </Button>
+              </div>
+            </label>
+
+            <form
+              className="space-y-2"
+              onSubmit={(event) => {
+                event.preventDefault();
+                const normalizedName = tagName.trim();
+                if (!normalizedName) {
+                  return;
+                }
+                onCreateAndAttachTag(normalizedName);
+                setTagName("");
+              }}
+            >
+              <label className="block">
+                <span className="mb-1 block text-muted-foreground">
+                  New tag
+                </span>
+                <div className="flex gap-2">
+                  <input
+                    className="h-9 min-w-0 flex-1 rounded-md border border-input bg-background px-3 outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    placeholder="e.g. tax, warranty, payroll"
+                    value={tagName}
+                    disabled={disabled}
+                    onChange={(event) => setTagName(event.target.value)}
+                  />
+                  <Button
+                    size="sm"
+                    type="submit"
+                    disabled={disabled || !tagName.trim()}
+                  >
+                    Create
+                  </Button>
+                </div>
+              </label>
+            </form>
+          </div>
+        ) : null}
+      </div>
 
       {error ? (
         <p
@@ -1992,7 +2192,7 @@ function DocumentFieldsEditor({
           onChange={(event) => setTitle(event.target.value)}
         />
       </label>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid gap-3 sm:grid-cols-2">
         <label className="block">
           <span className="mb-1 block text-muted-foreground">Type</span>
           <input
@@ -2013,7 +2213,7 @@ function DocumentFieldsEditor({
           />
         </label>
       </div>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid gap-3 sm:grid-cols-2">
         <label className="block">
           <span className="mb-1 block text-muted-foreground">Issuer</span>
           <input
@@ -2124,10 +2324,12 @@ function MetadataEditor({
 }
 
 function DocumentPreview({ document }: { document: DocumentItem }) {
+  const canLoadPreview = document.status === "ready";
   const fileQuery = useQuery({
     queryKey: ["document-file", document.id],
     queryFn: async () =>
       URL.createObjectURL(await getDocumentFile(document.id)),
+    enabled: canLoadPreview,
   });
 
   useEffect(() => {
@@ -2138,16 +2340,32 @@ function DocumentPreview({ document }: { document: DocumentItem }) {
     };
   }, [fileQuery.data]);
 
+  if (!canLoadPreview) {
+    return (
+      <div className="flex min-h-64 items-center justify-center rounded-lg border border-dashed border-border bg-muted/40 p-8 text-center">
+        <div className="max-w-sm">
+          <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-lg bg-background text-muted-foreground">
+            <FileText className="h-5 w-5" aria-hidden="true" />
+          </div>
+          <p className="mt-4 text-sm font-medium">Preview not ready</p>
+          <p className="mt-2 text-sm leading-6 text-muted-foreground">
+            The original file is saved, but a clean preview is available only
+            after processing completes successfully.
+          </p>
+        </div>
+      </div>
+    );
+  }
   if (fileQuery.isLoading) {
     return (
-      <div className="flex flex-1 items-center justify-center p-5 text-sm text-muted-foreground">
+      <div className="flex min-h-64 items-center justify-center rounded-lg border border-border bg-card p-5 text-sm text-muted-foreground">
         Loading preview...
       </div>
     );
   }
-  if (!fileQuery.data) {
+  if (!fileQuery.data || fileQuery.isError) {
     return (
-      <div className="flex flex-1 items-center justify-center p-5 text-sm text-muted-foreground">
+      <div className="flex min-h-64 items-center justify-center rounded-lg border border-border bg-card p-5 text-sm text-muted-foreground">
         Preview unavailable.
       </div>
     );
@@ -2156,62 +2374,16 @@ function DocumentPreview({ document }: { document: DocumentItem }) {
     return (
       <img
         alt={document.title}
-        className="min-h-0 flex-1 object-contain p-6"
+        className="max-h-[520px] w-full rounded-lg border border-border bg-card object-contain p-4"
         src={fileQuery.data}
       />
     );
   }
   return (
     <iframe
-      className="min-h-[calc(100vh-61px)] flex-1 bg-card"
+      className="h-[520px] w-full rounded-lg border border-border bg-card"
       src={fileQuery.data}
       title={document.title}
     />
-  );
-}
-
-function Panel({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <section className="rounded-lg border border-border bg-background shadow-sm">
-      <div className="border-b border-border px-4 py-3">
-        <h3 className="text-sm font-semibold">{title}</h3>
-      </div>
-      <div className="p-4">{children}</div>
-    </section>
-  );
-}
-
-function Metric({
-  label,
-  value,
-  detail,
-  icon: Icon,
-  tone = "neutral",
-}: {
-  label: string;
-  value: number;
-  detail: string;
-  icon: typeof FileText;
-  tone?: "neutral" | "primary" | "warning" | "danger";
-}) {
-  return (
-    <div className="rounded-lg border border-border bg-card p-3 shadow-sm">
-      <div className="flex items-center justify-between gap-2">
-        <p className="text-xs text-muted-foreground">{label}</p>
-        <span
-          className={cn(
-            "flex h-7 w-7 items-center justify-center rounded-md",
-            tone === "primary" && "bg-primary/10 text-primary",
-            tone === "warning" && "bg-amber-50 text-amber-700",
-            tone === "danger" && "bg-rose-50 text-rose-700",
-            tone === "neutral" && "bg-muted text-muted-foreground",
-          )}
-        >
-          <Icon className="h-4 w-4" aria-hidden="true" />
-        </span>
-      </div>
-      <p className="mt-2 text-2xl font-semibold">{value}</p>
-      <p className="mt-1 text-xs text-muted-foreground">{detail}</p>
-    </div>
   );
 }

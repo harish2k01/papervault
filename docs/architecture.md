@@ -145,7 +145,10 @@ Phase 15 improves the production workspace shell without changing API contracts:
 - Empty states are actionable but restrained: the first-run view has one primary upload action, while search recovery appears only when a search has no matches.
 - Search keeps the primary query path visible while advanced filters are grouped behind an expandable panel.
 - Saved and recent search shortcuts are shown only after they contain useful entries.
-- Document review separates preview, document identity, operational metrics, metadata editing, tags, timeline, and versions into a consistent sidebar.
+- Populated vaults use a reader-first document review surface. Preview, summary, and extracted fields are primary; edit forms and raw metadata are behind disclosures.
+- Failed or still-processing files show bounded status panels instead of mounting the PDF viewer.
+- The desktop shell is viewport-bound: navigation, document list, and document review scroll independently instead of stretching one long page.
+- Secondary controls such as saved-search creation, manual tag management, document field editing, and raw JSON editing mount only when explicitly opened.
 - Shared styling remains small: design tokens, the button primitive, and local shell presentation components. A larger design-system extraction is deferred until repeated UI patterns justify it.
 
 ## Data Storage

@@ -7,6 +7,7 @@ import {
   createTag,
   getAuthConfig,
   getDocument,
+  getDocumentFile,
   listDocuments,
   listTags,
 } from "../../lib/api";
@@ -46,6 +47,7 @@ vi.mock("../../lib/api", () => ({
 
 describe("AppShell", () => {
   beforeEach(() => {
+    vi.clearAllMocks();
     Object.defineProperty(URL, "createObjectURL", {
       configurable: true,
       value: vi.fn().mockReturnValue("blob:papervault-test"),
@@ -171,6 +173,73 @@ describe("AppShell", () => {
       expect(attachTag).toHaveBeenCalledWith("document-1", "tag-1");
     });
     expect(createTag).not.toHaveBeenCalled();
+  });
+
+  it("shows a bounded failed-document preview instead of loading the PDF viewer", async () => {
+    const createdAt = "2026-07-09T17:21:39.000Z";
+    const document = {
+      id: "document-failed",
+      owner_id: "user-1",
+      title: "Statement 2026MTH04 609599319",
+      original_filename: "Statement_2026MTH04_609599319.pdf",
+      content_type: "application/pdf",
+      file_size_bytes: 67584,
+      sha256_hash: "b".repeat(64),
+      source_kind: "upload",
+      status: "failed",
+      document_type: "generic_pdf",
+      document_date: null,
+      issuer: null,
+      organization: null,
+      archived_at: null,
+      created_at: createdAt,
+      updated_at: createdAt,
+    };
+    vi.mocked(listDocuments).mockResolvedValueOnce([document]);
+    vi.mocked(getDocument).mockResolvedValueOnce({
+      document,
+      ai_analysis: null,
+      metadata: {
+        schema_name: "generic_pdf",
+        schema_version: 1,
+        data: {},
+        confidence_score: null,
+      },
+      text_extraction: {
+        status: "failed",
+        source: "pdf",
+        page_count: null,
+        language: null,
+        error_message: "Password required",
+      },
+      tags: [],
+      timeline_events: [
+        {
+          id: "event-1",
+          event_type: "document_uploaded",
+          payload: {},
+          occurred_at: createdAt,
+        },
+      ],
+      versions: [
+        {
+          id: "version-1",
+          version_number: 1,
+          sha256_hash: document.sha256_hash,
+          file_size_bytes: document.file_size_bytes,
+          change_reason: null,
+          created_by_id: "user-1",
+          created_at: createdAt,
+        },
+      ],
+    });
+
+    renderAppShell();
+
+    expect(await screen.findByText("Processing failed")).toBeInTheDocument();
+    expect(screen.getByText("Preview not ready")).toBeInTheDocument();
+    expect(screen.queryByTitle(document.title)).not.toBeInTheDocument();
+    expect(getDocumentFile).not.toHaveBeenCalled();
   });
 });
 
