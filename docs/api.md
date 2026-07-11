@@ -33,6 +33,7 @@ Additional document endpoints:
 
 - `GET /documents`: list documents with `limit` and `offset` pagination
 - `GET /documents/types`: list supported document type keys, labels, and metadata field definitions
+- `GET /documents/review-queue`: list non-archived owned documents requiring metadata or classification review
 - `GET /documents/{document_id}`: document detail with AI summary, metadata, tags, timeline, and extraction status
 - `PATCH /documents/{document_id}`: edit document title, type, date, issuer, or organization
 - `PUT /documents/{document_id}/metadata`: replace current structured metadata with a manual metadata version
@@ -41,11 +42,15 @@ Additional document endpoints:
 - `GET /documents/{document_id}/file`: authenticated inline document response for the built-in viewer; add `download=true` for an attachment
 - `DELETE /documents/{document_id}`: permanently delete owned metadata, versions, search projection, and stored source objects
 - `GET /documents/{document_id}/text-search?query=salary&limit=50`: owner-scoped literal search over the current extracted text, returning bounded excerpts and page numbers when available
+- `GET /documents/{document_id}/ocr-blocks?page=1&query=salary`: return owner-scoped normalized OCR word coordinates for a page, optionally filtered by search terms
+- `PATCH /documents/{document_id}/review`: approve extracted details or return a document to pending review with an optional note
 - `GET /documents/{document_id}/timeline`: document timeline events
 - `GET /documents/duplicates/candidates`: exact-hash duplicate candidate groups
 - `POST /documents/duplicates/merge`: keep one exact-hash duplicate and archive selected redundant copies
 
 Document text search accepts a case-insensitive literal query between 2 and 200 characters and returns at most 100 matches. `total_matches` reports the complete count even when the response is limited. Legacy extractions without page rows remain searchable, but return `page_mapping_available=false` until they are reprocessed.
+
+Structured metadata is normalized according to the selected document type and `PAPERVAULT_METADATA_LOCALE`. Invalid values are retained for correction and reported through `review_reasons`; approving a document records the reviewer and timestamp.
 
 ## Search
 

@@ -16,7 +16,9 @@ import { Button } from "../../components/ui/button";
 import {
   DocumentItem,
   DocumentTextSearchResult,
+  OcrTextBlock,
   getDocumentFile,
+  getOcrTextBlocks,
   searchDocumentText,
 } from "../../lib/api";
 import { cn } from "../../lib/utils";
@@ -29,7 +31,13 @@ pdfjs.GlobalWorkerOptions.workerSrc = new URL(
 
 const MIN_QUERY_LENGTH = 2;
 
-export function DocumentPreview({ document }: { document: DocumentItem }) {
+export function DocumentPreview({
+  document,
+  ocrGeometryAvailable = false,
+}: {
+  document: DocumentItem;
+  ocrGeometryAvailable?: boolean;
+}) {
   const canLoadPreview = document.status === "ready";
   const fileQuery = useQuery({
     queryKey: ["document-file", document.id],
@@ -52,6 +60,11 @@ export function DocumentPreview({ document }: { document: DocumentItem }) {
     queryKey: ["document-text-search", document.id, submittedQuery],
     queryFn: () => searchDocumentText(document.id, submittedQuery),
     enabled: submittedQuery.length >= MIN_QUERY_LENGTH,
+  });
+  const ocrBlocksQuery = useQuery({
+    queryKey: ["ocr-blocks", document.id, pageNumber, submittedQuery],
+    queryFn: () => getOcrTextBlocks(document.id, pageNumber, submittedQuery),
+    enabled: ocrGeometryAvailable && submittedQuery.length >= MIN_QUERY_LENGTH,
   });
   const matches = searchQuery.data?.matches ?? [];
 
@@ -217,11 +230,14 @@ export function DocumentPreview({ document }: { document: DocumentItem }) {
           ref={viewerRef}
         >
           {isImage ? (
-            <img
-              alt={document.title}
-              className="max-h-[680px] max-w-full rounded-sm bg-white object-contain shadow-sm"
-              src={imageUrl ?? undefined}
-            />
+            <div className="relative inline-block max-w-full">
+              <img
+                alt={document.title}
+                className="block max-h-[680px] max-w-full rounded-sm bg-white object-contain shadow-sm"
+                src={imageUrl ?? undefined}
+              />
+              <OcrHighlightOverlay blocks={ocrBlocksQuery.data ?? []} />
+            </div>
           ) : (
             <Document
               file={fileQuery.data}
@@ -236,14 +252,17 @@ export function DocumentPreview({ document }: { document: DocumentItem }) {
                 );
               }}
             >
-              <Page
-                className="overflow-hidden rounded-sm bg-white shadow-sm"
-                customTextRenderer={textRenderer}
-                pageNumber={pageNumber}
-                renderAnnotationLayer
-                renderTextLayer
-                width={renderedPageWidth}
-              />
+              <div className="relative inline-block">
+                <Page
+                  className="overflow-hidden rounded-sm bg-white shadow-sm"
+                  customTextRenderer={textRenderer}
+                  pageNumber={pageNumber}
+                  renderAnnotationLayer
+                  renderTextLayer
+                  width={renderedPageWidth}
+                />
+                <OcrHighlightOverlay blocks={ocrBlocksQuery.data ?? []} />
+              </div>
             </Document>
           )}
         </div>
@@ -258,6 +277,31 @@ export function DocumentPreview({ document }: { document: DocumentItem }) {
           />
         ) : null}
       </div>
+    </div>
+  );
+}
+
+function OcrHighlightOverlay({ blocks }: { blocks: OcrTextBlock[] }) {
+  if (!blocks.length) return null;
+
+  return (
+    <div
+      aria-hidden="true"
+      className="pointer-events-none absolute inset-0 overflow-hidden rounded-sm"
+    >
+      {blocks.map((block, index) => (
+        <span
+          className="absolute rounded-[2px] border border-amber-500/70 bg-amber-300/35 mix-blend-multiply dark:mix-blend-normal"
+          key={`${block.page_number}-${block.left_ratio}-${block.top_ratio}-${index}`}
+          style={{
+            left: `${block.left_ratio * 100}%`,
+            top: `${block.top_ratio * 100}%`,
+            width: `${block.width_ratio * 100}%`,
+            height: `${block.height_ratio * 100}%`,
+          }}
+          title={block.text}
+        />
+      ))}
     </div>
   );
 }

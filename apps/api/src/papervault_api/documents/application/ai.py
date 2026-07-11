@@ -9,9 +9,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from papervault_api.documents.application.chunking import chunk_page_text
 from papervault_api.documents.domain.enums import (
     AIAnalysisStatus,
+    DocumentReviewStatus,
     MetadataSource,
     TextExtractionStatus,
 )
+from papervault_api.documents.domain.metadata import normalize_document_metadata
 from papervault_api.documents.infrastructure.models import (
     Document,
     DocumentAIAnalysis,
@@ -71,11 +73,13 @@ class DocumentAIProcessingService:
         ai_provider: DocumentAIProvider,
         embedding_provider: EmbeddingProvider,
         classification_threshold: float,
+        metadata_locale: str = "en-IN",
     ) -> None:
         self._session = session
         self._ai_provider = ai_provider
         self._embedding_provider = embedding_provider
         self._classification_threshold = classification_threshold
+        self._metadata_locale = metadata_locale
 
     async def process_document(self, document_id: UUID) -> None:
         document = await self._session.get(Document, document_id)
@@ -91,6 +95,11 @@ class DocumentAIProcessingService:
             document.document_type,
         )
         embedding = self._embedding_provider.embed(text_extraction.content_text)
+        normalized_metadata = normalize_document_metadata(
+            analysis.category,
+            analysis.extracted_metadata,
+            locale=self._metadata_locale,
+        )
         text_hash = hashlib.sha256(text_extraction.content_text.encode("utf-8")).hexdigest()
 
         await self._mark_existing_ai_outputs_not_current(document_id)
@@ -107,7 +116,7 @@ class DocumentAIProcessingService:
                 suggested_tags=list(analysis.suggested_tags),
                 category=analysis.category,
                 confidence_score=analysis.confidence_score,
-                extracted_metadata=analysis.extracted_metadata,
+                extracted_metadata=normalized_metadata.data,
                 is_current=True,
             ),
         )
@@ -126,13 +135,13 @@ class DocumentAIProcessingService:
         )
         await self._replace_text_chunks(document_id, text_extraction.id)
 
-        if analysis.extracted_metadata:
+        if normalized_metadata.data:
             self._session.add(
                 DocumentMetadataRecord(
                     document_id=document_id,
                     schema_name=analysis.category,
                     schema_version=1,
-                    data=analysis.extracted_metadata,
+                    data=normalized_metadata.data,
                     source=MetadataSource.AI.value,
                     confidence_score=analysis.confidence_score,
                     extractor=f"{analysis.provider}:{analysis.model}",
@@ -143,6 +152,21 @@ class DocumentAIProcessingService:
         document.summary = analysis.summary
         if analysis.confidence_score >= self._classification_threshold:
             document.document_type = analysis.category
+
+        review_reasons = [f"{issue.code}:{issue.field}" for issue in normalized_metadata.issues]
+        if analysis.confidence_score < self._classification_threshold:
+            review_reasons.append("low_confidence:classification")
+        if analysis.category == "generic_pdf":
+            review_reasons.append("unclassified:document_type")
+        document.review_status = (
+            DocumentReviewStatus.PENDING.value
+            if review_reasons
+            else DocumentReviewStatus.NOT_REQUIRED.value
+        )
+        document.review_reasons = list(dict.fromkeys(review_reasons))
+        document.reviewed_at = None
+        document.reviewed_by_id = None
+        document.review_note = None
 
         await TagService(self._session).apply_automatic_tags(
             owner_id=document.owner_id,

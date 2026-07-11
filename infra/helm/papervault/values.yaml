@@ -74,6 +74,7 @@ config:
   embeddingProvider: local
   embeddingDimensions: "64"
   aiClassificationThreshold: "0.55"
+  metadataLocale: en-IN
   modelProviderTimeoutSeconds: "60"
   ollamaBaseUrl: http://ollama:11434
   ollamaChatModel: llama3.2

@@ -30,7 +30,9 @@ from papervault_api.documents.api.schemas import (
     MergeDuplicateDocumentsResponse,
     MetadataFieldDefinitionResponse,
     MetadataResponse,
+    OcrTextBlockResponse,
     ReprocessDocumentResponse,
+    ReviewDocumentRequest,
     TextExtractionResponse,
     TimelineEventResponse,
     UpdateDocumentRequest,
@@ -45,6 +47,7 @@ from papervault_api.documents.application.lifecycle import (
     InvalidDuplicateMergeError,
     InvalidMetadataError,
     MetadataUpdateCommand,
+    ReviewUpdateCommand,
 )
 from papervault_api.documents.application.queues import DocumentProcessingQueue
 from papervault_api.documents.application.read import DocumentReadService
@@ -67,7 +70,11 @@ from papervault_api.documents.domain.document_types import (
     UnknownDocumentTypeError,
     list_document_types,
 )
-from papervault_api.documents.domain.enums import DocumentSourceKind, DocumentStatus
+from papervault_api.documents.domain.enums import (
+    DocumentReviewStatus,
+    DocumentSourceKind,
+    DocumentStatus,
+)
 from papervault_api.documents.domain.models import DocumentRecord
 from papervault_api.documents.infrastructure.models import Document
 from papervault_api.identity.api.dependencies import get_current_user
@@ -91,6 +98,22 @@ async def list_documents(
         limit=limit,
         offset=offset,
         include_archived=include_archived,
+    )
+    return [
+        DocumentResponse.model_validate(document_record_from_orm(document), from_attributes=True)
+        for document in documents
+    ]
+
+
+@router.get("/review-queue", response_model=list[DocumentResponse])
+async def list_review_queue(
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    session: Annotated[AsyncSession, Depends(get_session)],
+    limit: Annotated[int, Query(ge=1, le=500)] = 100,
+) -> list[DocumentResponse]:
+    documents = await DocumentReadService(session).list_review_queue(
+        owner_id=current_user.id,
+        limit=limit,
     )
     return [
         DocumentResponse.model_validate(document_record_from_orm(document), from_attributes=True)
@@ -406,6 +429,69 @@ async def search_document_text(
     )
 
 
+@router.get("/{document_id}/ocr-blocks", response_model=list[OcrTextBlockResponse])
+async def get_document_ocr_blocks(
+    document_id: UUID,
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    session: Annotated[AsyncSession, Depends(get_session)],
+    page: Annotated[int, Query(ge=1)],
+    query: Annotated[str | None, Query(max_length=200)] = None,
+) -> list[OcrTextBlockResponse]:
+    blocks = await DocumentReadService(session).list_ocr_blocks(
+        owner_id=current_user.id,
+        document_id=document_id,
+        page_number=page,
+        query=query,
+    )
+    if blocks is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
+    return [
+        OcrTextBlockResponse(
+            text=block.text,
+            page_number=block.page_number,
+            left_ratio=float(block.left_ratio),
+            top_ratio=float(block.top_ratio),
+            width_ratio=float(block.width_ratio),
+            height_ratio=float(block.height_ratio),
+            confidence_score=(
+                float(block.confidence_score) if block.confidence_score is not None else None
+            ),
+        )
+        for block in blocks
+    ]
+
+
+@router.patch("/{document_id}/review", response_model=DocumentResponse)
+async def update_document_review(
+    document_id: UUID,
+    request: ReviewDocumentRequest,
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    session: Annotated[AsyncSession, Depends(get_session)],
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> DocumentResponse:
+    try:
+        document = await DocumentLifecycleService(session).update_review(
+            ReviewUpdateCommand(
+                owner_id=current_user.id,
+                actor_id=current_user.id,
+                document_id=document_id,
+                status=DocumentReviewStatus(request.status),
+                note=request.note,
+            )
+        )
+    except InvalidMetadataError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    if document is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
+    await reindex_document_best_effort(
+        session=session,
+        settings=settings,
+        document_id=document.id,
+        reason="document_review_updated",
+    )
+    return DocumentResponse.model_validate(document_record_from_orm(document), from_attributes=True)
+
+
 @router.patch("/{document_id}", response_model=DocumentResponse)
 async def update_document(
     document_id: UUID,
@@ -461,10 +547,16 @@ async def replace_document_metadata(
                 document_date=request.document_date,
                 issuer=request.issuer,
                 organization=request.organization,
+                locale=settings.metadata_locale,
             ),
         )
     except InvalidMetadataError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except UnknownDocumentTypeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(exc),
+        ) from exc
     if metadata is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
 
@@ -601,6 +693,11 @@ def document_record_from_orm(document: Document) -> DocumentRecord:
         processing_error=document.processing_error,
         processing_started_at=document.processing_started_at,
         processing_completed_at=document.processing_completed_at,
+        review_status=DocumentReviewStatus(document.review_status),
+        review_reasons=tuple(document.review_reasons),
+        reviewed_at=document.reviewed_at,
+        reviewed_by_id=document.reviewed_by_id,
+        review_note=document.review_note,
         archived_at=document.archived_at,
         created_at=document.created_at,
         updated_at=document.updated_at,

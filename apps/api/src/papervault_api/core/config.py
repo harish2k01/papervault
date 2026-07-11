@@ -32,6 +32,7 @@ class Settings(BaseSettings):
         default=0.55,
         alias="PAPERVAULT_AI_CLASSIFICATION_THRESHOLD",
     )
+    metadata_locale: str = Field(default="en-IN", alias="PAPERVAULT_METADATA_LOCALE")
     model_provider_timeout_seconds: float = Field(
         default=60.0,
         gt=0,

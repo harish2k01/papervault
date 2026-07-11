@@ -65,7 +65,7 @@ sequenceDiagram
   Worker->>Storage: Download original
   Worker->>Worker: Extract embedded text or OCR
   Worker->>Worker: Normalize unsafe control characters
-  Worker->>DB: Store extraction and page text
+  Worker->>DB: Store extraction, page text, and OCR geometry
   Worker->>Worker: Analyze, classify, embed, and build page chunks
   Worker->>DB: Store metadata, AI output, reminders, completion state
   Worker->>Search: Update document projection
@@ -79,6 +79,10 @@ The extraction interface supports embedded PDF text and OCR adapters. The defaul
 
 Page text is stored as immutable children of each extraction. Flattened text remains available for summaries, metadata extraction, embeddings, and global search.
 
+Tesseract OCR also stores normalized word coordinates and confidence values. Coordinates are independent of source resolution, so the viewer can draw search highlights over responsive PDF and image previews without storing rendered pages.
+
+Document-specific metadata schemas live in the document-type registry. Provider output passes through a shared normalization boundary for locale-aware dates, currencies, numbers, booleans, and structured table rows. Missing required fields, invalid values, low classification confidence, and unresolved generic classifications place the document in an owner-scoped review queue.
+
 AI analysis and embeddings use provider interfaces. The default local providers are deterministic and require no external service. Ollama and OpenAI-compatible adapters implement the same contracts. Model output is parsed as structured JSON, categories are checked against the document-type registry, confidence is bounded, and embedding dimensions are validated before persistence.
 
 High-confidence suggested tags are normalized and attached automatically with an `ai`
@@ -91,7 +95,7 @@ Question answering is separate from document search. Search returns ranked docum
 
 Chunks and their embeddings are materialized during normal AI processing. The question service lazily backfills chunks for older current extractions, which avoids a blocking data migration. The local answer provider is extractive: it selects a bounded evidence excerpt, reports confidence, cites the document and page, and refuses when too few question concepts appear in the evidence. Ollama and OpenAI-compatible answer providers receive only retrieved evidence and must return citation indexes or refuse. The service validates those indexes and preserves the same citation contract for every provider.
 
-The database is the chunk source of truth. Retrieval is currently bounded to 5,000 owned chunks per request; a dedicated OpenSearch chunk projection is the scaling path for larger vaults. A future model-backed answer provider must preserve the same citation and refusal contract.
+The database is the chunk source of truth. Retrieval is currently bounded to 5,000 owned chunks per request; a dedicated OpenSearch chunk projection is the scaling path for larger vaults. Every answer provider preserves the same citation and refusal contract.
 
 ## Search
 
@@ -117,9 +121,9 @@ The first account becomes an administrator. Administrators can manage users and 
 
 ## Viewer And UI
 
-The PDF viewer is loaded only when a preview opens. PDF.js renders one responsive page at a time with zoom, page navigation, a text layer, and highlighted literal matches. OCR-only documents use stored page text for result navigation; precise image overlays require OCR geometry that is not yet persisted.
+The PDF viewer is loaded only when a preview opens. PDF.js renders one responsive page at a time with zoom, page navigation, a text layer, and highlighted literal matches. OCR-only documents use stored word geometry to highlight matching text over the rendered PDF or image. Highlights are fetched only for the active page and explicit query.
 
-The application opens on a vault dashboard. A full-width document library remains usable as collections grow, and document review uses a separate detail state rather than competing list, preview, and metadata columns. Secondary editors, raw metadata, filters, and search history appear only when requested. Settings and provider health are visible only to administrators. Light and dark themes share the same semantic design tokens.
+The application opens on a vault dashboard. A full-width document library remains usable as collections grow, and low-confidence documents have a dedicated review queue plus a compact approval action in document detail. Secondary editors, raw metadata, filters, and search history appear only when requested. Settings and provider health are visible only to administrators. Light and dark themes share the same semantic design tokens.
 
 ## Observability
 

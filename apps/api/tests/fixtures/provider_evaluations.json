@@ -10,5 +10,40 @@
     "text": "Insurance Policy Number PV-100 Provider Acme Insurance Premium INR 12000 Expiry Date 31/12/2026",
     "expected_category": "insurance_policy",
     "expected_terms": ["insurance", "expiry"]
+  },
+  {
+    "name": "bank statement classification",
+    "text": "Example Bank Bank Statement\nBank: Example Bank\nAccount Number: XXXX4321\nOpening Balance: INR 45000\nClosing Balance: INR 51200\nDebit and credit transactions follow.",
+    "expected_category": "bank_statement",
+    "expected_terms": ["balance", "account"],
+    "expected_metadata": {"bank": "Example Bank"}
+  },
+  {
+    "name": "invoice classification and amount extraction",
+    "text": "Tax Invoice\nVendor: Acme Electronics\nInvoice Number: INV-204\nPurchase Date: 11/07/2026\nTotal Amount: INR 124,999.50\nBill To: Customer",
+    "expected_category": "invoice",
+    "expected_terms": ["electronics", "purchase"],
+    "expected_metadata": {"vendor": "Acme Electronics", "total_amount": 124999.5}
+  },
+  {
+    "name": "passport classification",
+    "text": "REPUBLIC OF INDIA PASSPORT\nPassport Number: P1234567\nHolder Name: Example Person\nNationality: INDIAN\nPlace of Birth: Chennai\nDate of Expiry: 11/07/2036",
+    "expected_category": "passport",
+    "expected_terms": ["passport", "nationality"],
+    "expected_metadata": {"passport_number": "P1234567"}
+  },
+  {
+    "name": "mutual fund CAS classification",
+    "text": "Mutual Fund Consolidated Account Statement\nInvestor Name: Example Person\nPAN: ABCDE1234F\nStatement Period: April 2025 to March 2026\nRegistrar: CAMS\nFolio holdings and current value follow.",
+    "expected_category": "mutual_fund_cas",
+    "expected_terms": ["mutual", "folio"],
+    "expected_metadata": {"pan": "ABCDE1234F"}
+  },
+  {
+    "name": "medical report classification",
+    "text": "Clinical Medical Report\nProvider: Example Diagnostics\nPatient Name: Example Person\nReport Date: 11/07/2026\nDiagnosis and laboratory findings are attached.",
+    "expected_category": "medical_report",
+    "expected_terms": ["clinical", "diagnostics"],
+    "expected_metadata": {"provider": "Example Diagnostics"}
   }
 ]

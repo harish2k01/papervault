@@ -59,6 +59,11 @@ export type DocumentItem = {
   processing_error?: string | null;
   processing_started_at?: string | null;
   processing_completed_at?: string | null;
+  review_status: "approved" | "not_required" | "pending";
+  review_reasons: string[];
+  reviewed_at: string | null;
+  reviewed_by_id: string | null;
+  review_note: string | null;
   archived_at: string | null;
   created_at: string;
   updated_at: string;
@@ -205,6 +210,16 @@ export type DocumentTextSearchResult = {
     match: string;
     after: string;
   }>;
+};
+
+export type OcrTextBlock = {
+  text: string;
+  page_number: number;
+  left_ratio: number;
+  top_ratio: number;
+  width_ratio: number;
+  height_ratio: number;
+  confidence_score: number | null;
 };
 
 export type NotificationStatus = "pending" | "read" | "dismissed";
@@ -396,6 +411,10 @@ export async function listDocumentTypes() {
   return apiFetch<DocumentTypeDefinition[]>("/documents/types");
 }
 
+export async function listReviewQueue() {
+  return apiFetch<DocumentItem[]>("/documents/review-queue?limit=500");
+}
+
 export async function getDocument(documentId: string) {
   return apiFetch<DocumentDetail>(`/documents/${documentId}`);
 }
@@ -428,6 +447,18 @@ export async function searchDocumentText(documentId: string, query: string) {
   const params = new URLSearchParams({ query });
   return apiFetch<DocumentTextSearchResult>(
     `/documents/${documentId}/text-search?${params.toString()}`,
+  );
+}
+
+export async function getOcrTextBlocks(
+  documentId: string,
+  page: number,
+  query?: string,
+) {
+  const params = new URLSearchParams({ page: String(page) });
+  if (query?.trim()) params.set("query", query.trim());
+  return apiFetch<OcrTextBlock[]>(
+    `/documents/${documentId}/ocr-blocks?${params.toString()}`,
   );
 }
 
@@ -524,6 +555,16 @@ export async function updateDocumentMetadata(
       body: JSON.stringify(input),
     },
   );
+}
+
+export async function updateDocumentReview(
+  documentId: string,
+  input: { status: "approved" | "pending"; note?: string | null },
+) {
+  return apiFetch<DocumentItem>(`/documents/${documentId}/review`, {
+    method: "PATCH",
+    body: JSON.stringify(input),
+  });
 }
 
 export async function archiveDocument(documentId: string) {

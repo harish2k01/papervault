@@ -16,6 +16,12 @@ class DocumentStatus(StrEnum):
     UPLOADED = "uploaded"
 
 
+class DocumentReviewStatus(StrEnum):
+    APPROVED = "approved"
+    NOT_REQUIRED = "not_required"
+    PENDING = "pending"
+
+
 class MetadataSource(StrEnum):
     AI = "ai"
     IMPORT = "import"

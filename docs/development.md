@@ -40,6 +40,7 @@ PAPERVAULT_AI_PROVIDER=local
 PAPERVAULT_ANSWER_PROVIDER=local
 PAPERVAULT_EMBEDDING_PROVIDER=local
 PAPERVAULT_EMBEDDING_DIMENSIONS=64
+PAPERVAULT_METADATA_LOCALE=en-IN
 ```
 
 These providers require no external credentials. Analysis, embeddings, and grounded
@@ -61,6 +62,10 @@ and embedding model. `PAPERVAULT_EMBEDDING_DIMENSIONS` must exactly match the
 selected embedding model. Change the OpenSearch index name and rebuild the index
 when changing embedding models or dimensions. Administrators can inspect active
 provider reachability from Settings without exposing credentials.
+
+`PAPERVAULT_METADATA_LOCALE` controls ambiguous numeric date parsing. `en-IN` and
+other non-US values use day-first dates; `en-US` uses month-first dates. ISO dates
+remain unambiguous for every locale.
 
 OCR is enabled by default through local Tesseract and Poppler commands:
 

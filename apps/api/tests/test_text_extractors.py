@@ -24,9 +24,15 @@ class FakeOcrCommandRunner:
             Path(f"{output_prefix}-2.png").write_bytes(b"page two")
             return CommandResult(returncode=0, stdout="", stderr="")
         if command == "tesseract":
+            text = f"Text from {Path(args[1]).name}"
             return CommandResult(
                 returncode=0,
-                stdout=f"Text from {Path(args[1]).name}",
+                stdout=(
+                    "level\tpage_num\tblock_num\tpar_num\tline_num\tword_num\t"
+                    "left\ttop\twidth\theight\tconf\ttext\n"
+                    "1\t1\t0\t0\t0\t0\t0\t0\t1000\t500\t-1\t\n"
+                    f"5\t1\t1\t1\t1\t1\t100\t50\t300\t40\t92.5\t{text}\n"
+                ),
                 stderr="",
             )
         raise AssertionError(f"Unexpected command: {command}")
@@ -58,9 +64,13 @@ def test_tesseract_cli_extractor_reads_image_text(tmp_path: Path) -> None:
     assert result.status == TextExtractionStatus.SUCCEEDED
     assert result.content_text == "Text from receipt.png"
     assert result.page_texts == ("Text from receipt.png",)
+    assert result.confidence_score == 0.925
+    assert len(result.page_blocks[0]) == 1
+    assert result.page_blocks[0][0].left_ratio == 0.1
+    assert result.page_blocks[0][0].top_ratio == 0.1
     assert result.page_count == 1
     assert runner.calls == [
-        ["tesseract", str(source), "stdout", "-l", "eng", "--psm", "6"],
+        ["tesseract", str(source), "stdout", "-l", "eng", "--psm", "6", "tsv"],
     ]
 
 

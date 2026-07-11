@@ -1,4 +1,5 @@
 from datetime import UTC, datetime
+from decimal import Decimal
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from uuid import UUID
@@ -11,9 +12,14 @@ from papervault_api.documents.application.extraction import (
     sanitize_extracted_text,
 )
 from papervault_api.documents.application.storage import ObjectStorage
-from papervault_api.documents.domain.enums import DocumentStatus, TextExtractionStatus
+from papervault_api.documents.domain.enums import (
+    DocumentReviewStatus,
+    DocumentStatus,
+    TextExtractionStatus,
+)
 from papervault_api.documents.infrastructure.models import (
     Document,
+    DocumentTextBlock,
     DocumentTextExtraction,
     DocumentTextPage,
 )
@@ -82,6 +88,25 @@ class DocumentProcessingService:
             )
             for page_number, content_text in enumerate(page_texts, start=1)
         )
+        self._session.add_all(
+            DocumentTextBlock(
+                text_extraction_id=extraction.id,
+                page_number=page_number,
+                block_index=block_index,
+                text=sanitize_extracted_text(block.text),
+                left_ratio=Decimal(str(block.left_ratio)),
+                top_ratio=Decimal(str(block.top_ratio)),
+                width_ratio=Decimal(str(block.width_ratio)),
+                height_ratio=Decimal(str(block.height_ratio)),
+                confidence_score=(
+                    Decimal(str(block.confidence_score))
+                    if block.confidence_score is not None
+                    else None
+                ),
+            )
+            for page_number, blocks in enumerate(result.page_blocks, start=1)
+            for block_index, block in enumerate(blocks)
+        )
         await self._session.refresh(document, attribute_names=["status", "archived_at"])
         document.page_count = result.page_count or document.page_count
         if document.status != DocumentStatus.ARCHIVED.value and document.archived_at is None:
@@ -96,6 +121,9 @@ class DocumentProcessingService:
                 else None
             )
             document.processing_completed_at = datetime.now(UTC)
+            if result.status is TextExtractionStatus.SUCCEEDED:
+                document.review_status = DocumentReviewStatus.PENDING.value
+                document.review_reasons = ["analysis_pending:metadata"]
         await self._session.commit()
 
     async def _mark_existing_extractions_not_current(self, document_id: UUID) -> None:

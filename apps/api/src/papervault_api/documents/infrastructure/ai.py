@@ -1,4 +1,5 @@
 import hashlib
+import json
 import math
 import re
 from collections import Counter
@@ -196,6 +197,14 @@ class ModelDocumentAIProvider(DocumentAIProvider):
 
     def analyze(self, text: str, current_document_type: str) -> DocumentAIAnalysisResult:
         categories = ", ".join(definition.key for definition in list_document_types())
+        metadata_schemas = json.dumps(
+            {
+                definition.key: [field.key for field in definition.metadata_fields]
+                for definition in list_document_types()
+                if definition.metadata_fields
+            },
+            separators=(",", ":"),
+        )
         payload = parse_json_object(
             self._client.complete(
                 system=(
@@ -204,6 +213,8 @@ class ModelDocumentAIProvider(DocumentAIProvider):
                     "extracted_metadata. Every claim must come from the supplied text. "
                     f"category must be one of: {categories}. entities is an array of objects with "
                     "kind, value, and optional confidence_score."
+                    f" extracted_metadata must use only the selected category's fields: "
+                    f"{metadata_schemas}. Use arrays of objects for table fields."
                 ),
                 user=(
                     f"Current category: {current_document_type}\n"
@@ -377,12 +388,21 @@ def suggest_tags(category: str, text: str) -> tuple[str, ...]:
 
 
 def extract_metadata(category: str, text: str) -> dict[str, object]:
-    field_patterns = FIELD_PATTERNS.get(category)
-    if field_patterns is None:
+    definition = get_document_type(category)
+    if not definition.metadata_fields:
         return {}
 
     metadata: dict[str, object] = {}
-    for field_name, labels in field_patterns.items():
+    configured_patterns = FIELD_PATTERNS.get(category, {})
+    for field_definition in definition.metadata_fields:
+        field_name = field_definition.key
+        labels = configured_patterns.get(
+            field_name,
+            (
+                field_definition.label,
+                field_name.replace("_", " "),
+            ),
+        )
         value = first_label_value(text, labels)
         if value is None:
             continue

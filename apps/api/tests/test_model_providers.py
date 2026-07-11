@@ -106,6 +106,8 @@ def test_local_provider_evaluation_fixture() -> None:
         assert result.category == case["expected_category"], case["name"]
         searchable = " ".join((result.summary, *result.keywords)).lower()
         assert any(term.lower() in searchable for term in case["expected_terms"]), case["name"]
+        for field, expected in case.get("expected_metadata", {}).items():
+            assert result.extracted_metadata.get(field) == expected, case["name"]
 
 
 def test_json_http_response_fixture_is_an_object() -> None:

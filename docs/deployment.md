@@ -31,6 +31,7 @@ The Helm chart deploys PaperVault application workloads and expects production s
 - Keep `PAPERVAULT_SEARCH_QUERY_FALLBACK_ENABLED=true` unless you intentionally want OpenSearch outages to fail user-facing search.
 - Keep model API keys in a Kubernetes Secret and verify provider health in the administrator Settings screen after deployment.
 - Match `config.embeddingDimensions` to the selected embedding model and use a new versioned OpenSearch index when changing dimensions.
+- Set `config.metadataLocale` to the primary document locale so ambiguous numeric dates are normalized consistently.
 
 ## Model Providers
 

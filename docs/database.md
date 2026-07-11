@@ -6,11 +6,12 @@ PostgreSQL stores metadata and relationships. Original PDFs and images remain in
 
 - `users`: local and OIDC identities, roles, active state, password hashes, and last login.
 - `instance_settings`: singleton runtime policy overridden by administrators.
-- `documents`: owner, object reference, hash, lifecycle state, processing diagnostics, type, issuer, date, organization, and summary.
+- `documents`: owner, object reference, hash, lifecycle and review state, processing diagnostics, type, issuer, date, organization, and summary.
 - `document_versions`: immutable object-storage references for document revisions.
 - `document_metadata`: versioned structured extraction payloads.
 - `document_text_extractions`: current and historical extraction outcomes.
 - `document_text_pages`: ordered page text for viewer search and page navigation.
+- `document_text_blocks`: normalized OCR word geometry and confidence for precise viewer highlights.
 - `document_text_chunks`: page-bound retrieval chunks, embedding provider metadata, vectors, and source hashes.
 - `document_ai_analyses`: summaries, keywords, entities, suggested tags, category, confidence, and extracted metadata.
 - `document_embeddings`: provider/model metadata, vectors, and source hashes.

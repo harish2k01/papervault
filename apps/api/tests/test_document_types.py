@@ -53,6 +53,15 @@ def test_document_type_registry_has_structured_fields_for_core_examples() -> Non
     assert credit_card_fields["total_due"].field_type is MetadataFieldType.CURRENCY
 
 
+def test_every_specific_document_type_defines_structured_metadata() -> None:
+    definitions = [
+        definition for definition in list_document_types() if definition.key != "generic_pdf"
+    ]
+
+    assert definitions
+    assert all(definition.metadata_fields for definition in definitions)
+
+
 def test_unknown_document_type_raises_explicit_error() -> None:
     with pytest.raises(UnknownDocumentTypeError):
         get_document_type("unsupported")

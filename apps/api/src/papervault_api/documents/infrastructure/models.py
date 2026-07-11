@@ -27,6 +27,7 @@ from papervault_api.db.constraints import check_values
 from papervault_api.db.mixins import TimestampMixin, UuidPrimaryKeyMixin
 from papervault_api.documents.domain.enums import (
     AIAnalysisStatus,
+    DocumentReviewStatus,
     DocumentSourceKind,
     DocumentStatus,
     MetadataSource,
@@ -46,10 +47,12 @@ class Document(UuidPrimaryKeyMixin, TimestampMixin, Base):
         CheckConstraint("page_count IS NULL OR page_count >= 0", name="document_page_count_valid"),
         check_values("source_kind", DocumentSourceKind, "document_source_kind_valid"),
         check_values("status", DocumentStatus, "document_status_valid"),
+        check_values("review_status", DocumentReviewStatus, "document_review_status_valid"),
         UniqueConstraint("storage_bucket", "storage_key", name="uq_documents_storage_object"),
         Index("ix_documents_owner_status", "owner_id", "status"),
         Index("ix_documents_owner_type", "owner_id", "document_type"),
         Index("ix_documents_owner_date", "owner_id", "document_date"),
+        Index("ix_documents_owner_review", "owner_id", "review_status"),
         Index("ix_documents_sha256_hash", "sha256_hash"),
     )
 
@@ -87,6 +90,16 @@ class Document(UuidPrimaryKeyMixin, TimestampMixin, Base):
     processing_error: Mapped[str | None] = mapped_column(Text)
     processing_started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     processing_completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    review_status: Mapped[str] = mapped_column(
+        String(32),
+        nullable=False,
+        default=DocumentReviewStatus.NOT_REQUIRED.value,
+        server_default=DocumentReviewStatus.NOT_REQUIRED.value,
+    )
+    review_reasons: Mapped[list[str]] = mapped_column(JSON, nullable=False, default=list)
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    reviewed_by_id: Mapped[UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    review_note: Mapped[str | None] = mapped_column(String(1000))
     archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     metadata_records: Mapped[list[DocumentMetadataRecord]] = relationship(
@@ -297,6 +310,12 @@ class DocumentTextExtraction(UuidPrimaryKeyMixin, TimestampMixin, Base):
         passive_deletes=True,
         order_by="DocumentTextPage.page_number",
     )
+    blocks: Mapped[list[DocumentTextBlock]] = relationship(
+        back_populates="text_extraction",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        order_by="DocumentTextBlock.page_number, DocumentTextBlock.block_index",
+    )
     chunks: Mapped[list[DocumentTextChunk]] = relationship(
         back_populates="text_extraction",
         cascade="all, delete-orphan",
@@ -329,6 +348,57 @@ class DocumentTextPage(UuidPrimaryKeyMixin, Base):
     content_text: Mapped[str] = mapped_column(Text, nullable=False)
 
     text_extraction: Mapped[DocumentTextExtraction] = relationship(back_populates="pages")
+
+
+class DocumentTextBlock(UuidPrimaryKeyMixin, Base):
+    __tablename__ = "document_text_blocks"
+    __table_args__ = (
+        CheckConstraint("page_number > 0", name="text_block_page_positive"),
+        CheckConstraint("block_index >= 0", name="text_block_index_valid"),
+        CheckConstraint(
+            "left_ratio >= 0 AND left_ratio <= 1",
+            name="text_block_left_ratio_valid",
+        ),
+        CheckConstraint("top_ratio >= 0 AND top_ratio <= 1", name="text_block_top_ratio_valid"),
+        CheckConstraint(
+            "width_ratio > 0 AND width_ratio <= 1",
+            name="text_block_width_ratio_valid",
+        ),
+        CheckConstraint(
+            "height_ratio > 0 AND height_ratio <= 1",
+            name="text_block_height_ratio_valid",
+        ),
+        CheckConstraint(
+            "confidence_score IS NULL OR (confidence_score >= 0 AND confidence_score <= 1)",
+            name="text_block_confidence_valid",
+        ),
+        UniqueConstraint(
+            "text_extraction_id",
+            "page_number",
+            "block_index",
+            name="uq_text_blocks_extraction_page_index",
+        ),
+        Index("ix_text_blocks_extraction_page", "text_extraction_id", "page_number"),
+    )
+
+    text_extraction_id: Mapped[UUID] = mapped_column(
+        ForeignKey(
+            "document_text_extractions.id",
+            name="fk_text_blocks_extraction",
+            ondelete="CASCADE",
+        ),
+        nullable=False,
+    )
+    page_number: Mapped[int] = mapped_column(Integer, nullable=False)
+    block_index: Mapped[int] = mapped_column(Integer, nullable=False)
+    text: Mapped[str] = mapped_column(String(500), nullable=False)
+    left_ratio: Mapped[Decimal] = mapped_column(Numeric(8, 7), nullable=False)
+    top_ratio: Mapped[Decimal] = mapped_column(Numeric(8, 7), nullable=False)
+    width_ratio: Mapped[Decimal] = mapped_column(Numeric(8, 7), nullable=False)
+    height_ratio: Mapped[Decimal] = mapped_column(Numeric(8, 7), nullable=False)
+    confidence_score: Mapped[Decimal | None] = mapped_column(Numeric(5, 4))
+
+    text_extraction: Mapped[DocumentTextExtraction] = relationship(back_populates="blocks")
 
 
 class DocumentTextChunk(UuidPrimaryKeyMixin, TimestampMixin, Base):

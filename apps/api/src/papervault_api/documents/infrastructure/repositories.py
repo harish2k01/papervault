@@ -3,7 +3,11 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from papervault_api.documents.domain.enums import DocumentSourceKind, DocumentStatus
+from papervault_api.documents.domain.enums import (
+    DocumentReviewStatus,
+    DocumentSourceKind,
+    DocumentStatus,
+)
 from papervault_api.documents.domain.models import DocumentRecord, NewDocumentRecord
 from papervault_api.documents.infrastructure.models import Document
 
@@ -67,6 +71,11 @@ def document_record_from_model(model: Document) -> DocumentRecord:
         processing_error=model.processing_error,
         processing_started_at=model.processing_started_at,
         processing_completed_at=model.processing_completed_at,
+        review_status=DocumentReviewStatus(model.review_status),
+        review_reasons=tuple(model.review_reasons),
+        reviewed_at=model.reviewed_at,
+        reviewed_by_id=model.reviewed_by_id,
+        review_note=model.review_note,
         archived_at=model.archived_at,
         created_at=model.created_at,
         updated_at=model.updated_at,

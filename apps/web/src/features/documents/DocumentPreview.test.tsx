@@ -2,7 +2,11 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { getDocumentFile, searchDocumentText } from "../../lib/api";
+import {
+  getDocumentFile,
+  getOcrTextBlocks,
+  searchDocumentText,
+} from "../../lib/api";
 import { DocumentPreview } from "./DocumentPreview";
 
 vi.mock("react-pdf", () => ({
@@ -17,6 +21,7 @@ vi.mock("react-pdf", () => ({
 
 vi.mock("../../lib/api", () => ({
   getDocumentFile: vi.fn(),
+  getOcrTextBlocks: vi.fn(),
   searchDocumentText: vi.fn(),
 }));
 
@@ -45,6 +50,17 @@ describe("DocumentPreview", () => {
         },
       ],
     });
+    vi.mocked(getOcrTextBlocks).mockResolvedValue([
+      {
+        text: "salary",
+        page_number: 2,
+        left_ratio: 0.1,
+        top_ratio: 0.2,
+        width_ratio: 0.3,
+        height_ratio: 0.05,
+        confidence_score: 0.95,
+      },
+    ]);
   });
 
   it("searches extracted text and navigates to the matching page", async () => {
@@ -54,6 +70,7 @@ describe("DocumentPreview", () => {
     render(
       <QueryClientProvider client={queryClient}>
         <DocumentPreview
+          ocrGeometryAvailable
           document={{
             id: "document-1",
             owner_id: "user-1",
@@ -68,6 +85,11 @@ describe("DocumentPreview", () => {
             document_date: null,
             issuer: null,
             organization: null,
+            review_status: "not_required",
+            review_reasons: [],
+            reviewed_at: null,
+            reviewed_by_id: null,
+            review_note: null,
             archived_at: null,
             created_at: "2026-07-11T00:00:00Z",
             updated_at: "2026-07-11T00:00:00Z",
@@ -87,5 +109,9 @@ describe("DocumentPreview", () => {
     });
     expect(await screen.findByText("1 match")).toBeInTheDocument();
     expect(screen.getByTestId("pdf-page")).toHaveTextContent("Page 2");
+    await waitFor(() => {
+      expect(getOcrTextBlocks).toHaveBeenCalledWith("document-1", 2, "salary");
+    });
+    expect(await screen.findByTitle("salary")).toBeInTheDocument();
   });
 });

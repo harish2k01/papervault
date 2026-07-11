@@ -5,7 +5,11 @@ from uuid import uuid4
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from papervault_api.documents.application.extraction import TextExtractionResult, TextExtractor
+from papervault_api.documents.application.extraction import (
+    OcrTextBlock,
+    TextExtractionResult,
+    TextExtractor,
+)
 from papervault_api.documents.application.processing import DocumentProcessingService
 from papervault_api.documents.application.storage import StoredObject
 from papervault_api.documents.domain.enums import (
@@ -15,6 +19,7 @@ from papervault_api.documents.domain.enums import (
 )
 from papervault_api.documents.infrastructure.models import (
     Document,
+    DocumentTextBlock,
     DocumentTextExtraction,
     DocumentTextPage,
 )
@@ -47,6 +52,18 @@ class StaticTextExtractor(TextExtractor):
             status=TextExtractionStatus.SUCCEEDED,
             content_text="Hello from a PDF",
             page_texts=("Hello from a PDF",),
+            page_blocks=(
+                (
+                    OcrTextBlock(
+                        text="Hello",
+                        left_ratio=0.1,
+                        top_ratio=0.2,
+                        width_ratio=0.3,
+                        height_ratio=0.05,
+                        confidence_score=0.94,
+                    ),
+                ),
+            ),
             page_count=1,
             extractor="static",
         )
@@ -89,6 +106,11 @@ async def test_processing_service_records_current_text_extraction(session: Async
             select(DocumentTextPage).where(DocumentTextPage.text_extraction_id == extraction.id)
         )
     ).scalar_one()
+    block = (
+        await session.execute(
+            select(DocumentTextBlock).where(DocumentTextBlock.text_extraction_id == extraction.id)
+        )
+    ).scalar_one()
 
     assert refreshed_document is not None
     assert refreshed_document.status == DocumentStatus.READY.value
@@ -100,6 +122,10 @@ async def test_processing_service_records_current_text_extraction(session: Async
     assert extraction.is_current is True
     assert page.page_number == 1
     assert page.content_text == "Hello from a PDF"
+    assert block.page_number == 1
+    assert block.text == "Hello"
+    assert float(block.left_ratio) == 0.1
+    assert float(block.confidence_score or 0) == 0.94
 
 
 async def test_processing_service_does_not_resurrect_archived_document(

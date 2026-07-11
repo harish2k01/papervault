@@ -3,6 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from papervault_api.documents.application.ai import DocumentAIProcessingService
 from papervault_api.documents.domain.enums import (
+    DocumentReviewStatus,
     DocumentStatus,
     TextExtractionSource,
     TextExtractionStatus,
@@ -131,6 +132,7 @@ async def test_ai_processing_service_persists_analysis_embedding_and_metadata(
 
     assert refreshed_document is not None
     assert refreshed_document.document_type == "salary_slip"
+    assert refreshed_document.review_status == DocumentReviewStatus.NOT_REQUIRED.value
     assert refreshed_document.summary is not None
     assert analysis.category == "salary_slip"
     assert analysis.keywords

@@ -1,5 +1,6 @@
 import asyncio
 from datetime import UTC, datetime, timedelta
+from decimal import Decimal
 from pathlib import Path
 from uuid import UUID, uuid4
 
@@ -19,6 +20,7 @@ from papervault_api.documents.application.queues import DocumentProcessingQueue
 from papervault_api.documents.application.storage import StoredObject
 from papervault_api.documents.infrastructure.models import (
     Document,
+    DocumentTextBlock,
     DocumentTextExtraction,
     DocumentTextPage,
 )
@@ -236,7 +238,24 @@ def test_document_lifecycle_routes_update_metadata_and_archive() -> None:
         detail = detail_response.json()
         assert detail["document"]["issuer"] == "Apple Store"
         assert detail["document"]["document_date"] == "2026-07-01"
+        assert detail["document"]["review_status"] == "pending"
         assert detail["versions"][0]["version_number"] == 1
+
+        review_queue_response = client.get("/documents/review-queue", headers=headers)
+        assert review_queue_response.status_code == 200
+        assert [item["id"] for item in review_queue_response.json()] == [document_id]
+
+        review_response = client.patch(
+            f"/documents/{document_id}/review",
+            headers=headers,
+            json={"status": "approved", "note": "Invoice details checked"},
+        )
+        assert review_response.status_code == 200
+        assert review_response.json()["review_status"] == "approved"
+        assert review_response.json()["review_note"] == "Invoice details checked"
+
+        cleared_queue_response = client.get("/documents/review-queue", headers=headers)
+        assert cleared_queue_response.json() == []
 
         archive_response = client.post(f"/documents/{document_id}/archive", headers=headers)
         assert archive_response.status_code == 200
@@ -276,9 +295,26 @@ def test_document_text_search_returns_page_aware_matches() -> None:
             headers=headers,
             params={"query": "  "},
         )
+        blocks_response = client.get(
+            f"/documents/{document_id}/ocr-blocks",
+            headers=headers,
+            params={"page": 1, "query": "salary"},
+        )
 
     assert response.status_code == 200
     assert invalid_response.status_code == 422
+    assert blocks_response.status_code == 200
+    assert blocks_response.json() == [
+        {
+            "text": "salary",
+            "page_number": 1,
+            "left_ratio": 0.1,
+            "top_ratio": 0.2,
+            "width_ratio": 0.3,
+            "height_ratio": 0.05,
+            "confidence_score": 0.95,
+        }
+    ]
     assert response.json() == {
         "query": "salary",
         "total_matches": 2,
@@ -326,6 +362,19 @@ async def seed_text_pages(engine: AsyncEngine, document_id: UUID) -> None:
                     page_number=2,
                     content_text="February salary was 1100",
                 ),
+            )
+        )
+        session.add(
+            DocumentTextBlock(
+                text_extraction_id=extraction.id,
+                page_number=1,
+                block_index=0,
+                text="salary",
+                left_ratio=Decimal("0.1"),
+                top_ratio=Decimal("0.2"),
+                width_ratio=Decimal("0.3"),
+                height_ratio=Decimal("0.05"),
+                confidence_score=Decimal("0.95"),
             )
         )
         await session.commit()

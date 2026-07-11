@@ -87,6 +87,7 @@ async def _process_document(document_id: UUID) -> None:
                     settings,
                 ),
                 classification_threshold=settings.ai_classification_threshold,
+                metadata_locale=settings.metadata_locale,
             )
             await ai_processing_service.process_document(document_id)
 

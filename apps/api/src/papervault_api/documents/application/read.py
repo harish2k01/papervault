@@ -5,11 +5,12 @@ from uuid import UUID
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from papervault_api.documents.domain.enums import DocumentStatus
+from papervault_api.documents.domain.enums import DocumentReviewStatus, DocumentStatus
 from papervault_api.documents.infrastructure.models import (
     Document,
     DocumentAIAnalysis,
     DocumentMetadataRecord,
+    DocumentTextBlock,
     DocumentTextExtraction,
     DocumentVersion,
 )
@@ -91,6 +92,57 @@ class DocumentReadService:
 
     async def get_document_file(self, *, document_id: UUID, owner_id: UUID) -> Document | None:
         return await self._get_document(document_id=document_id, owner_id=owner_id)
+
+    async def list_review_queue(
+        self,
+        *,
+        owner_id: UUID,
+        limit: int = 100,
+    ) -> tuple[Document, ...]:
+        result = await self._session.execute(
+            select(Document)
+            .where(
+                Document.owner_id == owner_id,
+                Document.review_status == DocumentReviewStatus.PENDING.value,
+                Document.status != DocumentStatus.ARCHIVED.value,
+            )
+            .order_by(Document.updated_at.desc())
+            .limit(limit)
+        )
+        return tuple(result.scalars())
+
+    async def list_ocr_blocks(
+        self,
+        *,
+        owner_id: UUID,
+        document_id: UUID,
+        page_number: int,
+        query: str | None = None,
+    ) -> tuple[DocumentTextBlock, ...] | None:
+        document = await self._get_document(document_id=document_id, owner_id=owner_id)
+        if document is None:
+            return None
+        result = await self._session.execute(
+            select(DocumentTextBlock)
+            .join(
+                DocumentTextExtraction,
+                DocumentTextExtraction.id == DocumentTextBlock.text_extraction_id,
+            )
+            .where(
+                DocumentTextExtraction.document_id == document_id,
+                DocumentTextExtraction.is_current.is_(True),
+                DocumentTextBlock.page_number == page_number,
+            )
+            .order_by(DocumentTextBlock.block_index)
+            .limit(2000)
+        )
+        blocks = tuple(result.scalars())
+        terms = {term.casefold() for term in (query or "").split() if len(term) >= 2}
+        if not terms:
+            return blocks
+        return tuple(
+            block for block in blocks if any(term in block.text.casefold() for term in terms)
+        )
 
     async def get_duplicate_candidates(self, owner_id: UUID) -> tuple[tuple[Document, ...], ...]:
         duplicate_hashes = (

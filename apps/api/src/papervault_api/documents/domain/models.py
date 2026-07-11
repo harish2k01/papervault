@@ -2,7 +2,11 @@ from dataclasses import dataclass
 from datetime import date, datetime
 from uuid import UUID
 
-from papervault_api.documents.domain.enums import DocumentSourceKind, DocumentStatus
+from papervault_api.documents.domain.enums import (
+    DocumentReviewStatus,
+    DocumentSourceKind,
+    DocumentStatus,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -47,4 +51,9 @@ class DocumentRecord:
     processing_error: str | None = None
     processing_started_at: datetime | None = None
     processing_completed_at: datetime | None = None
+    review_status: DocumentReviewStatus = DocumentReviewStatus.NOT_REQUIRED
+    review_reasons: tuple[str, ...] = ()
+    reviewed_at: datetime | None = None
+    reviewed_by_id: UUID | None = None
+    review_note: str | None = None
     archived_at: datetime | None = None

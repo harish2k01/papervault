@@ -15,6 +15,7 @@ import {
   listDuplicates,
   listDocuments,
   listNotifications,
+  listReviewQueue,
   listTags,
   listUsers,
   mergeDuplicateDocuments,
@@ -58,6 +59,7 @@ vi.mock("../../lib/api", () => ({
   listDocuments: vi.fn().mockResolvedValue([]),
   listDuplicates: vi.fn().mockResolvedValue([]),
   listNotifications: vi.fn().mockResolvedValue([]),
+  listReviewQueue: vi.fn().mockResolvedValue([]),
   listRecentSearches: vi.fn().mockResolvedValue([]),
   listSavedSearches: vi.fn().mockResolvedValue([]),
   listTags: vi.fn().mockResolvedValue([]),
@@ -81,6 +83,7 @@ vi.mock("../../lib/api", () => ({
   updateDocumentMetadata: vi.fn(),
   updateAdminSettings: vi.fn(),
   updateNotificationStatus: vi.fn(),
+  updateDocumentReview: vi.fn(),
   updateUser: vi.fn(),
   uploadDocument: vi.fn(),
 }));
@@ -116,6 +119,7 @@ describe("AppShell", () => {
     vi.mocked(getProviderHealth).mockResolvedValue({ checks: [] });
     vi.mocked(listDuplicates).mockResolvedValue([]);
     vi.mocked(listNotifications).mockResolvedValue([]);
+    vi.mocked(listReviewQueue).mockResolvedValue([]);
     vi.mocked(listTags).mockResolvedValue([]);
     vi.mocked(syncDocumentNotifications).mockResolvedValue([]);
     vi.mocked(searchDocumentText).mockResolvedValue({

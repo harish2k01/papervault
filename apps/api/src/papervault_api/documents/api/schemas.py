@@ -1,10 +1,14 @@
 from datetime import date, datetime
-from typing import Any
+from typing import Any, Literal
 from uuid import UUID
 
 from pydantic import BaseModel, Field
 
-from papervault_api.documents.domain.enums import DocumentSourceKind, DocumentStatus
+from papervault_api.documents.domain.enums import (
+    DocumentReviewStatus,
+    DocumentSourceKind,
+    DocumentStatus,
+)
 
 
 class DocumentResponse(BaseModel):
@@ -24,6 +28,11 @@ class DocumentResponse(BaseModel):
     processing_error: str | None
     processing_started_at: datetime | None
     processing_completed_at: datetime | None
+    review_status: DocumentReviewStatus
+    review_reasons: list[str]
+    reviewed_at: datetime | None
+    reviewed_by_id: UUID | None
+    review_note: str | None
     archived_at: datetime | None
     created_at: datetime
     updated_at: datetime
@@ -112,6 +121,21 @@ class DocumentTextSearchResponse(BaseModel):
     total_matches: int
     matches: list[DocumentTextMatchResponse]
     page_mapping_available: bool
+
+
+class OcrTextBlockResponse(BaseModel):
+    text: str
+    page_number: int
+    left_ratio: float
+    top_ratio: float
+    width_ratio: float
+    height_ratio: float
+    confidence_score: float | None
+
+
+class ReviewDocumentRequest(BaseModel):
+    status: Literal["approved", "pending"]
+    note: str | None = Field(default=None, max_length=1000)
 
 
 class DocumentDetailResponse(BaseModel):

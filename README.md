@@ -7,11 +7,12 @@ PaperVault is a self-hosted document management system for turning PDFs, scans, 
 - Upload PDFs, scanned PDFs, JPEGs, and PNGs.
 - Extract embedded text and fall back to Tesseract OCR for scans.
 - Classify common financial, employment, identity, medical, education, property, and purchase documents.
-- Generate summaries, keywords, entities, suggested tags, structured metadata, and embeddings.
+- Generate summaries, keywords, entities, suggested tags, typed structured metadata, and embeddings.
 - Search by keyword, meaning, document type, date, tag, issuer, organization, or combined filters.
 - Ask natural-language questions and receive evidence-backed answers with document and page citations.
 - Save searches and revisit recent queries.
-- Read documents in a built-in page-aware PDF viewer with in-document highlighting.
+- Read documents in a built-in page-aware viewer with text-layer and OCR-coordinate highlighting.
+- Review incomplete or low-confidence extraction results in a dedicated quality queue.
 - Track metadata edits, tag changes, archive actions, versions, reminders, and duplicate resolution.
 - Use local accounts or OIDC providers such as Authentik and Keycloak.
 - Administer registration, user access, roles, and active runtime providers from the web app.

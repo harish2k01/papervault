@@ -12,6 +12,7 @@ import {
   CheckCircle2,
   ChevronDown,
   Clock3,
+  ClipboardCheck,
   Download,
   FileSearch,
   FileText,
@@ -66,6 +67,7 @@ import {
   listDocuments,
   listDuplicates,
   listNotifications,
+  listReviewQueue,
   listUsers,
   listRecentSearches,
   listSavedSearches,
@@ -83,6 +85,7 @@ import {
   updateDocumentMetadata,
   updateAdminSettings,
   updateNotificationStatus,
+  updateDocumentReview,
   updateUser,
   uploadDocument,
 } from "../../lib/api";
@@ -93,6 +96,8 @@ import { DuplicatesWorkspace } from "./DuplicatesWorkspace";
 import { NotificationsWorkspace } from "./NotificationsWorkspace";
 import { TagsWorkspace } from "./TagsWorkspace";
 import { HomeWorkspace } from "./HomeWorkspace";
+import { ReviewWorkspace } from "./ReviewWorkspace";
+import { formatReviewReason } from "./review-utils";
 import {
   compareNotifications,
   formatDateOnly,
@@ -103,6 +108,7 @@ type WorkspaceView =
   | "home"
   | "documents"
   | "questions"
+  | "review"
   | "duplicates"
   | "tags"
   | "notifications"
@@ -117,6 +123,7 @@ const navItems = [
   { key: "home", label: "Home", icon: LayoutDashboard },
   { key: "documents", label: "Documents", icon: FileText },
   { key: "questions", label: "Ask", icon: MessageSquareText },
+  { key: "review", label: "Review", icon: ClipboardCheck },
   { key: "duplicates", label: "Duplicates", icon: FileSearch },
   { key: "tags", label: "Tags", icon: Tags },
   { key: "notifications", label: "Notifications", icon: Bell },
@@ -240,6 +247,11 @@ export function AppShell() {
     queryFn: listDuplicates,
     enabled: workspaceEnabled,
   });
+  const reviewQueueQuery = useQuery({
+    queryKey: ["documents", "review-queue"],
+    queryFn: listReviewQueue,
+    enabled: workspaceEnabled,
+  });
   const detailQuery = useQuery({
     queryKey: ["document", selectedDocumentId],
     queryFn: () => getDocument(selectedDocumentId!),
@@ -293,6 +305,24 @@ export function AppShell() {
         queryClient.invalidateQueries({
           queryKey: ["document", response.document.id],
         }),
+      ]);
+    },
+  });
+  const reviewMutation = useMutation({
+    mutationFn: (input: {
+      documentId: string;
+      status: "approved" | "pending";
+      note?: string | null;
+    }) =>
+      updateDocumentReview(input.documentId, {
+        status: input.status,
+        note: input.note,
+      }),
+    onSuccess: async (document) => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["documents"] }),
+        queryClient.invalidateQueries({ queryKey: ["document", document.id] }),
+        queryClient.invalidateQueries({ queryKey: ["search"] }),
       ]);
     },
   });
@@ -643,6 +673,7 @@ export function AppShell() {
       .length ?? 0;
   const documentCount = loadedDocuments.length;
   const duplicateGroups = duplicatesQuery.data?.length ?? 0;
+  const reviewCount = reviewQueueQuery.data?.length ?? 0;
   const tagCreateError =
     tagCreateMutation.error instanceof Error
       ? tagCreateMutation.error.message
@@ -776,6 +807,18 @@ export function AppShell() {
                       {duplicateGroups}
                     </span>
                   ) : null}
+                  {item.label === "Review" && reviewCount > 0 ? (
+                    <span
+                      className={cn(
+                        "rounded-full px-2 py-0.5 text-xs",
+                        active
+                          ? "bg-background/20"
+                          : "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-200",
+                      )}
+                    >
+                      {reviewCount}
+                    </span>
+                  ) : null}
                   {item.label === "Notifications" &&
                   pendingNotifications > 0 ? (
                     <span
@@ -826,6 +869,17 @@ export function AppShell() {
           />
         ) : activeView === "questions" ? (
           <QuestionsWorkspace onOpenDocument={openDocument} />
+        ) : activeView === "review" ? (
+          <ReviewWorkspace
+            documents={reviewQueueQuery.data ?? []}
+            documentTypes={documentTypesQuery.data ?? []}
+            isLoading={reviewQueueQuery.isLoading}
+            isUpdating={reviewMutation.isPending}
+            onOpenDocument={openDocument}
+            onApprove={(documentId) =>
+              reviewMutation.mutate({ documentId, status: "approved" })
+            }
+          />
         ) : activeView === "settings" && isAdmin ? (
           <SettingsWorkspace
             settings={adminSettingsQuery.data}
@@ -933,6 +987,7 @@ export function AppShell() {
                   }
                   isSyncingNotifications={notificationSyncMutation.isPending}
                   isReprocessing={reprocessingMutation.isPending}
+                  isReviewUpdating={reviewMutation.isPending}
                   isTagUpdating={
                     tagCreateAttachMutation.isPending ||
                     tagAttachMutation.isPending ||
@@ -949,6 +1004,9 @@ export function AppShell() {
                   onDelete={confirmDelete}
                   onReprocess={(documentId) =>
                     reprocessingMutation.mutate(documentId)
+                  }
+                  onUpdateReview={(documentId, status) =>
+                    reviewMutation.mutate({ documentId, status })
                   }
                   onSyncNotifications={(documentId) =>
                     notificationSyncMutation.mutate(documentId)
@@ -2092,6 +2150,7 @@ function DocumentPanel({
   isUpdating,
   isSyncingNotifications,
   isReprocessing,
+  isReviewUpdating,
   isTagUpdating,
   tagError,
   notificationError,
@@ -2101,6 +2160,7 @@ function DocumentPanel({
   onDownload,
   onDelete,
   onReprocess,
+  onUpdateReview,
   onSyncNotifications,
   onUpdateNotificationStatus,
   onUpdateDocument,
@@ -2118,6 +2178,7 @@ function DocumentPanel({
   isUpdating: boolean;
   isSyncingNotifications: boolean;
   isReprocessing: boolean;
+  isReviewUpdating: boolean;
   isTagUpdating: boolean;
   tagError: string | null;
   notificationError: string | null;
@@ -2127,6 +2188,7 @@ function DocumentPanel({
   onDownload: (documentId: string) => void;
   onDelete: (documentId: string, title: string) => void;
   onReprocess: (documentId: string) => void;
+  onUpdateReview: (documentId: string, status: "approved" | "pending") => void;
   onSyncNotifications: (documentId: string) => void;
   onUpdateNotificationStatus: (
     notificationId: string,
@@ -2192,6 +2254,11 @@ function DocumentPanel({
                 {documentTypeLabel}
               </span>
               <StatusBadge status={detail.document.status} />
+              {detail.document.review_status === "pending" ? (
+                <span className="rounded-md bg-amber-100 px-2 py-1 text-xs font-medium text-amber-900 dark:bg-amber-950 dark:text-amber-200">
+                  Needs review
+                </span>
+              ) : null}
             </div>
             <h2 className="max-w-full break-words text-2xl font-semibold tracking-normal">
               {detail.document.title}
@@ -2246,6 +2313,31 @@ function DocumentPanel({
             onRetry={() => onReprocess(detail.document.id)}
           />
 
+          {detail.document.review_status === "pending" ? (
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 dark:border-amber-900 dark:bg-amber-950/40">
+              <div>
+                <p className="text-sm font-medium text-amber-950 dark:text-amber-100">
+                  Check extracted details
+                </p>
+                <p className="mt-0.5 text-xs text-amber-800 dark:text-amber-300">
+                  {detail.document.review_reasons
+                    .slice(0, 3)
+                    .map(formatReviewReason)
+                    .join(" · ") ||
+                    "PaperVault flagged this document for review."}
+                </p>
+              </div>
+              <Button
+                size="sm"
+                disabled={isReviewUpdating}
+                onClick={() => onUpdateReview(detail.document.id, "approved")}
+              >
+                <CheckCircle2 className="h-4 w-4" />
+                Approve
+              </Button>
+            </div>
+          ) : null}
+
           <section>
             <div className="mb-3">
               <h3 className="text-sm font-semibold">Preview</h3>
@@ -2254,7 +2346,10 @@ function DocumentPanel({
               </p>
             </div>
             <Suspense fallback={<PreviewLoadingState />}>
-              <DocumentPreview document={detail.document} />
+              <DocumentPreview
+                document={detail.document}
+                ocrGeometryAvailable={detail.text_extraction?.source === "ocr"}
+              />
             </Suspense>
           </section>
 

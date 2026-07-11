@@ -7,11 +7,22 @@ from papervault_api.documents.domain.enums import TextExtractionSource, TextExtr
 
 
 @dataclass(frozen=True, slots=True)
+class OcrTextBlock:
+    text: str
+    left_ratio: float
+    top_ratio: float
+    width_ratio: float
+    height_ratio: float
+    confidence_score: float | None = None
+
+
+@dataclass(frozen=True, slots=True)
 class TextExtractionResult:
     source: TextExtractionSource
     status: TextExtractionStatus
     content_text: str | None = None
     page_texts: tuple[str, ...] = ()
+    page_blocks: tuple[tuple[OcrTextBlock, ...], ...] = ()
     page_count: int | None = None
     language: str | None = None
     confidence_score: float | None = None
