@@ -1,9 +1,9 @@
 [
   {
     "name": "salary slip classification",
-    "text": "ACME PRIVATE LIMITED Salary Slip January 2025 Gross Salary INR 125000 Net Pay INR 108500",
+    "text": "EXAMPLE PAYROLL COMPANY Salary Slip March 2030 Gross Salary INR 12500 Net Pay INR 12000",
     "expected_category": "salary_slip",
-    "expected_terms": ["salary", "108500"]
+    "expected_terms": ["salary", "12000"]
   },
   {
     "name": "insurance policy classification",
@@ -48,7 +48,7 @@
   },
   {
     "name": "taxpayer information summary is not a salary slip",
-    "text": "TAXPAYER INFORMATION SUMMARY\nAssessment Year 2026-27\nINFORMATION CATEGORY PROCESSED BY SYSTEM ACCEPTED BY TAXPAYER\nSalary 9,27,308\nOther Salary (TDS Annexure II)\nSFT Interest Income",
+    "text": "TAXPAYER INFORMATION SUMMARY\nAssessment Year 2030-31\nINFORMATION CATEGORY PROCESSED BY SYSTEM ACCEPTED BY TAXPAYER\nSalary 1,23,456\nOther Salary (TDS Annexure II)\nSFT Interest Income",
     "expected_category": "tax_return",
     "expected_terms": ["tax", "reported-income"]
   }

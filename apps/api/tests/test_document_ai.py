@@ -22,13 +22,13 @@ from papervault_api.documents.infrastructure.models import (
 from papervault_api.identity.infrastructure.models import User
 from papervault_api.tags.infrastructure.models import DocumentTag, Tag
 
-SALARY_TEXT = """
+SYNTHETIC_SALARY_TEXT = """
 Salary Slip
-Employer: Acme Technologies
-Month: 1
-Year: 2025
-Gross Salary: INR 150,000
-Net Salary: INR 120,000
+Employer: Example Payroll Company
+Month: 3
+Year: 2030
+Gross Salary: INR 12,500
+Net Salary: INR 12,000
 Employee earnings and deductions are listed below.
 """
 
@@ -36,12 +36,12 @@ Employee earnings and deductions are listed below.
 def test_local_ai_provider_classifies_and_extracts_salary_metadata() -> None:
     provider = LocalDocumentAIProvider()
 
-    result = provider.analyze(SALARY_TEXT, "generic_pdf")
+    result = provider.analyze(SYNTHETIC_SALARY_TEXT, "generic_pdf")
 
     assert result.category == "salary_slip"
     assert result.confidence_score >= 0.55
-    assert result.extracted_metadata["employer"] == "Acme Technologies"
-    assert result.extracted_metadata["net_salary"] == 120000.0
+    assert result.extracted_metadata["employer"] == "Example Payroll Company"
+    assert result.extracted_metadata["net_salary"] == 12000.0
     assert "salary-slip" in result.suggested_tags
 
 
@@ -49,9 +49,9 @@ def test_local_ai_provider_does_not_classify_tax_summary_as_salary_slip() -> Non
     result = LocalDocumentAIProvider().analyze(
         """
         TAXPAYER INFORMATION SUMMARY
-        Assessment Year 2026-27
+        Assessment Year 2030-31
         INFORMATION CATEGORY PROCESSED BY SYSTEM ACCEPTED BY TAXPAYER
-        Salary 9,27,308
+        Salary 1,23,456
         Other Salary (TDS Annexure II)
         SFT Interest Income
         """,
@@ -101,7 +101,7 @@ async def test_ai_processing_service_persists_analysis_embedding_and_metadata(
             document_id=document.id,
             source=TextExtractionSource.EMBEDDED_TEXT.value,
             status=TextExtractionStatus.SUCCEEDED.value,
-            content_text=SALARY_TEXT,
+            content_text=SYNTHETIC_SALARY_TEXT,
             page_count=1,
             extractor="test",
             is_current=True,
@@ -154,9 +154,9 @@ async def test_ai_processing_service_persists_analysis_embedding_and_metadata(
     assert refreshed_document.summary is not None
     assert analysis.category == "salary_slip"
     assert analysis.keywords
-    assert analysis.extracted_metadata["gross_salary"] == 150000.0
+    assert analysis.extracted_metadata["gross_salary"] == 12500.0
     assert embedding.dimensions == 16
     assert len(embedding.vector) == 16
     assert metadata.schema_name == "salary_slip"
-    assert metadata.data["net_salary"] == 120000.0
+    assert metadata.data["net_salary"] == 12000.0
     assert "salary-slip" in {tag.slug for tag in automatic_tags}

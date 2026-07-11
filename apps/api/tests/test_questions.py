@@ -24,23 +24,23 @@ from papervault_api.questions.application.service import (
 )
 
 PAYSLIP_TEXT = """
-WORKHALL PRIVATE LIMITED
-Period Beginning 1-Aug-22
-Period Ending 31-Aug-22
+EXAMPLE PAYROLL COMPANY
+Period Beginning 1-Mar-30
+Period Ending 31-Mar-30
 Employee profile and payroll account information repeated before the final totals.
 Employee profile and payroll account information repeated before the final totals.
 Employee profile and payroll account information repeated before the final totals.
 Employee profile and payroll account information repeated before the final totals.
-TOTAL EARNINGS INR 31,000.00
-TOTAL DEDUCTIONS INR 2,825.00
-NET PAY INR 28,175.00
+TOTAL EARNINGS INR 12,500.00
+TOTAL DEDUCTIONS INR 500.00
+NET PAY INR 12,000.00
 """
 
 TAX_SUMMARY_TEXT = """
 TAXPAYER INFORMATION SUMMARY
-Assessment Year 2026-27
+Assessment Year 2030-31
 INFORMATION CATEGORY PROCESSED BY SYSTEM ACCEPTED BY TAXPAYER
-Salary 9,27,308
+Salary 1,23,456
 Other Salary TDS Annexure II
 SFT Interest Income
 """
@@ -75,8 +75,8 @@ async def test_question_answering_returns_page_citations_and_refuses_unknowns(
     await session.flush()
     document = Document(
         owner_id=user.id,
-        title="August 2022 Payslip",
-        original_filename="08-2022-Aug.pdf",
+        title="March 2030 Payroll Statement",
+        original_filename="synthetic-payroll-2030-03.pdf",
         content_type="application/pdf",
         file_size_bytes=100,
         sha256_hash="9" * 64,
@@ -106,8 +106,8 @@ async def test_question_answering_returns_page_citations_and_refuses_unknowns(
     )
     tax_document = Document(
         owner_id=user.id,
-        title="TIS AY 2026 2027",
-        original_filename="tis.pdf",
+        title="Synthetic Tax Summary 2030 2031",
+        original_filename="synthetic-tax-summary.pdf",
         content_type="application/pdf",
         file_size_bytes=100,
         sha256_hash="8" * 64,
@@ -145,7 +145,7 @@ async def test_question_answering_returns_page_citations_and_refuses_unknowns(
 
     answer = await service.ask(
         owner_id=user.id,
-        question="What was my salary in August 2022?",
+        question="What was my net pay in March 2030?",
     )
     refusal = await service.ask(
         owner_id=user.id,
@@ -163,6 +163,6 @@ async def test_question_answering_returns_page_citations_and_refuses_unknowns(
     assert answer.citations[0].document_id == document.id
     assert {citation.document_id for citation in answer.citations} == {document.id}
     assert answer.citations[0].page_number == 1
-    assert "28,175" in answer.answer
+    assert "12,000" in answer.answer
     assert refusal.answered is False
     assert refusal.citations == ()

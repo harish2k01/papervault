@@ -27,7 +27,7 @@ def main() -> None:
             document_id,
             timeout_seconds=args.processing_timeout_seconds,
         )
-        search_results = search_documents(client, base_url, headers, "phase 10 salary")
+        search_results = search_documents(client, base_url, headers, "searchable smoke document")
 
     extraction = detail.get("text_extraction") or {}
     ai_analysis = detail.get("ai_analysis") or {}
@@ -43,7 +43,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run a PaperVault deployed smoke test.")
     parser.add_argument(
         "--base-url",
-        default="https://papervault.k8s.harish2k01.xyz/api",
+        default="http://localhost:8000/api",
         help="API base URL, including the /api prefix when routed through the web host.",
     )
     parser.add_argument("--email-prefix", default="cluster-smoke")
@@ -72,7 +72,7 @@ def upload_document(client: httpx.Client, base_url: str, headers: dict[str, str]
         files={
             "file": (
                 "cluster-smoke.pdf",
-                build_pdf("Phase 10 salary smoke document for PaperVault search."),
+                build_pdf("Synthetic searchable smoke document for PaperVault."),
                 "application/pdf",
             ),
         },

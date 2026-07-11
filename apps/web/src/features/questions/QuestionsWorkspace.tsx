@@ -12,7 +12,7 @@ import { Button } from "../../components/ui/button";
 import { askQuestion } from "../../lib/api";
 
 const exampleQuestions = [
-  "What was my salary in August 2022?",
+  "What was the net pay in my latest payslip?",
   "Show my insurance policies and their expiry dates.",
   "When did I purchase my iPad?",
 ];
