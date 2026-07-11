@@ -104,6 +104,11 @@ class Document(UuidPrimaryKeyMixin, TimestampMixin, Base):
         cascade="all, delete-orphan",
         passive_deletes=True,
     )
+    text_chunks: Mapped[list[DocumentTextChunk]] = relationship(
+        back_populates="document",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
     text_extractions: Mapped[list[DocumentTextExtraction]] = relationship(
         back_populates="document",
         cascade="all, delete-orphan",
@@ -292,6 +297,12 @@ class DocumentTextExtraction(UuidPrimaryKeyMixin, TimestampMixin, Base):
         passive_deletes=True,
         order_by="DocumentTextPage.page_number",
     )
+    chunks: Mapped[list[DocumentTextChunk]] = relationship(
+        back_populates="text_extraction",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        order_by="DocumentTextChunk.chunk_index",
+    )
 
 
 class DocumentTextPage(UuidPrimaryKeyMixin, Base):
@@ -318,3 +329,48 @@ class DocumentTextPage(UuidPrimaryKeyMixin, Base):
     content_text: Mapped[str] = mapped_column(Text, nullable=False)
 
     text_extraction: Mapped[DocumentTextExtraction] = relationship(back_populates="pages")
+
+
+class DocumentTextChunk(UuidPrimaryKeyMixin, TimestampMixin, Base):
+    __tablename__ = "document_text_chunks"
+    __table_args__ = (
+        CheckConstraint("page_number > 0", name="chunk_page_positive"),
+        CheckConstraint("chunk_index >= 0", name="chunk_index_valid"),
+        CheckConstraint("token_count > 0", name="chunk_tokens_positive"),
+        CheckConstraint("dimensions > 0", name="chunk_dimensions_positive"),
+        CheckConstraint("vector_norm >= 0", name="chunk_norm_non_negative"),
+        UniqueConstraint(
+            "text_extraction_id",
+            "page_number",
+            "chunk_index",
+            name="uq_text_chunks_extraction_page_index",
+        ),
+        Index("ix_text_chunks_document_page", "document_id", "page_number"),
+        Index("ix_text_chunks_extraction", "text_extraction_id"),
+    )
+
+    document_id: Mapped[UUID] = mapped_column(
+        ForeignKey("documents.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    text_extraction_id: Mapped[UUID] = mapped_column(
+        ForeignKey(
+            "document_text_extractions.id",
+            name="fk_text_chunks_extraction",
+            ondelete="CASCADE",
+        ),
+        nullable=False,
+    )
+    page_number: Mapped[int] = mapped_column(Integer, nullable=False)
+    chunk_index: Mapped[int] = mapped_column(Integer, nullable=False)
+    content_text: Mapped[str] = mapped_column(Text, nullable=False)
+    token_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    provider: Mapped[str] = mapped_column(String(80), nullable=False)
+    model: Mapped[str] = mapped_column(String(120), nullable=False)
+    dimensions: Mapped[int] = mapped_column(Integer, nullable=False)
+    vector: Mapped[list[float]] = mapped_column(JSON, nullable=False)
+    vector_norm: Mapped[float] = mapped_column(Numeric(12, 8), nullable=False)
+    source_text_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+
+    document: Mapped[Document] = relationship(back_populates="text_chunks")
+    text_extraction: Mapped[DocumentTextExtraction] = relationship(back_populates="chunks")

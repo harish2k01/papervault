@@ -29,6 +29,7 @@ The backend is a modular monolith organized by feature:
 - `identity`: local authentication, OIDC, JWTs, RBAC, and user management.
 - `administration`: persisted instance policy and runtime administration views.
 - `search`: database and OpenSearch query/index adapters plus search history.
+- `questions`: tenant-scoped chunk retrieval, grounded answer policy, citations, and refusal behavior.
 - `tags`: tag ownership and document assignment.
 - `notifications`: reminder projection and user status.
 - `timeline`: append-only document activity.
@@ -39,7 +40,7 @@ HTTP routes validate transport data and call application services. Celery tasks 
 The frontend follows the same feature-first approach:
 
 - `app`: providers and routing.
-- `features`: documents, administration, tags, duplicates, notifications, and shell workflows.
+- `features`: documents, questions, administration, tags, duplicates, notifications, and shell workflows.
 - `components/ui`: shared interaction primitives.
 - `lib`: typed API client, configuration, and small utilities.
 
@@ -65,7 +66,7 @@ sequenceDiagram
   Worker->>Worker: Extract embedded text or OCR
   Worker->>Worker: Normalize unsafe control characters
   Worker->>DB: Store extraction and page text
-  Worker->>Worker: Analyze, classify, and embed
+  Worker->>Worker: Analyze, classify, embed, and build page chunks
   Worker->>DB: Store metadata, AI output, reminders, completion state
   Worker->>Search: Update document projection
 ```
@@ -79,6 +80,14 @@ The extraction interface supports embedded PDF text and OCR adapters. The defaul
 Page text is stored as immutable children of each extraction. Flattened text remains available for summaries, metadata extraction, embeddings, and global search.
 
 AI analysis and embeddings use provider interfaces. The default local providers are deterministic and require no external service. Model-backed providers can be added without changing processing orchestration or storage contracts.
+
+## Grounded Questions
+
+Question answering is separate from document search. Search returns ranked documents; the question service retrieves page-bound chunks from ready documents owned by the caller and asks a grounded-answer provider to answer only from that evidence.
+
+Chunks and their embeddings are materialized during normal AI processing. The question service lazily backfills chunks for older current extractions, which avoids a blocking data migration. The local answer provider is extractive: it selects a bounded evidence excerpt, reports confidence, cites the document and page, and refuses when too few question concepts appear in the evidence. This is intentionally more conservative than an unconstrained generated answer.
+
+The database is the chunk source of truth. Retrieval is currently bounded to 5,000 owned chunks per request; a dedicated OpenSearch chunk projection is the scaling path for larger vaults. A future model-backed answer provider must preserve the same citation and refusal contract.
 
 ## Search
 

@@ -96,6 +96,21 @@ export type SearchRequestInput = {
   offset?: number;
 };
 
+export type QuestionAnswer = {
+  answered: boolean;
+  answer: string | null;
+  confidence_score: number;
+  citations: Array<{
+    document_id: string;
+    document_title: string;
+    original_filename: string;
+    page_number: number;
+    snippet: string;
+    relevance_score: number;
+  }>;
+  refusal_reason: string | null;
+};
+
 export type SavedSearch = {
   id: string;
   name: string;
@@ -396,6 +411,13 @@ export async function searchDocuments(input: SearchRequestInput) {
     }),
   });
   return response.results;
+}
+
+export async function askQuestion(question: string) {
+  return apiFetch<QuestionAnswer>("/questions/ask", {
+    method: "POST",
+    body: JSON.stringify({ question }),
+  });
 }
 
 export async function listSavedSearches() {

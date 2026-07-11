@@ -11,6 +11,7 @@ PostgreSQL stores metadata and relationships. Original PDFs and images remain in
 - `document_metadata`: versioned structured extraction payloads.
 - `document_text_extractions`: current and historical extraction outcomes.
 - `document_text_pages`: ordered page text for viewer search and page navigation.
+- `document_text_chunks`: page-bound retrieval chunks, embedding provider metadata, vectors, and source hashes.
 - `document_ai_analyses`: summaries, keywords, entities, suggested tags, category, confidence, and extracted metadata.
 - `document_embeddings`: provider/model metadata, vectors, and source hashes.
 - `tags` and `document_tags`: user-owned tags and assignments.
@@ -24,7 +25,7 @@ Document types are application registry keys rather than database enums. Adding 
 
 ## Versioned Data
 
-Metadata, text extraction, AI analysis, and embeddings retain historical rows and mark one row current for each document. This permits reprocessing with new providers without destroying previous output.
+Metadata, text extraction, AI analysis, and document embeddings retain historical rows and mark one row current for each document. Retrieval chunks belong to a specific extraction, so the current extraction determines which chunks can support answers. This permits reprocessing without destroying previous output.
 
 ## Search Projection
 

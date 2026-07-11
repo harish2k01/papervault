@@ -5,7 +5,7 @@ FastAPI exposes OpenAPI documentation at `/docs` and `/openapi.json` when enable
 The API includes health endpoints:
 
 - `GET /health/live`: process liveness
-- `GET /health/ready`: dependency readiness placeholder
+- `GET /health/ready`: database-backed dependency readiness
 - `GET /health`: aggregate health response
 
 ## Documents
@@ -58,6 +58,12 @@ Document text search accepts a case-insensitive literal query between 2 and 200 
 Search uses OpenSearch for user-facing keyword, semantic, and hybrid queries when `PAPERVAULT_SEARCH_QUERY_BACKEND=opensearch` and indexing is enabled. PostgreSQL remains the source of truth and fallback query path when OpenSearch errors or is disabled.
 Archived documents are excluded by default. Set `filters.include_archived=true` to include them.
 Supported filters are document type, issuer, organization, tag slug, document date range, and archived inclusion.
+
+## Questions
+
+- `POST /questions/ask`: answer a natural-language question from the current user's ready documents
+
+The request accepts a `question` between 3 and 1,000 characters. The response states whether the question was answered, includes a confidence score, and returns document/page citations with bounded evidence snippets. When the retrieval policy cannot find enough lexical support, PaperVault refuses to answer and returns no citations. Existing page text is chunked and embedded lazily on first use; newly processed documents materialize chunks during AI processing.
 
 ## Tags
 

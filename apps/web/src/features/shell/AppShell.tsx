@@ -11,6 +11,7 @@ import {
   type LucideIcon,
   LogIn,
   LogOut,
+  MessageSquareText,
   Moon,
   RefreshCw,
   Search,
@@ -75,6 +76,7 @@ import {
 } from "../../lib/api";
 import { cn } from "../../lib/utils";
 import { SettingsWorkspace } from "../administration/SettingsWorkspace";
+import { QuestionsWorkspace } from "../questions/QuestionsWorkspace";
 import { DuplicatesWorkspace } from "./DuplicatesWorkspace";
 import { NotificationsWorkspace } from "./NotificationsWorkspace";
 import { TagsWorkspace } from "./TagsWorkspace";
@@ -85,7 +87,12 @@ import {
 } from "./notification-utils";
 
 type WorkspaceView =
-  "documents" | "duplicates" | "tags" | "notifications" | "settings";
+  | "documents"
+  | "questions"
+  | "duplicates"
+  | "tags"
+  | "notifications"
+  | "settings";
 
 const DocumentPreview = lazy(async () => {
   const module = await import("../documents/DocumentPreview");
@@ -94,6 +101,7 @@ const DocumentPreview = lazy(async () => {
 
 const navItems = [
   { key: "documents", label: "Documents", icon: FileText },
+  { key: "questions", label: "Ask", icon: MessageSquareText },
   { key: "duplicates", label: "Duplicates", icon: FileSearch },
   { key: "tags", label: "Tags", icon: Tags },
   { key: "notifications", label: "Notifications", icon: Bell },
@@ -622,7 +630,7 @@ export function AppShell() {
     <main className="min-h-screen bg-background text-foreground xl:h-screen xl:overflow-hidden">
       <div
         className={cn(
-          "grid min-h-screen xl:h-screen",
+          "grid min-h-screen content-start xl:h-screen xl:content-normal",
           workspaceIsEmpty
             ? "xl:grid-cols-[252px_minmax(0,1fr)]"
             : "xl:grid-cols-[252px_minmax(0,1fr)]",
@@ -668,7 +676,7 @@ export function AppShell() {
 
           <nav
             aria-label="Primary navigation"
-            className="grid grid-flow-col auto-cols-fr gap-1 xl:block xl:space-y-1"
+            className="grid grid-cols-3 gap-1 xl:block xl:space-y-1"
           >
             {visibleNavItems.map((item) => {
               const active = activeView === item.key;
@@ -738,7 +746,9 @@ export function AppShell() {
           </div>
         </aside>
 
-        {activeView === "settings" && isAdmin ? (
+        {activeView === "questions" ? (
+          <QuestionsWorkspace onOpenDocument={openDocument} />
+        ) : activeView === "settings" && isAdmin ? (
           <SettingsWorkspace
             settings={adminSettingsQuery.data}
             users={usersQuery.data ?? []}

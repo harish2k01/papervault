@@ -48,6 +48,8 @@ jobs:
         run: npm ci
       - name: Lint
         run: npm run lint
+      - name: Format check
+        run: npm exec prettier -- --check src
       - name: Test
         run: npm test -- --run
       - name: Build

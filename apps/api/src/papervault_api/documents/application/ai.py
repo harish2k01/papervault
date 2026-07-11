@@ -3,9 +3,10 @@ from dataclasses import asdict, dataclass
 from typing import Protocol
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from papervault_api.documents.application.chunking import chunk_page_text
 from papervault_api.documents.domain.enums import (
     AIAnalysisStatus,
     MetadataSource,
@@ -16,7 +17,9 @@ from papervault_api.documents.infrastructure.models import (
     DocumentAIAnalysis,
     DocumentEmbedding,
     DocumentMetadataRecord,
+    DocumentTextChunk,
     DocumentTextExtraction,
+    DocumentTextPage,
 )
 
 
@@ -120,6 +123,7 @@ class DocumentAIProcessingService:
                 is_current=True,
             ),
         )
+        await self._replace_text_chunks(document_id, text_extraction.id)
 
         if analysis.extracted_metadata:
             self._session.add(
@@ -140,6 +144,43 @@ class DocumentAIProcessingService:
             document.document_type = analysis.category
 
         await self._session.commit()
+
+    async def _replace_text_chunks(
+        self,
+        document_id: UUID,
+        text_extraction_id: UUID,
+    ) -> None:
+        await self._session.execute(
+            delete(DocumentTextChunk).where(
+                DocumentTextChunk.text_extraction_id == text_extraction_id,
+            )
+        )
+        result = await self._session.execute(
+            select(DocumentTextPage)
+            .where(DocumentTextPage.text_extraction_id == text_extraction_id)
+            .order_by(DocumentTextPage.page_number)
+        )
+        for page in result.scalars():
+            for chunk in chunk_page_text(page.page_number, page.content_text):
+                embedding = self._embedding_provider.embed(chunk.content_text)
+                self._session.add(
+                    DocumentTextChunk(
+                        document_id=document_id,
+                        text_extraction_id=text_extraction_id,
+                        page_number=chunk.page_number,
+                        chunk_index=chunk.chunk_index,
+                        content_text=chunk.content_text,
+                        token_count=chunk.token_count,
+                        provider=embedding.provider,
+                        model=embedding.model,
+                        dimensions=embedding.dimensions,
+                        vector=list(embedding.vector),
+                        vector_norm=embedding.vector_norm,
+                        source_text_sha256=hashlib.sha256(
+                            chunk.content_text.encode("utf-8")
+                        ).hexdigest(),
+                    )
+                )
 
     async def _get_current_successful_text_extraction(
         self,

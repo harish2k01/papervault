@@ -36,6 +36,7 @@ vi.mock("react-pdf", () => ({
 
 vi.mock("../../lib/api", () => ({
   archiveDocument: vi.fn(),
+  askQuestion: vi.fn(),
   attachTag: vi.fn(),
   buildOidcLoginUrl: vi
     .fn()
@@ -289,7 +290,7 @@ describe("AppShell", () => {
     renderAppShell();
 
     expect(await screen.findByText("Processing failed")).toBeInTheDocument();
-    expect(screen.getByText("Preview not ready")).toBeInTheDocument();
+    expect(await screen.findByText("Preview not ready")).toBeInTheDocument();
     expect(screen.queryByTitle(document.title)).not.toBeInTheDocument();
     expect(getDocumentFile).not.toHaveBeenCalled();
 
