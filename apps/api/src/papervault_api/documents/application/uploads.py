@@ -125,6 +125,8 @@ class DocumentUploadService:
                 DocumentVersion(
                     document_id=document.id,
                     version_number=1,
+                    original_filename=command.filename,
+                    content_type=command.content_type,
                     storage_bucket=stored_object.bucket,
                     storage_key=stored_object.key,
                     storage_version_id=stored_object.version_id,
@@ -132,6 +134,7 @@ class DocumentUploadService:
                     file_size_bytes=staged_file.file_size_bytes,
                     created_by_id=command.actor_id,
                     change_reason="initial_upload",
+                    is_current=True,
                 ),
             )
             self._session.add(
@@ -180,42 +183,54 @@ class DocumentUploadService:
         return task_id
 
     async def _stage_upload(self, stream: AsyncReadable) -> "StagedUpload":
-        digest = hashlib.sha256()
-        file_size_bytes = 0
-        temp_path: Path | None = None
-        try:
-            with NamedTemporaryFile(prefix="papervault-upload-", delete=False) as temp_file:
-                temp_path = Path(temp_file.name)
-                while chunk := await stream.read(CHUNK_SIZE_BYTES):
-                    file_size_bytes += len(chunk)
-                    if file_size_bytes > self._max_upload_size_bytes:
-                        raise UploadTooLargeError(self._max_upload_size_bytes)
-                    digest.update(chunk)
-                    temp_file.write(chunk)
-        except Exception:
-            if temp_path is not None:
-                temp_path.unlink(missing_ok=True)
-            raise
-
-        assert temp_path is not None
-        if file_size_bytes == 0:
-            temp_path.unlink(missing_ok=True)
-            raise EmptyUploadError()
-
-        return StagedUpload(
-            path=temp_path,
-            sha256_hash=digest.hexdigest(),
-            file_size_bytes=file_size_bytes,
-        )
+        return await stage_upload(stream, self._max_upload_size_bytes)
 
     def _validate_content_type(self, content_type: str) -> None:
-        if content_type not in SUPPORTED_CONTENT_TYPES:
-            raise UnsupportedUploadTypeError(content_type)
+        validate_content_type(content_type)
 
     def _build_storage_key(self, *, owner_id: UUID, filename: str) -> str:
-        object_id = uuid4()
-        safe_filename = sanitize_filename(filename)
-        return f"{owner_id}/originals/{object_id}/{safe_filename}"
+        return build_storage_key(owner_id=owner_id, filename=filename)
+
+
+async def stage_upload(stream: AsyncReadable, max_size_bytes: int) -> "StagedUpload":
+    digest = hashlib.sha256()
+    file_size_bytes = 0
+    temp_path: Path | None = None
+    try:
+        with NamedTemporaryFile(prefix="papervault-upload-", delete=False) as temp_file:
+            temp_path = Path(temp_file.name)
+            while chunk := await stream.read(CHUNK_SIZE_BYTES):
+                file_size_bytes += len(chunk)
+                if file_size_bytes > max_size_bytes:
+                    raise UploadTooLargeError(max_size_bytes)
+                digest.update(chunk)
+                temp_file.write(chunk)
+    except Exception:
+        if temp_path is not None:
+            temp_path.unlink(missing_ok=True)
+        raise
+
+    assert temp_path is not None
+    if file_size_bytes == 0:
+        temp_path.unlink(missing_ok=True)
+        raise EmptyUploadError()
+
+    return StagedUpload(
+        path=temp_path,
+        sha256_hash=digest.hexdigest(),
+        file_size_bytes=file_size_bytes,
+    )
+
+
+def validate_content_type(content_type: str) -> None:
+    if content_type not in SUPPORTED_CONTENT_TYPES:
+        raise UnsupportedUploadTypeError(content_type)
+
+
+def build_storage_key(*, owner_id: UUID, filename: str) -> str:
+    object_id = uuid4()
+    safe_filename = sanitize_filename(filename)
+    return f"{owner_id}/originals/{object_id}/{safe_filename}"
 
 
 @dataclass(frozen=True, slots=True)

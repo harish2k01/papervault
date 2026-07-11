@@ -7,6 +7,7 @@ import {
   HardDrive,
   Search,
   ShieldCheck,
+  Trash2,
   Users,
 } from "lucide-react";
 
@@ -20,6 +21,7 @@ export function SettingsWorkspace({
   error,
   onRegistrationChange,
   onUpdateUser,
+  onDeleteUser,
 }: {
   settings: AdminSettings | undefined;
   providerHealth: ProviderHealth | undefined;
@@ -33,6 +35,7 @@ export function SettingsWorkspace({
     userId: string,
     input: Partial<{ role: "admin" | "user"; is_active: boolean }>,
   ) => void;
+  onDeleteUser: (userId: string, label: string) => void;
 }) {
   return (
     <section className="flex min-w-0 flex-col bg-background xl:h-screen xl:min-h-0">
@@ -189,7 +192,7 @@ export function SettingsWorkspace({
             <div className="overflow-hidden rounded-lg border border-border bg-card">
               {users.map((user) => (
                 <div
-                  className="grid gap-3 border-b border-border px-4 py-3 last:border-b-0 md:grid-cols-[minmax(0,1fr)_140px_110px] md:items-center"
+                  className="grid gap-3 border-b border-border px-4 py-3 last:border-b-0 md:grid-cols-[minmax(0,1fr)_140px_110px_40px] md:items-center"
                   key={user.id}
                 >
                   <div className="min-w-0">
@@ -227,6 +230,20 @@ export function SettingsWorkspace({
                     }
                   >
                     {user.is_active ? "Active" : "Disabled"}
+                  </Button>
+                  <Button
+                    aria-label={`Delete ${user.email}`}
+                    className="text-muted-foreground hover:bg-rose-50 hover:text-rose-700 dark:hover:bg-rose-950"
+                    size="icon"
+                    type="button"
+                    variant="ghost"
+                    disabled={isUpdating || user.id === currentUser?.id}
+                    title="Permanently delete user"
+                    onClick={() =>
+                      onDeleteUser(user.id, user.display_name || user.email)
+                    }
+                  >
+                    <Trash2 className="h-4 w-4" aria-hidden="true" />
                   </Button>
                 </div>
               ))}

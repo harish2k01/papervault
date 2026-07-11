@@ -7,7 +7,7 @@ PostgreSQL stores metadata and relationships. Original PDFs and images remain in
 - `users`: local and OIDC identities, roles, active state, password hashes, and last login.
 - `instance_settings`: singleton runtime policy overridden by administrators.
 - `documents`: owner, object reference, hash, lifecycle and review state, processing diagnostics, type, issuer, date, organization, and summary.
-- `document_versions`: immutable object-storage references for document revisions.
+- `document_versions`: immutable object-storage references, original filename/media type, current-source marker, and revision provenance.
 - `document_metadata`: versioned structured extraction payloads.
 - `document_text_extractions`: current and historical extraction outcomes.
 - `document_text_pages`: ordered page text for viewer search and page navigation.
@@ -26,7 +26,7 @@ Document types are application registry keys rather than database enums. Adding 
 
 ## Versioned Data
 
-Metadata, text extraction, AI analysis, and document embeddings retain historical rows and mark one row current for each document. Retrieval chunks belong to a specific extraction, so the current extraction determines which chunks can support answers. This permits reprocessing without destroying previous output.
+Metadata, text extraction, AI analysis, and document embeddings retain historical rows and mark one row current for each document. Text extractions reference the source version that produced them. Retrieval chunks belong to a specific extraction, so the current extraction determines which chunks can support answers. This permits reprocessing, source comparison, and restoration without destroying previous output.
 
 ## Search Projection
 

@@ -38,6 +38,8 @@ from papervault_api.documents.api.schemas import (
     UpdateDocumentRequest,
     UpdateMetadataRequest,
     UploadDocumentResponse,
+    VersionChangeResponse,
+    VersionComparisonResponse,
 )
 from papervault_api.documents.application.deletion import DocumentDeletionService
 from papervault_api.documents.application.lifecycle import (
@@ -66,6 +68,11 @@ from papervault_api.documents.application.uploads import (
     UploadDocumentCommand,
     UploadTooLargeError,
 )
+from papervault_api.documents.application.versions import (
+    DocumentVersionService,
+    InvalidVersionChangeError,
+    VersionChangeResult,
+)
 from papervault_api.documents.domain.document_types import (
     UnknownDocumentTypeError,
     list_document_types,
@@ -76,7 +83,7 @@ from papervault_api.documents.domain.enums import (
     DocumentStatus,
 )
 from papervault_api.documents.domain.models import DocumentRecord
-from papervault_api.documents.infrastructure.models import Document
+from papervault_api.documents.infrastructure.models import Document, DocumentVersion
 from papervault_api.identity.api.dependencies import get_current_user
 from papervault_api.identity.application.current_user import CurrentUser
 from papervault_api.search.api.indexing import reindex_document_best_effort
@@ -323,6 +330,8 @@ async def get_document_detail(
         ),
         ai_analysis=(
             AIAnalysisResponse(
+                provider=detail.current_ai_analysis.provider,
+                model=detail.current_ai_analysis.model,
                 summary=detail.current_ai_analysis.summary,
                 keywords=detail.current_ai_analysis.keywords,
                 entities=detail.current_ai_analysis.entities,
@@ -380,14 +389,167 @@ async def get_document_detail(
             DocumentVersionResponse(
                 id=version.id,
                 version_number=version.version_number,
+                original_filename=version.original_filename,
+                content_type=version.content_type,
                 sha256_hash=version.sha256_hash,
                 file_size_bytes=version.file_size_bytes,
                 change_reason=version.change_reason,
+                is_current=version.is_current,
                 created_by_id=version.created_by_id,
                 created_at=version.created_at,
             )
             for version in detail.versions
         ],
+    )
+
+
+@router.post("/{document_id}/versions", response_model=VersionChangeResponse)
+async def replace_document_source(
+    document_id: UUID,
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    session: Annotated[AsyncSession, Depends(get_session)],
+    storage: Annotated[ObjectStorage, Depends(get_object_storage)],
+    queue: Annotated[DocumentProcessingQueue, Depends(get_document_processing_queue)],
+    settings: Annotated[Settings, Depends(get_settings)],
+    file: Annotated[UploadFile, File()],
+    change_reason: Annotated[str | None, Form(max_length=255)] = None,
+) -> VersionChangeResponse:
+    service = document_version_service(session, storage, queue, settings)
+    try:
+        result = await service.replace_source(
+            owner_id=current_user.id,
+            actor_id=current_user.id,
+            document_id=document_id,
+            filename=file.filename or "document",
+            content_type=file.content_type or "application/octet-stream",
+            stream=file,
+            change_reason=change_reason,
+        )
+    except UnsupportedUploadTypeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE, detail=str(exc)
+        ) from exc
+    except UploadTooLargeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail=str(exc)
+        ) from exc
+    except EmptyUploadError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except InvalidVersionChangeError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    if result is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
+    await reindex_document_best_effort(
+        session=session,
+        settings=settings,
+        document_id=document_id,
+        reason="document_source_replaced",
+    )
+    return version_change_response(result)
+
+
+@router.post(
+    "/{document_id}/versions/{version_id}/restore",
+    response_model=VersionChangeResponse,
+)
+async def restore_document_version(
+    document_id: UUID,
+    version_id: UUID,
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    session: Annotated[AsyncSession, Depends(get_session)],
+    storage: Annotated[ObjectStorage, Depends(get_object_storage)],
+    queue: Annotated[DocumentProcessingQueue, Depends(get_document_processing_queue)],
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> VersionChangeResponse:
+    service = document_version_service(session, storage, queue, settings)
+    try:
+        result = await service.restore_version(
+            owner_id=current_user.id,
+            actor_id=current_user.id,
+            document_id=document_id,
+            version_id=version_id,
+        )
+    except InvalidVersionChangeError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    if result is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
+    await reindex_document_best_effort(
+        session=session,
+        settings=settings,
+        document_id=document_id,
+        reason="document_version_restored",
+    )
+    return version_change_response(result)
+
+
+@router.get(
+    "/{document_id}/versions/compare",
+    response_model=VersionComparisonResponse,
+)
+async def compare_document_versions(
+    document_id: UUID,
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    session: Annotated[AsyncSession, Depends(get_session)],
+    storage: Annotated[ObjectStorage, Depends(get_object_storage)],
+    queue: Annotated[DocumentProcessingQueue, Depends(get_document_processing_queue)],
+    settings: Annotated[Settings, Depends(get_settings)],
+    from_version: Annotated[UUID, Query()],
+    to_version: Annotated[UUID, Query()],
+) -> VersionComparisonResponse:
+    try:
+        comparison = await document_version_service(
+            session, storage, queue, settings
+        ).compare_versions(
+            owner_id=current_user.id,
+            document_id=document_id,
+            from_version_id=from_version,
+            to_version_id=to_version,
+        )
+    except InvalidVersionChangeError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    if comparison is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
+    return VersionComparisonResponse(
+        from_version=comparison.from_version.version_number,
+        to_version=comparison.to_version.version_number,
+        source_changed=comparison.source_changed,
+        text_available=comparison.text_available,
+        added_lines=comparison.added_lines,
+        removed_lines=comparison.removed_lines,
+        diff_lines=list(comparison.diff_lines),
+    )
+
+
+@router.get("/{document_id}/versions/{version_id}/file")
+async def get_document_version_file(
+    document_id: UUID,
+    version_id: UUID,
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    session: Annotated[AsyncSession, Depends(get_session)],
+    storage: Annotated[ObjectStorage, Depends(get_object_storage)],
+    queue: Annotated[DocumentProcessingQueue, Depends(get_document_processing_queue)],
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> FileResponse:
+    version = await document_version_service(session, storage, queue, settings).get_version(
+        owner_id=current_user.id,
+        document_id=document_id,
+        version_id=version_id,
+    )
+    if version is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Version not found")
+    with NamedTemporaryFile(prefix="papervault-version-", delete=False) as temp_file:
+        temp_path = Path(temp_file.name)
+    await storage.download_to_file(
+        bucket=version.storage_bucket,
+        key=version.storage_key,
+        destination=temp_path,
+    )
+    return FileResponse(
+        temp_path,
+        media_type=version.content_type,
+        filename=version.original_filename,
+        content_disposition_type="attachment",
+        background=BackgroundTask(lambda: temp_path.unlink(missing_ok=True)),
     )
 
 
@@ -701,4 +863,45 @@ def document_record_from_orm(document: Document) -> DocumentRecord:
         archived_at=document.archived_at,
         created_at=document.created_at,
         updated_at=document.updated_at,
+    )
+
+
+def document_version_service(
+    session: AsyncSession,
+    storage: ObjectStorage,
+    queue: DocumentProcessingQueue,
+    settings: Settings,
+) -> DocumentVersionService:
+    return DocumentVersionService(
+        session=session,
+        storage=storage,
+        processing_queue=queue,
+        bucket_name=settings.s3_bucket_documents,
+        max_upload_size_bytes=settings.max_upload_size_bytes,
+    )
+
+
+def document_version_response(version: DocumentVersion) -> DocumentVersionResponse:
+    return DocumentVersionResponse(
+        id=version.id,
+        version_number=version.version_number,
+        original_filename=version.original_filename,
+        content_type=version.content_type,
+        sha256_hash=version.sha256_hash,
+        file_size_bytes=version.file_size_bytes,
+        change_reason=version.change_reason,
+        is_current=version.is_current,
+        created_by_id=version.created_by_id,
+        created_at=version.created_at,
+    )
+
+
+def version_change_response(result: VersionChangeResult) -> VersionChangeResponse:
+    return VersionChangeResponse(
+        document=DocumentResponse.model_validate(
+            document_record_from_orm(result.document),
+            from_attributes=True,
+        ),
+        version=document_version_response(result.version),
+        processing_task_id=result.processing_task_id,
     )

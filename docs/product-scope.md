@@ -14,12 +14,12 @@ the intended product direction.
 | Intelligence | Local, Ollama, and OpenAI-compatible analysis providers for summaries, keywords, entities, suggested tags, classification, confidence, and metadata extraction |
 | Embeddings | Local deterministic, Ollama, and OpenAI-compatible embedding providers with dimension validation and provider/model provenance |
 | Search | Keyword, semantic, and hybrid search; type/date/tag/issuer/organization filters; saved searches; deduplicated recent searches; PostgreSQL fallback |
-| Questions | Natural-language questions over page chunks with tenant isolation, local or model-backed grounded answers, confidence, document/page citations, and refusal when evidence is insufficient |
+| Questions | Natural-language questions over page chunks with tenant isolation, concept-coverage and document-type ranking, direct local answers for common amount/date/list intents, model-backed grounded answers, confidence, citations, and refusal when evidence is insufficient |
 | Viewer | Responsive PDF/image viewer, page navigation, zoom, literal in-document search, page-aware results, text-layer highlighting, and OCR coordinate overlays |
-| Lifecycle | Metadata editing, confidence review queue and approval, archive, permanent deletion, version history display, document timeline, processing diagnostics, and retry for failed or stale queued jobs |
+| Lifecycle | Metadata editing, confidence review, source replacement, immutable versions, restore, download, extracted-text comparison, document and vault timelines, archive, permanent deletion, diagnostics, and retry |
 | Organization | Manual and confidence-gated automatic tags, tag filtering, and exact-hash duplicate resolution by archive |
 | Notifications | Due date, expiry, renewal, and warranty reminders derived from document metadata with user-controlled status |
-| Identity | Local login, JWT access tokens, OIDC authorization-code login, admin/user RBAC, runtime registration policy, and user activation/role management |
+| Identity | Local login, JWT access tokens, OIDC authorization-code login, admin/user RBAC, runtime registration policy, user activation/role management, and guarded permanent deletion with owned-file cleanup |
 | Administration | User and registration management plus non-secret runtime provider and provider-health visibility |
 | Operations | Structured logs, Prometheus metrics, OpenTelemetry export, health probes, Docker Compose, GHCR workflows, Kubernetes, Helm, migration hooks, and Gateway API routing |
 
@@ -32,8 +32,8 @@ the intended product direction.
   vaults need a dedicated chunk-vector projection.
 - OCR geometry is available for newly processed Tesseract documents. Existing OCR
   documents must be reprocessed before coordinate highlights are available.
-- Version history currently records the initial source; replace, compare, restore,
-  and retention workflows are not available.
+- Source versions are retained indefinitely. Automated retention policies and legal
+  holds are not yet available.
 - Reminders are generated during processing or manual refresh. Scheduled delivery,
   email, webhooks, and user timezone preferences are not available.
 - Model provider settings are deployment configuration. Administrators can inspect
@@ -43,12 +43,11 @@ the intended product direction.
 
 1. Content-similarity and OCR-similarity duplicate detection in addition to exact hashes.
 2. Smart tags, reusable collections, and optional folder-style views.
-3. A vault-wide timeline workspace rather than document-only history.
-4. A dedicated chunk index, embedding-version migration, index aliases, and search relevance evaluation.
-5. Scheduled reminder generation, notification preferences, digests, email, and webhook delivery.
-6. Document replacement, version comparison, restore, and configurable retention.
-7. Password reset, optional email verification, refresh-token session management, MFA integration, and active-session revocation.
-8. Backup, restore, disaster-recovery verification, export/import, and documented storage lifecycle procedures.
-9. Malware scanning, configurable quotas, rate limiting, stronger content validation, and security event auditing.
-10. Full browser end-to-end, accessibility, upgrade, rollback, backup, and restore suites in CI.
-11. International OCR language packs, locale-aware classification, and per-locale evaluation corpora.
+3. A dedicated chunk index, embedding-version migration, index aliases, and search relevance evaluation.
+4. Scheduled reminder generation, notification preferences, digests, email, and webhook delivery.
+5. Configurable source-version retention and legal holds.
+6. Password reset, optional email verification, refresh-token session management, MFA integration, and active-session revocation.
+7. Backup, restore, disaster-recovery verification, export/import, and documented storage lifecycle procedures.
+8. Malware scanning, configurable quotas, rate limiting, stronger content validation, and security event auditing.
+9. Full browser end-to-end, accessibility, upgrade, rollback, backup, and restore suites in CI.
+10. International OCR language packs, locale-aware classification, and per-locale evaluation corpora.

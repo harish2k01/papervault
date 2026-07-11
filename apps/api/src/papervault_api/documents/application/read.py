@@ -38,9 +38,12 @@ class DocumentTimelineEventView:
 class DocumentVersionView:
     id: UUID
     version_number: int
+    original_filename: str
+    content_type: str
     sha256_hash: str
     file_size_bytes: int
     change_reason: str | None
+    is_current: bool
     created_by_id: UUID | None
     created_at: datetime
 
@@ -251,9 +254,12 @@ class DocumentReadService:
             DocumentVersionView(
                 id=version.id,
                 version_number=version.version_number,
+                original_filename=version.original_filename,
+                content_type=version.content_type,
                 sha256_hash=version.sha256_hash,
                 file_size_bytes=version.file_size_bytes,
                 change_reason=version.change_reason,
+                is_current=version.is_current,
                 created_by_id=version.created_by_id,
                 created_at=version.created_at,
             )

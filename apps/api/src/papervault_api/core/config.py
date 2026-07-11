@@ -178,9 +178,7 @@ class Settings(BaseSettings):
     def validate_model_provider(cls, value: Any) -> str:
         provider = str(value or "local").strip().lower().replace("-", "_")
         if provider not in {"local", "ollama", "openai_compatible"}:
-            raise ValueError(
-                "Model provider must be 'local', 'ollama', or 'openai_compatible'"
-            )
+            raise ValueError("Model provider must be 'local', 'ollama', or 'openai_compatible'")
         return provider
 
     @property

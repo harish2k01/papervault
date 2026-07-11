@@ -76,6 +76,8 @@ class TimelineEventResponse(BaseModel):
 
 
 class AIAnalysisResponse(BaseModel):
+    provider: str
+    model: str
     summary: str | None
     keywords: list[str]
     entities: list[dict[str, Any]]
@@ -94,11 +96,30 @@ class MetadataResponse(BaseModel):
 class DocumentVersionResponse(BaseModel):
     id: UUID
     version_number: int
+    original_filename: str
+    content_type: str
     sha256_hash: str
     file_size_bytes: int
     change_reason: str | None
+    is_current: bool
     created_by_id: UUID | None
     created_at: datetime
+
+
+class VersionChangeResponse(BaseModel):
+    document: DocumentResponse
+    version: DocumentVersionResponse
+    processing_task_id: str | None
+
+
+class VersionComparisonResponse(BaseModel):
+    from_version: int
+    to_version: int
+    source_changed: bool
+    text_available: bool
+    added_lines: int
+    removed_lines: int
+    diff_lines: list[str]
 
 
 class TextExtractionResponse(BaseModel):

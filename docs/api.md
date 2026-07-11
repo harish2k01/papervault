@@ -45,6 +45,10 @@ Additional document endpoints:
 - `GET /documents/{document_id}/ocr-blocks?page=1&query=salary`: return owner-scoped normalized OCR word coordinates for a page, optionally filtered by search terms
 - `PATCH /documents/{document_id}/review`: approve extracted details or return a document to pending review with an optional note
 - `GET /documents/{document_id}/timeline`: document timeline events
+- `POST /documents/{document_id}/versions`: replace the current source with a multipart PDF/image upload and create an immutable version
+- `POST /documents/{document_id}/versions/{version_id}/restore`: restore a retained source as a new current version
+- `GET /documents/{document_id}/versions/{version_id}/file`: download a retained source version
+- `GET /documents/{document_id}/versions/compare?from_version=...&to_version=...`: compare source hashes and bounded extracted-text differences
 - `GET /documents/duplicates/candidates`: exact-hash duplicate candidate groups
 - `POST /documents/duplicates/merge`: keep one exact-hash duplicate and archive selected redundant copies
 
@@ -96,6 +100,7 @@ Tag assignment endpoints are owner-scoped, append `tags_changed` timeline events
 - `GET /auth/me`: current user profile
 - `GET /users`: admin-only user listing
 - `PATCH /users/{user_id}`: admin-only role, display name, or active-state update
+- `DELETE /users/{user_id}`: permanently delete a non-current user, owned documents, and stored source objects; self and last-admin deletion are refused
 - `GET /admin/settings`: admin-only effective registration policy and non-secret runtime provider information
 - `PATCH /admin/settings`: admin-only update of the persisted local-registration policy
 - `GET /admin/settings/providers/health`: admin-only health and active-model information for analysis, embedding, and answer providers
@@ -103,3 +108,7 @@ Tag assignment endpoints are owner-scoped, append `tags_changed` timeline events
 The first registered local user is assigned the `admin` role. Later users are assigned `user` by default.
 The first OIDC-created user is also assigned `admin` when no users exist. OIDC login is advertised
 only when issuer URL, client id, client secret, and redirect URI are configured.
+
+## Timeline
+
+- `GET /timeline`: list the current user's cross-document activity with pagination and optional `event_type` or `document_id` filters

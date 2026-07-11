@@ -31,7 +31,11 @@ class ModelGroundedAnswerProvider(GroundedAnswerProvider):
                 system=(
                     "Answer only from the numbered evidence. Return JSON with answered, answer, "
                     "confidence_score, citation_indexes, and refusal_reason. Refuse when evidence "
-                    "does not support the answer. citation_indexes must refer to supplied evidence."
+                    "does not support the answer. Give the direct value or concise list requested; "
+                    "do not copy a long passage or add facts not present in evidence. Prefer "
+                    "evidence "
+                    "matching every date and document-type constraint in the question. "
+                    "citation_indexes must refer to supplied evidence."
                 ),
                 user=f"Question: {question}\n\nEvidence:\n{evidence_text}",
             )

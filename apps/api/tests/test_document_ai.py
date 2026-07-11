@@ -45,6 +45,24 @@ def test_local_ai_provider_classifies_and_extracts_salary_metadata() -> None:
     assert "salary-slip" in result.suggested_tags
 
 
+def test_local_ai_provider_does_not_classify_tax_summary_as_salary_slip() -> None:
+    result = LocalDocumentAIProvider().analyze(
+        """
+        TAXPAYER INFORMATION SUMMARY
+        Assessment Year 2026-27
+        INFORMATION CATEGORY PROCESSED BY SYSTEM ACCEPTED BY TAXPAYER
+        Salary 9,27,308
+        Other Salary (TDS Annexure II)
+        SFT Interest Income
+        """,
+        "generic_pdf",
+    )
+
+    assert result.category == "tax_return"
+    assert "salary-slip" not in result.suggested_tags
+    assert "tax record" in result.summary.lower()
+
+
 def test_hashing_embedding_provider_is_deterministic() -> None:
     provider = HashingEmbeddingProvider(dimensions=16)
 

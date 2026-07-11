@@ -18,6 +18,7 @@ from papervault_api.documents.api.dependencies import (
 )
 from papervault_api.documents.application.queues import DocumentProcessingQueue
 from papervault_api.documents.application.storage import StoredObject
+from papervault_api.documents.domain.enums import DocumentStatus
 from papervault_api.documents.infrastructure.models import (
     Document,
     DocumentTextBlock,
@@ -149,6 +150,46 @@ def test_document_file_can_be_downloaded_and_permanently_deleted() -> None:
     assert deleted.status_code == 204
     assert missing.status_code == 404
     assert storage.objects == {}
+    asyncio.run(engine.dispose())
+
+
+def test_document_source_can_be_replaced_without_losing_first_version() -> None:
+    app, _storage, engine = build_upload_test_app()
+    app.dependency_overrides[get_settings] = lambda: Settings(search_index_enabled=False)
+    headers = {
+        "X-PaperVault-User-Id": str(uuid4()),
+        "X-PaperVault-User-Email": "versions@example.com",
+    }
+    with TestClient(app) as client:
+        uploaded = client.post(
+            "/documents/uploads",
+            headers=headers,
+            files={"file": ("policy-v1.pdf", b"%PDF-version-one", "application/pdf")},
+        )
+        document_id = uploaded.json()["document"]["id"]
+        initial_detail = client.get(f"/documents/{document_id}", headers=headers).json()
+        first_version = initial_detail["versions"][0]
+        asyncio.run(set_document_status(engine, UUID(document_id), DocumentStatus.READY.value))
+
+        replaced = client.post(
+            f"/documents/{document_id}/versions",
+            headers=headers,
+            data={"change_reason": "renewed policy"},
+            files={"file": ("policy-v2.pdf", b"%PDF-version-two", "application/pdf")},
+        )
+        first_download = client.get(
+            f"/documents/{document_id}/versions/{first_version['id']}/file",
+            headers=headers,
+        )
+
+    assert replaced.status_code == 200
+    body = replaced.json()
+    assert body["version"]["version_number"] == 2
+    assert body["version"]["is_current"] is True
+    assert body["document"]["original_filename"] == "policy-v2.pdf"
+    assert body["document"]["status"] == "pending_processing"
+    assert first_download.status_code == 200
+    assert first_download.content == b"%PDF-version-one"
     asyncio.run(engine.dispose())
 
 
@@ -377,4 +418,13 @@ async def seed_text_pages(engine: AsyncEngine, document_id: UUID) -> None:
                 confidence_score=Decimal("0.95"),
             )
         )
+        await session.commit()
+
+
+async def set_document_status(engine: AsyncEngine, document_id: UUID, status: str) -> None:
+    session_factory = async_sessionmaker(engine, expire_on_commit=False)
+    async with session_factory() as session:
+        document = await session.get(Document, document_id)
+        assert document is not None
+        document.status = status
         await session.commit()

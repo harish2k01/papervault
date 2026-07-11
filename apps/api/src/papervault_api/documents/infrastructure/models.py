@@ -20,6 +20,9 @@ from sqlalchemy import (
     UniqueConstraint,
     func,
 )
+from sqlalchemy import (
+    text as sql_text,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from papervault_api.db.base import Base
@@ -146,6 +149,13 @@ class DocumentVersion(UuidPrimaryKeyMixin, Base):
         CheckConstraint("version_number > 0", name="document_version_number_positive"),
         CheckConstraint("file_size_bytes >= 0", name="document_version_file_size_non_negative"),
         UniqueConstraint("document_id", "version_number", name="uq_document_versions_number"),
+        Index(
+            "uq_document_versions_current",
+            "document_id",
+            unique=True,
+            postgresql_where=sql_text("is_current"),
+            sqlite_where=sql_text("is_current = 1"),
+        ),
     )
 
     document_id: Mapped[UUID] = mapped_column(
@@ -153,6 +163,8 @@ class DocumentVersion(UuidPrimaryKeyMixin, Base):
         nullable=False,
     )
     version_number: Mapped[int] = mapped_column(Integer, nullable=False)
+    original_filename: Mapped[str] = mapped_column(String(512), nullable=False)
+    content_type: Mapped[str] = mapped_column(String(100), nullable=False)
     storage_bucket: Mapped[str] = mapped_column(String(63), nullable=False)
     storage_key: Mapped[str] = mapped_column(String(1024), nullable=False)
     storage_version_id: Mapped[str | None] = mapped_column(String(255))
@@ -160,6 +172,11 @@ class DocumentVersion(UuidPrimaryKeyMixin, Base):
     file_size_bytes: Mapped[int] = mapped_column(BigInteger, nullable=False)
     created_by_id: Mapped[UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
     change_reason: Mapped[str | None] = mapped_column(String(255))
+    is_current: Mapped[bool] = mapped_column(
+        nullable=False,
+        default=True,
+        server_default="true",
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
@@ -287,11 +304,19 @@ class DocumentTextExtraction(UuidPrimaryKeyMixin, TimestampMixin, Base):
         check_values("source", TextExtractionSource, "text_extraction_source_valid"),
         check_values("status", TextExtractionStatus, "text_extraction_status_valid"),
         Index("ix_document_text_extractions_current", "document_id", "is_current"),
+        Index("ix_text_extractions_document_version", "document_version_id"),
     )
 
     document_id: Mapped[UUID] = mapped_column(
         ForeignKey("documents.id", ondelete="CASCADE"),
         nullable=False,
+    )
+    document_version_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey(
+            "document_versions.id",
+            name="fk_text_extractions_document_version",
+            ondelete="SET NULL",
+        ),
     )
     source: Mapped[str] = mapped_column(String(32), nullable=False)
     status: Mapped[str] = mapped_column(String(32), nullable=False)

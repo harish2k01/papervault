@@ -16,6 +16,8 @@ import {
   Download,
   FileSearch,
   FileText,
+  GitCompare,
+  History,
   type LucideIcon,
   LogIn,
   LogOut,
@@ -23,6 +25,7 @@ import {
   MessageSquareText,
   Moon,
   RefreshCw,
+  RotateCcw,
   Search,
   Settings2,
   ShieldCheck,
@@ -49,14 +52,17 @@ import {
   SearchRequestInput,
   TagItem,
   TokenResponse,
+  VersionComparison,
   archiveDocument,
   attachTag,
   buildOidcLoginUrl,
   clearStoredAccessToken,
   createTag,
   deleteDocument,
+  deleteUser,
   detachTag,
   downloadDocumentFile,
+  downloadDocumentVersion,
   getAuthConfig,
   getAdminSettings,
   getDocument,
@@ -68,6 +74,7 @@ import {
   listDuplicates,
   listNotifications,
   listReviewQueue,
+  listVaultTimeline,
   listUsers,
   listRecentSearches,
   listSavedSearches,
@@ -77,6 +84,9 @@ import {
   parseOidcCallbackHash,
   registerAccount,
   reprocessDocument,
+  replaceDocumentSource,
+  restoreDocumentVersion,
+  compareDocumentVersions,
   saveSearch,
   searchDocuments,
   storeAccessToken,
@@ -90,13 +100,7 @@ import {
   uploadDocument,
 } from "../../lib/api";
 import { cn, humanizeLabel } from "../../lib/utils";
-import { SettingsWorkspace } from "../administration/SettingsWorkspace";
-import { QuestionsWorkspace } from "../questions/QuestionsWorkspace";
-import { DuplicatesWorkspace } from "./DuplicatesWorkspace";
-import { NotificationsWorkspace } from "./NotificationsWorkspace";
-import { TagsWorkspace } from "./TagsWorkspace";
 import { HomeWorkspace } from "./HomeWorkspace";
-import { ReviewWorkspace } from "./ReviewWorkspace";
 import { formatReviewReason } from "./review-utils";
 import {
   compareNotifications,
@@ -109,6 +113,7 @@ type WorkspaceView =
   | "documents"
   | "questions"
   | "review"
+  | "timeline"
   | "duplicates"
   | "tags"
   | "notifications"
@@ -119,11 +124,47 @@ const DocumentPreview = lazy(async () => {
   return { default: module.DocumentPreview };
 });
 
+const SettingsWorkspace = lazy(async () => {
+  const module = await import("../administration/SettingsWorkspace");
+  return { default: module.SettingsWorkspace };
+});
+
+const QuestionsWorkspace = lazy(async () => {
+  const module = await import("../questions/QuestionsWorkspace");
+  return { default: module.QuestionsWorkspace };
+});
+
+const DuplicatesWorkspace = lazy(async () => {
+  const module = await import("./DuplicatesWorkspace");
+  return { default: module.DuplicatesWorkspace };
+});
+
+const NotificationsWorkspace = lazy(async () => {
+  const module = await import("./NotificationsWorkspace");
+  return { default: module.NotificationsWorkspace };
+});
+
+const ReviewWorkspace = lazy(async () => {
+  const module = await import("./ReviewWorkspace");
+  return { default: module.ReviewWorkspace };
+});
+
+const TagsWorkspace = lazy(async () => {
+  const module = await import("./TagsWorkspace");
+  return { default: module.TagsWorkspace };
+});
+
+const TimelineWorkspace = lazy(async () => {
+  const module = await import("./TimelineWorkspace");
+  return { default: module.TimelineWorkspace };
+});
+
 const navItems = [
   { key: "home", label: "Home", icon: LayoutDashboard },
   { key: "documents", label: "Documents", icon: FileText },
   { key: "questions", label: "Ask", icon: MessageSquareText },
   { key: "review", label: "Review", icon: ClipboardCheck },
+  { key: "timeline", label: "Activity", icon: History },
   { key: "duplicates", label: "Duplicates", icon: FileSearch },
   { key: "tags", label: "Tags", icon: Tags },
   { key: "notifications", label: "Notifications", icon: Bell },
@@ -252,6 +293,11 @@ export function AppShell() {
     queryFn: listReviewQueue,
     enabled: workspaceEnabled,
   });
+  const timelineQuery = useQuery({
+    queryKey: ["timeline"],
+    queryFn: listVaultTimeline,
+    enabled: workspaceEnabled,
+  });
   const detailQuery = useQuery({
     queryKey: ["document", selectedDocumentId],
     queryFn: () => getDocument(selectedDocumentId!),
@@ -281,6 +327,7 @@ export function AppShell() {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["documents"] }),
         queryClient.invalidateQueries({ queryKey: ["search"] }),
+        queryClient.invalidateQueries({ queryKey: ["timeline"] }),
       ]);
     },
   });
@@ -294,6 +341,7 @@ export function AppShell() {
         queryClient.invalidateQueries({ queryKey: ["documents"] }),
         queryClient.invalidateQueries({ queryKey: ["document", document.id] }),
         queryClient.invalidateQueries({ queryKey: ["search"] }),
+        queryClient.invalidateQueries({ queryKey: ["timeline"] }),
       ]);
     },
   });
@@ -305,6 +353,7 @@ export function AppShell() {
         queryClient.invalidateQueries({
           queryKey: ["document", response.document.id],
         }),
+        queryClient.invalidateQueries({ queryKey: ["timeline"] }),
       ]);
     },
   });
@@ -323,6 +372,7 @@ export function AppShell() {
         queryClient.invalidateQueries({ queryKey: ["documents"] }),
         queryClient.invalidateQueries({ queryKey: ["document", document.id] }),
         queryClient.invalidateQueries({ queryKey: ["search"] }),
+        queryClient.invalidateQueries({ queryKey: ["timeline"] }),
       ]);
     },
   });
@@ -348,6 +398,15 @@ export function AppShell() {
       if (user.id === meQuery.data?.id && user.role !== "admin") {
         setActiveView("documents");
       }
+    },
+  });
+  const userDeleteMutation = useMutation({
+    mutationFn: deleteUser,
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["admin", "users"] }),
+        queryClient.invalidateQueries({ queryKey: ["duplicates"] }),
+      ]);
     },
   });
   const notificationStatusMutation = useMutation({
@@ -390,6 +449,7 @@ export function AppShell() {
         }),
         queryClient.invalidateQueries({ queryKey: ["documents"] }),
         queryClient.invalidateQueries({ queryKey: ["search"] }),
+        queryClient.invalidateQueries({ queryKey: ["timeline"] }),
       ]);
       notificationSyncMutation.mutate(input.documentId);
     },
@@ -419,6 +479,51 @@ export function AppShell() {
       link.download = filename;
       link.click();
       URL.revokeObjectURL(url);
+    },
+  });
+  const versionDownloadMutation = useMutation({
+    mutationFn: (input: {
+      documentId: string;
+      versionId: string;
+      filename: string;
+    }) => downloadDocumentVersion(input.documentId, input.versionId),
+    onSuccess: (blob, input) => {
+      const url = URL.createObjectURL(blob);
+      const link = window.document.createElement("a");
+      link.href = url;
+      link.download = input.filename;
+      link.click();
+      URL.revokeObjectURL(url);
+    },
+  });
+  const versionReplaceMutation = useMutation({
+    mutationFn: (input: {
+      documentId: string;
+      file: File;
+      changeReason?: string;
+    }) =>
+      replaceDocumentSource(input.documentId, input.file, input.changeReason),
+    onSuccess: async (response) => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["documents"] }),
+        queryClient.invalidateQueries({
+          queryKey: ["document", response.document.id],
+        }),
+        queryClient.invalidateQueries({ queryKey: ["search"] }),
+      ]);
+    },
+  });
+  const versionRestoreMutation = useMutation({
+    mutationFn: (input: { documentId: string; versionId: string }) =>
+      restoreDocumentVersion(input.documentId, input.versionId),
+    onSuccess: async (response) => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["documents"] }),
+        queryClient.invalidateQueries({
+          queryKey: ["document", response.document.id],
+        }),
+        queryClient.invalidateQueries({ queryKey: ["search"] }),
+      ]);
     },
   });
   const deleteMutation = useMutation({
@@ -593,6 +698,7 @@ export function AppShell() {
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: ["document", documentId] }),
       queryClient.invalidateQueries({ queryKey: ["search"] }),
+      queryClient.invalidateQueries({ queryKey: ["timeline"] }),
     ]);
   }
 
@@ -698,18 +804,24 @@ export function AppShell() {
     reprocessingMutation.error instanceof Error
       ? reprocessingMutation.error.message
       : null;
+  const versionActionError =
+    [versionReplaceMutation.error, versionRestoreMutation.error].find(
+      (error): error is Error => error instanceof Error,
+    )?.message ?? null;
   const administrationError =
     adminSettingsMutation.error instanceof Error
       ? adminSettingsMutation.error.message
       : userUpdateMutation.error instanceof Error
         ? userUpdateMutation.error.message
-        : adminSettingsQuery.error instanceof Error
-          ? adminSettingsQuery.error.message
-          : usersQuery.error instanceof Error
-            ? usersQuery.error.message
-            : providerHealthQuery.error instanceof Error
-              ? providerHealthQuery.error.message
-              : null;
+        : userDeleteMutation.error instanceof Error
+          ? userDeleteMutation.error.message
+          : adminSettingsQuery.error instanceof Error
+            ? adminSettingsQuery.error.message
+            : usersQuery.error instanceof Error
+              ? usersQuery.error.message
+              : providerHealthQuery.error instanceof Error
+                ? providerHealthQuery.error.message
+                : null;
 
   if (
     (!authConfigQuery.data && accessToken === null) ||
@@ -856,227 +968,283 @@ export function AppShell() {
           </div>
         </aside>
 
-        {activeView === "home" ? (
-          <HomeWorkspace
-            documents={loadedDocuments}
-            notifications={notificationsQuery.data ?? []}
-            isLoading={documentsQuery.isLoading}
-            isUploading={uploadMutation.isPending}
-            onUpload={(file) => uploadMutation.mutate(file)}
-            onOpenDocument={openDocument}
-            onOpenDocuments={() => setActiveView("documents")}
-            onAsk={() => setActiveView("questions")}
-          />
-        ) : activeView === "questions" ? (
-          <QuestionsWorkspace onOpenDocument={openDocument} />
-        ) : activeView === "review" ? (
-          <ReviewWorkspace
-            documents={reviewQueueQuery.data ?? []}
-            documentTypes={documentTypesQuery.data ?? []}
-            isLoading={reviewQueueQuery.isLoading}
-            isUpdating={reviewMutation.isPending}
-            onOpenDocument={openDocument}
-            onApprove={(documentId) =>
-              reviewMutation.mutate({ documentId, status: "approved" })
-            }
-          />
-        ) : activeView === "settings" && isAdmin ? (
-          <SettingsWorkspace
-            settings={adminSettingsQuery.data}
-            providerHealth={providerHealthQuery.data}
-            users={usersQuery.data ?? []}
-            currentUser={meQuery.data}
-            isLoading={adminSettingsQuery.isLoading || usersQuery.isLoading}
-            isUpdating={
-              adminSettingsMutation.isPending || userUpdateMutation.isPending
-            }
-            error={administrationError}
-            onRegistrationChange={(enabled) =>
-              adminSettingsMutation.mutate({
-                local_registration_enabled: enabled,
-              })
-            }
-            onUpdateUser={(userId, updates) =>
-              userUpdateMutation.mutate({ userId, updates })
-            }
-          />
-        ) : activeView === "notifications" ? (
-          <NotificationsWorkspace
-            notifications={notificationsQuery.data ?? []}
-            documents={loadedDocuments}
-            isLoading={notificationsQuery.isLoading}
-            isUpdating={notificationStatusMutation.isPending}
-            error={notificationActionError}
-            onOpenDocument={openDocument}
-            onUpdateStatus={(notificationId, status) =>
-              notificationStatusMutation.mutate({ notificationId, status })
-            }
-          />
-        ) : activeView === "duplicates" ? (
-          <DuplicatesWorkspace
-            groups={duplicatesQuery.data ?? []}
-            isLoading={duplicatesQuery.isLoading}
-            isResolving={duplicateMergeMutation.isPending}
-            error={duplicateMergeError}
-            onOpenDocument={openDocument}
-            onMerge={(input) => duplicateMergeMutation.mutate(input)}
-          />
-        ) : activeView === "tags" ? (
-          <TagsWorkspace
-            tags={tagsQuery.data ?? []}
-            isLoading={tagsQuery.isLoading}
-            isCreating={tagCreateMutation.isPending}
-            error={tagCreateError}
-            onCreateTag={createVaultTag}
-          />
-        ) : (
-          <section className="flex min-w-0 flex-col bg-background xl:h-screen xl:min-h-0">
-            <header className="border-b border-border bg-card px-5 py-4 xl:px-8">
-              <div className="flex flex-col gap-4">
-                <div className="flex flex-wrap items-start justify-between gap-4">
-                  <div>
-                    <h1 className="text-xl font-semibold tracking-normal">
-                      Documents
-                    </h1>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      Browse and search your document library.
-                    </p>
+        <Suspense fallback={<WorkspaceLoading />}>
+          {activeView === "home" ? (
+            <HomeWorkspace
+              documents={loadedDocuments}
+              notifications={notificationsQuery.data ?? []}
+              isLoading={documentsQuery.isLoading}
+              isUploading={uploadMutation.isPending}
+              onUpload={(file) => uploadMutation.mutate(file)}
+              onOpenDocument={openDocument}
+              onOpenDocuments={() => setActiveView("documents")}
+              onAsk={() => setActiveView("questions")}
+            />
+          ) : activeView === "questions" ? (
+            <QuestionsWorkspace onOpenDocument={openDocument} />
+          ) : activeView === "review" ? (
+            <ReviewWorkspace
+              documents={reviewQueueQuery.data ?? []}
+              documentTypes={documentTypesQuery.data ?? []}
+              isLoading={reviewQueueQuery.isLoading}
+              isUpdating={reviewMutation.isPending}
+              onOpenDocument={openDocument}
+              onApprove={(documentId) =>
+                reviewMutation.mutate({ documentId, status: "approved" })
+              }
+            />
+          ) : activeView === "timeline" ? (
+            <TimelineWorkspace
+              events={timelineQuery.data ?? []}
+              isLoading={timelineQuery.isLoading}
+              onOpenDocument={openDocument}
+            />
+          ) : activeView === "settings" && isAdmin ? (
+            <SettingsWorkspace
+              settings={adminSettingsQuery.data}
+              providerHealth={providerHealthQuery.data}
+              users={usersQuery.data ?? []}
+              currentUser={meQuery.data}
+              isLoading={adminSettingsQuery.isLoading || usersQuery.isLoading}
+              isUpdating={
+                adminSettingsMutation.isPending ||
+                userUpdateMutation.isPending ||
+                userDeleteMutation.isPending
+              }
+              error={administrationError}
+              onRegistrationChange={(enabled) =>
+                adminSettingsMutation.mutate({
+                  local_registration_enabled: enabled,
+                })
+              }
+              onUpdateUser={(userId, updates) =>
+                userUpdateMutation.mutate({ userId, updates })
+              }
+              onDeleteUser={(userId, label) => {
+                if (
+                  window.confirm(
+                    `Permanently delete ${label} and all documents owned by this account? This cannot be undone.`,
+                  )
+                ) {
+                  userDeleteMutation.mutate(userId);
+                }
+              }}
+            />
+          ) : activeView === "notifications" ? (
+            <NotificationsWorkspace
+              notifications={notificationsQuery.data ?? []}
+              documents={loadedDocuments}
+              isLoading={notificationsQuery.isLoading}
+              isUpdating={notificationStatusMutation.isPending}
+              error={notificationActionError}
+              onOpenDocument={openDocument}
+              onUpdateStatus={(notificationId, status) =>
+                notificationStatusMutation.mutate({ notificationId, status })
+              }
+            />
+          ) : activeView === "duplicates" ? (
+            <DuplicatesWorkspace
+              groups={duplicatesQuery.data ?? []}
+              isLoading={duplicatesQuery.isLoading}
+              isResolving={duplicateMergeMutation.isPending}
+              error={duplicateMergeError}
+              onOpenDocument={openDocument}
+              onMerge={(input) => duplicateMergeMutation.mutate(input)}
+            />
+          ) : activeView === "tags" ? (
+            <TagsWorkspace
+              tags={tagsQuery.data ?? []}
+              isLoading={tagsQuery.isLoading}
+              isCreating={tagCreateMutation.isPending}
+              error={tagCreateError}
+              onCreateTag={createVaultTag}
+            />
+          ) : (
+            <section className="flex min-w-0 flex-col bg-background xl:h-screen xl:min-h-0">
+              {!selectedDocumentId ? (
+                <header className="border-b border-border bg-card px-5 py-4 xl:px-8">
+                  <div className="flex flex-col gap-4">
+                    <div className="flex flex-wrap items-start justify-between gap-4">
+                      <div>
+                        <h1 className="text-xl font-semibold tracking-normal">
+                          Documents
+                        </h1>
+                        <p className="mt-1 text-sm text-muted-foreground">
+                          Browse and search your document library.
+                        </p>
+                      </div>
+                      <UploadButton
+                        disabled={uploadMutation.isPending}
+                        onUpload={(file) => uploadMutation.mutate(file)}
+                      />
+                    </div>
+
+                    <SearchControls
+                      query={query}
+                      mode={searchMode}
+                      filters={filters}
+                      saveSearchName={saveSearchName}
+                      documentTypes={documentTypesQuery.data ?? []}
+                      tags={tagsQuery.data ?? []}
+                      savedSearches={savedSearchesQuery.data ?? []}
+                      recentSearches={recentSearchesQuery.data ?? []}
+                      isSaving={saveSearchMutation.isPending}
+                      onQueryChange={setQuery}
+                      onModeChange={setSearchMode}
+                      onFiltersChange={setFilters}
+                      onSaveNameChange={setSaveSearchName}
+                      onSubmit={() => submitSearch()}
+                      onClear={clearSearch}
+                      onSave={saveCurrentSearch}
+                      onApplySearch={submitSearch}
+                    />
                   </div>
-                  <UploadButton
-                    disabled={uploadMutation.isPending}
-                    onUpload={(file) => uploadMutation.mutate(file)}
+                </header>
+              ) : null}
+
+              <div className="min-h-0 flex-1 overflow-auto">
+                {selectedDocumentId ? (
+                  <DocumentPanel
+                    detail={detailQuery.data}
+                    documentTypes={documentTypesQuery.data ?? []}
+                    duplicateGroups={duplicateGroups}
+                    notifications={notificationsQuery.data ?? []}
+                    tags={tagsQuery.data ?? []}
+                    isLoading={detailQuery.isLoading}
+                    isUpdating={
+                      documentUpdateMutation.isPending ||
+                      metadataUpdateMutation.isPending ||
+                      archiveMutation.isPending ||
+                      deleteMutation.isPending
+                    }
+                    isSyncingNotifications={notificationSyncMutation.isPending}
+                    isReprocessing={reprocessingMutation.isPending}
+                    isReviewUpdating={reviewMutation.isPending}
+                    isVersionUpdating={
+                      versionReplaceMutation.isPending ||
+                      versionRestoreMutation.isPending ||
+                      versionDownloadMutation.isPending
+                    }
+                    isTagUpdating={
+                      tagCreateAttachMutation.isPending ||
+                      tagAttachMutation.isPending ||
+                      tagDetachMutation.isPending
+                    }
+                    tagError={tagMutationError}
+                    notificationError={notificationActionError}
+                    processingError={reprocessingError}
+                    versionError={versionActionError}
+                    onBack={() => setSelectedDocumentId(null)}
+                    onArchive={(documentId) =>
+                      archiveMutation.mutate(documentId)
+                    }
+                    onDownload={(documentId) =>
+                      downloadMutation.mutate(documentId)
+                    }
+                    onDelete={confirmDelete}
+                    onReprocess={(documentId) =>
+                      reprocessingMutation.mutate(documentId)
+                    }
+                    onUpdateReview={(documentId, status) =>
+                      reviewMutation.mutate({ documentId, status })
+                    }
+                    onReplaceSource={(documentId, file, changeReason) =>
+                      versionReplaceMutation.mutate({
+                        documentId,
+                        file,
+                        changeReason,
+                      })
+                    }
+                    onRestoreVersion={(documentId, versionId) =>
+                      versionRestoreMutation.mutate({ documentId, versionId })
+                    }
+                    onDownloadVersion={(documentId, versionId, filename) =>
+                      versionDownloadMutation.mutate({
+                        documentId,
+                        versionId,
+                        filename,
+                      })
+                    }
+                    onSyncNotifications={(documentId) =>
+                      notificationSyncMutation.mutate(documentId)
+                    }
+                    onUpdateNotificationStatus={(notificationId, status) =>
+                      notificationStatusMutation.mutate({
+                        notificationId,
+                        status,
+                      })
+                    }
+                    onUpdateDocument={(documentId, updates) =>
+                      documentUpdateMutation.mutate({ documentId, updates })
+                    }
+                    onUpdateMetadata={(documentId, metadata) =>
+                      metadataUpdateMutation.mutate({ documentId, metadata })
+                    }
+                    onAttachTag={(documentId, tagId) =>
+                      tagAttachMutation.mutate({ documentId, tagId })
+                    }
+                    onCreateAndAttachTag={(documentId, name) =>
+                      tagCreateAttachMutation.mutate({ documentId, name })
+                    }
+                    onDetachTag={(documentId, tagId) =>
+                      tagDetachMutation.mutate({ documentId, tagId })
+                    }
                   />
-                </div>
-
-                <SearchControls
-                  query={query}
-                  mode={searchMode}
-                  filters={filters}
-                  saveSearchName={saveSearchName}
-                  documentTypes={documentTypesQuery.data ?? []}
-                  tags={tagsQuery.data ?? []}
-                  savedSearches={savedSearchesQuery.data ?? []}
-                  recentSearches={recentSearchesQuery.data ?? []}
-                  isSaving={saveSearchMutation.isPending}
-                  onQueryChange={setQuery}
-                  onModeChange={setSearchMode}
-                  onFiltersChange={setFilters}
-                  onSaveNameChange={setSaveSearchName}
-                  onSubmit={() => submitSearch()}
-                  onClear={clearSearch}
-                  onSave={saveCurrentSearch}
-                  onApplySearch={submitSearch}
-                />
+                ) : (
+                  <DocumentLibrary
+                    documents={visibleDocuments}
+                    documentTypes={documentTypesQuery.data ?? []}
+                    isLoading={
+                      documentsQuery.isLoading || searchQuery.isLoading
+                    }
+                    hasSearch={submittedSearch !== null}
+                    isUploading={uploadMutation.isPending}
+                    hasMore={
+                      documentsQuery.hasNextPage && submittedSearch === null
+                    }
+                    searchOffset={submittedSearch?.offset ?? 0}
+                    hasNextSearchPage={
+                      submittedSearch !== null &&
+                      (searchQuery.data?.length ?? 0) === 50
+                    }
+                    isLoadingMore={documentsQuery.isFetchingNextPage}
+                    onClear={clearSearch}
+                    onLoadMore={() => void documentsQuery.fetchNextPage()}
+                    onNextSearchPage={() =>
+                      setSubmittedSearch((current) =>
+                        current
+                          ? { ...current, offset: (current.offset ?? 0) + 50 }
+                          : current,
+                      )
+                    }
+                    onPreviousSearchPage={() =>
+                      setSubmittedSearch((current) =>
+                        current
+                          ? {
+                              ...current,
+                              offset: Math.max(0, (current.offset ?? 0) - 50),
+                            }
+                          : current,
+                      )
+                    }
+                    onUpload={(file) => uploadMutation.mutate(file)}
+                    onOpen={setSelectedDocumentId}
+                  />
+                )}
               </div>
-            </header>
-
-            <div className="min-h-0 flex-1 overflow-auto">
-              {selectedDocumentId ? (
-                <DocumentPanel
-                  detail={detailQuery.data}
-                  documentTypes={documentTypesQuery.data ?? []}
-                  duplicateGroups={duplicateGroups}
-                  notifications={notificationsQuery.data ?? []}
-                  tags={tagsQuery.data ?? []}
-                  isLoading={detailQuery.isLoading}
-                  isUpdating={
-                    documentUpdateMutation.isPending ||
-                    metadataUpdateMutation.isPending ||
-                    archiveMutation.isPending ||
-                    deleteMutation.isPending
-                  }
-                  isSyncingNotifications={notificationSyncMutation.isPending}
-                  isReprocessing={reprocessingMutation.isPending}
-                  isReviewUpdating={reviewMutation.isPending}
-                  isTagUpdating={
-                    tagCreateAttachMutation.isPending ||
-                    tagAttachMutation.isPending ||
-                    tagDetachMutation.isPending
-                  }
-                  tagError={tagMutationError}
-                  notificationError={notificationActionError}
-                  processingError={reprocessingError}
-                  onBack={() => setSelectedDocumentId(null)}
-                  onArchive={(documentId) => archiveMutation.mutate(documentId)}
-                  onDownload={(documentId) =>
-                    downloadMutation.mutate(documentId)
-                  }
-                  onDelete={confirmDelete}
-                  onReprocess={(documentId) =>
-                    reprocessingMutation.mutate(documentId)
-                  }
-                  onUpdateReview={(documentId, status) =>
-                    reviewMutation.mutate({ documentId, status })
-                  }
-                  onSyncNotifications={(documentId) =>
-                    notificationSyncMutation.mutate(documentId)
-                  }
-                  onUpdateNotificationStatus={(notificationId, status) =>
-                    notificationStatusMutation.mutate({
-                      notificationId,
-                      status,
-                    })
-                  }
-                  onUpdateDocument={(documentId, updates) =>
-                    documentUpdateMutation.mutate({ documentId, updates })
-                  }
-                  onUpdateMetadata={(documentId, metadata) =>
-                    metadataUpdateMutation.mutate({ documentId, metadata })
-                  }
-                  onAttachTag={(documentId, tagId) =>
-                    tagAttachMutation.mutate({ documentId, tagId })
-                  }
-                  onCreateAndAttachTag={(documentId, name) =>
-                    tagCreateAttachMutation.mutate({ documentId, name })
-                  }
-                  onDetachTag={(documentId, tagId) =>
-                    tagDetachMutation.mutate({ documentId, tagId })
-                  }
-                />
-              ) : (
-                <DocumentLibrary
-                  documents={visibleDocuments}
-                  documentTypes={documentTypesQuery.data ?? []}
-                  isLoading={documentsQuery.isLoading || searchQuery.isLoading}
-                  hasSearch={submittedSearch !== null}
-                  isUploading={uploadMutation.isPending}
-                  hasMore={
-                    documentsQuery.hasNextPage && submittedSearch === null
-                  }
-                  searchOffset={submittedSearch?.offset ?? 0}
-                  hasNextSearchPage={
-                    submittedSearch !== null &&
-                    (searchQuery.data?.length ?? 0) === 50
-                  }
-                  isLoadingMore={documentsQuery.isFetchingNextPage}
-                  onClear={clearSearch}
-                  onLoadMore={() => void documentsQuery.fetchNextPage()}
-                  onNextSearchPage={() =>
-                    setSubmittedSearch((current) =>
-                      current
-                        ? { ...current, offset: (current.offset ?? 0) + 50 }
-                        : current,
-                    )
-                  }
-                  onPreviousSearchPage={() =>
-                    setSubmittedSearch((current) =>
-                      current
-                        ? {
-                            ...current,
-                            offset: Math.max(0, (current.offset ?? 0) - 50),
-                          }
-                        : current,
-                    )
-                  }
-                  onUpload={(file) => uploadMutation.mutate(file)}
-                  onOpen={setSelectedDocumentId}
-                />
-              )}
-            </div>
-          </section>
-        )}
+            </section>
+          )}
+        </Suspense>
       </div>
     </main>
+  );
+}
+
+function WorkspaceLoading() {
+  return (
+    <section className="flex min-h-[50vh] min-w-0 flex-1 items-center justify-center bg-background text-sm text-muted-foreground xl:min-h-screen">
+      Loading workspace...
+    </section>
   );
 }
 
@@ -2151,16 +2319,21 @@ function DocumentPanel({
   isSyncingNotifications,
   isReprocessing,
   isReviewUpdating,
+  isVersionUpdating,
   isTagUpdating,
   tagError,
   notificationError,
   processingError,
+  versionError,
   onBack,
   onArchive,
   onDownload,
   onDelete,
   onReprocess,
   onUpdateReview,
+  onReplaceSource,
+  onRestoreVersion,
+  onDownloadVersion,
   onSyncNotifications,
   onUpdateNotificationStatus,
   onUpdateDocument,
@@ -2179,16 +2352,29 @@ function DocumentPanel({
   isSyncingNotifications: boolean;
   isReprocessing: boolean;
   isReviewUpdating: boolean;
+  isVersionUpdating: boolean;
   isTagUpdating: boolean;
   tagError: string | null;
   notificationError: string | null;
   processingError: string | null;
+  versionError: string | null;
   onBack: () => void;
   onArchive: (documentId: string) => void;
   onDownload: (documentId: string) => void;
   onDelete: (documentId: string, title: string) => void;
   onReprocess: (documentId: string) => void;
   onUpdateReview: (documentId: string, status: "approved" | "pending") => void;
+  onReplaceSource: (
+    documentId: string,
+    file: File,
+    changeReason?: string,
+  ) => void;
+  onRestoreVersion: (documentId: string, versionId: string) => void;
+  onDownloadVersion: (
+    documentId: string,
+    versionId: string,
+    filename: string,
+  ) => void;
   onSyncNotifications: (documentId: string) => void;
   onUpdateNotificationStatus: (
     notificationId: string,
@@ -2208,6 +2394,21 @@ function DocumentPanel({
 }) {
   const [fieldsEditorOpen, setFieldsEditorOpen] = useState(false);
   const [metadataEditorOpen, setMetadataEditorOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<
+    "overview" | "details" | "activity" | "versions"
+  >("overview");
+  const comparisonMutation = useMutation<
+    VersionComparison,
+    Error,
+    { documentId: string; fromVersionId: string; toVersionId: string }
+  >({
+    mutationFn: (input) =>
+      compareDocumentVersions(
+        input.documentId,
+        input.fromVersionId,
+        input.toVersionId,
+      ),
+  });
 
   if (isLoading) {
     return (
@@ -2303,295 +2504,660 @@ function DocumentPanel({
         </div>
       </header>
 
-      <div className="grid min-w-0 2xl:grid-cols-[minmax(0,1fr)_340px]">
-        <main className="min-w-0 space-y-6 p-5 xl:p-7">
-          <DocumentStatusNotice
-            document={detail.document}
-            extractionError={detail.text_extraction?.error_message}
-            mutationError={processingError}
-            isRetrying={isReprocessing}
-            onRetry={() => onReprocess(detail.document.id)}
-          />
+      <nav className="flex gap-1 overflow-x-auto border-b border-border bg-card px-5 xl:px-7">
+        {(
+          [
+            ["overview", "Overview", FileText],
+            ["details", "Details", Settings2],
+            ["activity", "Activity", History],
+            ["versions", "Versions", GitCompare],
+          ] as const
+        ).map(([key, label, Icon]) => (
+          <button
+            className={cn(
+              "flex items-center gap-2 border-b-2 px-3 py-3 text-sm font-medium transition-colors",
+              activeTab === key
+                ? "border-primary text-foreground"
+                : "border-transparent text-muted-foreground hover:text-foreground",
+            )}
+            key={key}
+            type="button"
+            onClick={() => setActiveTab(key)}
+          >
+            <Icon className="h-4 w-4" aria-hidden="true" />
+            {label}
+            {key === "versions" ? (
+              <span className="rounded-full bg-muted px-1.5 py-0.5 text-[11px]">
+                {detail.versions.length}
+              </span>
+            ) : null}
+          </button>
+        ))}
+      </nav>
 
-          {detail.document.review_status === "pending" ? (
-            <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 dark:border-amber-900 dark:bg-amber-950/40">
-              <div>
-                <p className="text-sm font-medium text-amber-950 dark:text-amber-100">
-                  Check extracted details
-                </p>
-                <p className="mt-0.5 text-xs text-amber-800 dark:text-amber-300">
-                  {detail.document.review_reasons
-                    .slice(0, 3)
-                    .map(formatReviewReason)
-                    .join(" · ") ||
-                    "PaperVault flagged this document for review."}
-                </p>
-              </div>
-              <Button
-                size="sm"
-                disabled={isReviewUpdating}
-                onClick={() => onUpdateReview(detail.document.id, "approved")}
-              >
-                <CheckCircle2 className="h-4 w-4" />
-                Approve
-              </Button>
-            </div>
+      <div
+        className={cn(
+          "grid min-w-0",
+          activeTab === "overview" && "2xl:grid-cols-[minmax(0,1fr)_320px]",
+        )}
+      >
+        <main className="min-w-0 space-y-6 p-5 xl:p-7">
+          {activeTab === "overview" ? (
+            <>
+              <DocumentStatusNotice
+                document={detail.document}
+                extractionError={detail.text_extraction?.error_message}
+                mutationError={processingError}
+                isRetrying={isReprocessing}
+                onRetry={() => onReprocess(detail.document.id)}
+              />
+
+              {detail.document.review_status === "pending" ? (
+                <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 dark:border-amber-900 dark:bg-amber-950/40">
+                  <div>
+                    <p className="text-sm font-medium text-amber-950 dark:text-amber-100">
+                      Check extracted details
+                    </p>
+                    <p className="mt-0.5 text-xs text-amber-800 dark:text-amber-300">
+                      {detail.document.review_reasons
+                        .slice(0, 3)
+                        .map(formatReviewReason)
+                        .join(" · ") ||
+                        "PaperVault flagged this document for review."}
+                    </p>
+                  </div>
+                  <Button
+                    size="sm"
+                    disabled={isReviewUpdating}
+                    onClick={() =>
+                      onUpdateReview(detail.document.id, "approved")
+                    }
+                  >
+                    <CheckCircle2 className="h-4 w-4" />
+                    Approve
+                  </Button>
+                </div>
+              ) : null}
+
+              <section>
+                <div className="mb-3">
+                  <h3 className="text-sm font-semibold">Preview</h3>
+                  <p className="text-xs text-muted-foreground">
+                    Source file stays separate from metadata.
+                  </p>
+                </div>
+                <Suspense fallback={<PreviewLoadingState />}>
+                  <DocumentPreview
+                    document={detail.document}
+                    ocrGeometryAvailable={
+                      detail.text_extraction?.source === "ocr"
+                    }
+                  />
+                </Suspense>
+              </section>
+
+              <section className="border-t border-border pt-5">
+                <div className="flex flex-wrap items-start justify-between gap-4">
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h3 className="text-sm font-semibold">Summary</h3>
+                      <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">
+                        {detail.ai_analysis
+                          ? `${humanizeLabel(detail.ai_analysis.provider || "unknown")} · ${detail.ai_analysis.model || "unknown model"}`
+                          : "Not generated"}
+                      </span>
+                    </div>
+                    <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">
+                      {detail.ai_analysis?.summary ??
+                        "No summary generated yet."}
+                    </p>
+                  </div>
+                  {confidence !== null && confidence !== undefined ? (
+                    <div className="flex items-center gap-2">
+                      <span className="rounded-full bg-muted px-3 py-1 text-xs text-muted-foreground">
+                        {Math.round(confidence * 100)}% confidence
+                      </span>
+                      <Button
+                        size="sm"
+                        type="button"
+                        variant="ghost"
+                        disabled={isReprocessing}
+                        onClick={() => onReprocess(detail.document.id)}
+                      >
+                        <RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />
+                        Regenerate
+                      </Button>
+                    </div>
+                  ) : null}
+                </div>
+                {detail.ai_analysis?.keywords?.length ? (
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    {detail.ai_analysis.keywords.slice(0, 8).map((keyword) => (
+                      <span
+                        className="rounded-full border border-border px-2.5 py-1 text-xs text-muted-foreground"
+                        key={keyword}
+                      >
+                        {keyword}
+                      </span>
+                    ))}
+                  </div>
+                ) : null}
+              </section>
+            </>
           ) : null}
 
-          <section>
-            <div className="mb-3">
-              <h3 className="text-sm font-semibold">Preview</h3>
-              <p className="text-xs text-muted-foreground">
-                Source file stays separate from metadata.
-              </p>
-            </div>
-            <Suspense fallback={<PreviewLoadingState />}>
-              <DocumentPreview
-                document={detail.document}
-                ocrGeometryAvailable={detail.text_extraction?.source === "ocr"}
-              />
-            </Suspense>
-          </section>
-
-          <section className="border-t border-border pt-5">
-            <div className="flex flex-wrap items-start justify-between gap-4">
-              <div>
-                <h3 className="text-sm font-semibold">AI Summary</h3>
-                <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">
-                  {detail.ai_analysis?.summary ?? "No summary generated yet."}
-                </p>
-              </div>
-              {confidence !== null && confidence !== undefined ? (
-                <span className="rounded-full bg-muted px-3 py-1 text-xs text-muted-foreground">
-                  {Math.round(confidence * 100)}% confidence
-                </span>
-              ) : null}
-            </div>
-            {detail.ai_analysis?.keywords?.length ? (
-              <div className="mt-4 flex flex-wrap gap-2">
-                {detail.ai_analysis.keywords.slice(0, 8).map((keyword) => (
-                  <span
-                    className="rounded-full border border-border px-2.5 py-1 text-xs text-muted-foreground"
-                    key={keyword}
-                  >
-                    {keyword}
-                  </span>
-                ))}
-              </div>
-            ) : null}
-          </section>
-
-          <section className="border-t border-border pt-5">
-            <h3 className="text-sm font-semibold">Document Details</h3>
-            <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-              <ReadOnlyField label="Type" value={documentTypeLabel} />
-              <ReadOnlyField label="Date" value={documentDate} />
-              <ReadOnlyField label="Issuer" value={detail.document.issuer} />
-              <ReadOnlyField
-                label="Organization"
-                value={detail.document.organization}
-              />
-            </div>
-
-            {metadataEntries.length ? (
-              <div className="mt-5">
-                <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                  Extracted metadata
-                </p>
-                <div className="grid gap-2 sm:grid-cols-2">
-                  {metadataEntries.slice(0, 8).map(([key, value]) => (
-                    <ReadOnlyField
-                      key={key}
-                      label={humanizeLabel(key)}
-                      value={formatMetadataValue(value)}
-                    />
-                  ))}
+          {activeTab === "details" ? (
+            <>
+              <section className="border-t border-border pt-5">
+                <h3 className="text-sm font-semibold">Document Details</h3>
+                <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                  <ReadOnlyField label="Type" value={documentTypeLabel} />
+                  <ReadOnlyField label="Date" value={documentDate} />
+                  <ReadOnlyField
+                    label="Issuer"
+                    value={detail.document.issuer}
+                  />
+                  <ReadOnlyField
+                    label="Organization"
+                    value={detail.document.organization}
+                  />
                 </div>
-              </div>
-            ) : null}
-          </section>
 
-          <section className="border-t border-border pt-5">
-            <button
-              className="text-sm font-semibold hover:text-primary"
-              type="button"
-              onClick={() => setFieldsEditorOpen((current) => !current)}
-            >
-              Edit document fields
-            </button>
-            {fieldsEditorOpen ? (
-              <div className="mt-4 max-w-2xl">
-                <DocumentFieldsEditor
-                  document={detail.document}
-                  documentTypes={documentTypes}
-                  disabled={isUpdating}
-                  onSave={(updates) =>
-                    onUpdateDocument(detail.document.id, updates)
-                  }
-                />
-              </div>
-            ) : null}
-          </section>
+                {metadataEntries.length ? (
+                  <div className="mt-5">
+                    <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                      Extracted metadata
+                    </p>
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      {metadataEntries.slice(0, 8).map(([key, value]) => (
+                        <ReadOnlyField
+                          key={key}
+                          label={humanizeLabel(key)}
+                          value={formatMetadataValue(value)}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+              </section>
 
-          <section className="border-t border-border pt-5">
-            <button
-              className="text-sm font-semibold hover:text-primary"
-              type="button"
-              onClick={() => setMetadataEditorOpen((current) => !current)}
-            >
-              Raw metadata JSON
-            </button>
-            {metadataEditorOpen ? (
-              <div className="mt-4 max-w-2xl">
-                <MetadataEditor
-                  metadata={detail.metadata}
-                  document={detail.document}
-                  disabled={isUpdating}
-                  onSave={(metadata) =>
-                    onUpdateMetadata(detail.document.id, metadata)
-                  }
-                />
-              </div>
-            ) : null}
-          </section>
+              <section className="border-t border-border pt-5">
+                <button
+                  className="text-sm font-semibold hover:text-primary"
+                  type="button"
+                  onClick={() => setFieldsEditorOpen((current) => !current)}
+                >
+                  Edit document fields
+                </button>
+                {fieldsEditorOpen ? (
+                  <div className="mt-4 max-w-2xl">
+                    <DocumentFieldsEditor
+                      document={detail.document}
+                      documentTypes={documentTypes}
+                      disabled={isUpdating}
+                      onSave={(updates) =>
+                        onUpdateDocument(detail.document.id, updates)
+                      }
+                    />
+                  </div>
+                ) : null}
+              </section>
+
+              <section className="border-t border-border pt-5">
+                <button
+                  className="text-sm font-semibold hover:text-primary"
+                  type="button"
+                  onClick={() => setMetadataEditorOpen((current) => !current)}
+                >
+                  Raw metadata JSON
+                </button>
+                {metadataEditorOpen ? (
+                  <div className="mt-4 max-w-2xl">
+                    <MetadataEditor
+                      metadata={detail.metadata}
+                      document={detail.document}
+                      disabled={isUpdating}
+                      onSave={(metadata) =>
+                        onUpdateMetadata(detail.document.id, metadata)
+                      }
+                    />
+                  </div>
+                ) : null}
+              </section>
+            </>
+          ) : null}
+
+          {activeTab === "activity" ? (
+            <DocumentActivityPanel events={detail.timeline_events} />
+          ) : null}
+
+          {activeTab === "versions" ? (
+            <DocumentVersionsPanel
+              document={detail.document}
+              versions={detail.versions}
+              comparison={comparisonMutation.data}
+              compareError={
+                comparisonMutation.error instanceof Error
+                  ? comparisonMutation.error.message
+                  : null
+              }
+              actionError={versionError}
+              isComparing={comparisonMutation.isPending}
+              isUpdating={isVersionUpdating}
+              onCompare={(fromVersionId, toVersionId) =>
+                comparisonMutation.mutate({
+                  documentId: detail.document.id,
+                  fromVersionId,
+                  toVersionId,
+                })
+              }
+              onDownload={(versionId, filename) =>
+                onDownloadVersion(detail.document.id, versionId, filename)
+              }
+              onReplace={(file, reason) =>
+                onReplaceSource(detail.document.id, file, reason)
+              }
+              onRestore={(versionId) =>
+                onRestoreVersion(detail.document.id, versionId)
+              }
+            />
+          ) : null}
         </main>
 
-        <aside className="min-w-0 border-t border-border bg-card/70 p-5 2xl:border-l 2xl:border-t-0">
-          <div className="space-y-6">
-            <section>
-              <h3 className="text-sm font-semibold">Tags</h3>
-              <div className="mt-3">
-                <TagEditor
-                  assignedTags={detail.tags}
-                  availableTags={tags}
-                  disabled={isTagUpdating}
-                  error={tagError}
-                  suggestedTags={detail.ai_analysis?.suggested_tags ?? []}
-                  onAttachTag={(tagId) =>
-                    onAttachTag(detail.document.id, tagId)
-                  }
-                  onCreateAndAttachTag={(name) =>
-                    onCreateAndAttachTag(detail.document.id, name)
-                  }
-                  onDetachTag={(tagId) =>
-                    onDetachTag(detail.document.id, tagId)
-                  }
-                />
-              </div>
-            </section>
-
-            <section className="border-t border-border pt-5">
-              <div className="flex items-center justify-between gap-3">
-                <h3 className="text-sm font-semibold">Signals</h3>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  type="button"
-                  disabled={isSyncingNotifications}
-                  onClick={() => onSyncNotifications(detail.document.id)}
-                >
-                  <RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />
-                  Refresh
-                </Button>
-              </div>
-              <div className="mt-3 grid grid-cols-2 gap-2">
-                <SignalItem label="Duplicates" value={duplicateGroups} />
-                <SignalItem
-                  label="Reminders"
-                  value={pendingDocumentNotifications.length}
-                />
-              </div>
-              {notificationError ? (
-                <p
-                  className="mt-3 rounded-md border border-rose-200 bg-rose-50 p-2 text-xs text-rose-900 dark:border-rose-900 dark:bg-rose-950 dark:text-rose-100"
-                  role="alert"
-                >
-                  {notificationError}
-                </p>
-              ) : null}
-              {activeDocumentNotifications.length ? (
-                <div className="mt-3 space-y-2">
-                  {activeDocumentNotifications
-                    .slice(0, 3)
-                    .map((notification) => (
-                      <DocumentReminder
-                        key={notification.id}
-                        notification={notification}
-                        disabled={isSyncingNotifications}
-                        onUpdateStatus={(status) =>
-                          onUpdateNotificationStatus(notification.id, status)
-                        }
-                      />
-                    ))}
+        {activeTab === "overview" ? (
+          <aside className="min-w-0 border-t border-border bg-card/70 p-5 2xl:border-l 2xl:border-t-0">
+            <div className="space-y-6">
+              <section>
+                <h3 className="text-sm font-semibold">Tags</h3>
+                <div className="mt-3">
+                  <TagEditor
+                    assignedTags={detail.tags}
+                    availableTags={tags}
+                    disabled={isTagUpdating}
+                    error={tagError}
+                    suggestedTags={detail.ai_analysis?.suggested_tags ?? []}
+                    onAttachTag={(tagId) =>
+                      onAttachTag(detail.document.id, tagId)
+                    }
+                    onCreateAndAttachTag={(name) =>
+                      onCreateAndAttachTag(detail.document.id, name)
+                    }
+                    onDetachTag={(tagId) =>
+                      onDetachTag(detail.document.id, tagId)
+                    }
+                  />
                 </div>
-              ) : (
-                <p className="mt-3 rounded-md border border-dashed border-border bg-background p-3 text-xs leading-5 text-muted-foreground">
-                  No active reminders for this document. Refresh after adding
-                  due, expiry, renewal, or warranty dates to metadata.
-                </p>
-              )}
-              {detail.document.archived_at ? (
-                <p className="mt-3 rounded-md border border-border bg-muted p-2 text-xs text-muted-foreground">
-                  Archived{" "}
-                  {new Date(detail.document.archived_at).toLocaleString()}
-                </p>
-              ) : null}
-            </section>
-
-            <details className="border-t border-border pt-5">
-              <summary className="cursor-pointer text-sm font-semibold hover:text-primary">
-                Activity and versions
-              </summary>
-              <section className="mt-4">
-                <h3 className="text-xs font-medium uppercase text-muted-foreground">
-                  Timeline
-                </h3>
-                {detail.timeline_events.length ? (
-                  <div className="mt-3 space-y-3">
-                    {detail.timeline_events.slice(0, 6).map((event) => (
-                      <div className="text-sm" key={event.id}>
-                        <p>{humanizeLabel(event.event_type)}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {new Date(event.occurred_at).toLocaleString()}
-                        </p>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="mt-2 text-sm text-muted-foreground">
-                    No timeline events yet.
-                  </p>
-                )}
               </section>
 
-              <section className="mt-5 border-t border-border pt-4">
-                <h3 className="text-xs font-medium uppercase text-muted-foreground">
-                  Versions
-                </h3>
-                {detail.versions.length ? (
-                  <div className="mt-3 space-y-3 text-sm">
-                    {detail.versions.map((version) => (
-                      <div key={version.id}>
-                        <p>Version {version.version_number}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {new Date(version.created_at).toLocaleString()} -{" "}
-                          {Math.round(version.file_size_bytes / 1024)} KB
-                        </p>
-                      </div>
-                    ))}
+              <section className="border-t border-border pt-5">
+                <div className="flex items-center justify-between gap-3">
+                  <h3 className="text-sm font-semibold">Signals</h3>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    type="button"
+                    disabled={isSyncingNotifications}
+                    onClick={() => onSyncNotifications(detail.document.id)}
+                  >
+                    <RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />
+                    Refresh
+                  </Button>
+                </div>
+                <div className="mt-3 grid grid-cols-2 gap-2">
+                  <SignalItem label="Duplicates" value={duplicateGroups} />
+                  <SignalItem
+                    label="Reminders"
+                    value={pendingDocumentNotifications.length}
+                  />
+                </div>
+                {notificationError ? (
+                  <p
+                    className="mt-3 rounded-md border border-rose-200 bg-rose-50 p-2 text-xs text-rose-900 dark:border-rose-900 dark:bg-rose-950 dark:text-rose-100"
+                    role="alert"
+                  >
+                    {notificationError}
+                  </p>
+                ) : null}
+                {activeDocumentNotifications.length ? (
+                  <div className="mt-3 space-y-2">
+                    {activeDocumentNotifications
+                      .slice(0, 3)
+                      .map((notification) => (
+                        <DocumentReminder
+                          key={notification.id}
+                          notification={notification}
+                          disabled={isSyncingNotifications}
+                          onUpdateStatus={(status) =>
+                            onUpdateNotificationStatus(notification.id, status)
+                          }
+                        />
+                      ))}
                   </div>
                 ) : (
-                  <p className="mt-2 text-sm text-muted-foreground">
-                    No versions recorded.
+                  <p className="mt-3 rounded-md border border-dashed border-border bg-background p-3 text-xs leading-5 text-muted-foreground">
+                    No active reminders for this document. Refresh after adding
+                    due, expiry, renewal, or warranty dates to metadata.
                   </p>
                 )}
+                {detail.document.archived_at ? (
+                  <p className="mt-3 rounded-md border border-border bg-muted p-2 text-xs text-muted-foreground">
+                    Archived{" "}
+                    {new Date(detail.document.archived_at).toLocaleString()}
+                  </p>
+                ) : null}
               </section>
-            </details>
-          </div>
-        </aside>
+            </div>
+          </aside>
+        ) : null}
       </div>
     </article>
   );
+}
+
+function DocumentActivityPanel({
+  events,
+}: {
+  events: DocumentDetail["timeline_events"];
+}) {
+  return (
+    <section className="mx-auto max-w-4xl">
+      <div className="mb-5">
+        <h3 className="text-lg font-semibold">Activity</h3>
+        <p className="mt-1 text-sm text-muted-foreground">
+          A chronological record of changes to this document.
+        </p>
+      </div>
+      {events.length ? (
+        <div className="border-l border-border pl-5">
+          {events.map((event) => (
+            <div className="relative pb-6 last:pb-0" key={event.id}>
+              <span className="absolute -left-[25px] top-1.5 h-2 w-2 rounded-full bg-primary" />
+              <p className="text-sm font-medium">
+                {humanizeLabel(event.event_type)}
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {new Date(event.occurred_at).toLocaleString()}
+              </p>
+              {Object.keys(event.payload).length ? (
+                <p className="mt-2 text-xs text-muted-foreground">
+                  {Object.entries(event.payload)
+                    .slice(0, 3)
+                    .map(
+                      ([key, value]) =>
+                        `${humanizeLabel(key)}: ${String(value)}`,
+                    )
+                    .join(" · ")}
+                </p>
+              ) : null}
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className="rounded-lg border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
+          No activity recorded yet.
+        </p>
+      )}
+    </section>
+  );
+}
+
+function DocumentVersionsPanel({
+  document,
+  versions,
+  comparison,
+  compareError,
+  actionError,
+  isComparing,
+  isUpdating,
+  onCompare,
+  onDownload,
+  onReplace,
+  onRestore,
+}: {
+  document: DocumentItem;
+  versions: DocumentDetail["versions"];
+  comparison: VersionComparison | undefined;
+  compareError: string | null;
+  actionError: string | null;
+  isComparing: boolean;
+  isUpdating: boolean;
+  onCompare: (fromVersionId: string, toVersionId: string) => void;
+  onDownload: (versionId: string, filename: string) => void;
+  onReplace: (file: File, reason?: string) => void;
+  onRestore: (versionId: string) => void;
+}) {
+  const ordered = useMemo(
+    () =>
+      [...versions].sort(
+        (left, right) => left.version_number - right.version_number,
+      ),
+    [versions],
+  );
+  const [reason, setReason] = useState("");
+  const [fromVersionId, setFromVersionId] = useState(ordered[0]?.id ?? "");
+  const [toVersionId, setToVersionId] = useState(ordered.at(-1)?.id ?? "");
+
+  useEffect(() => {
+    setFromVersionId((current) => current || ordered[0]?.id || "");
+    setToVersionId(ordered.at(-1)?.id ?? "");
+  }, [ordered]);
+
+  return (
+    <section className="mx-auto max-w-5xl">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h3 className="text-lg font-semibold">Source versions</h3>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Replace the source without losing earlier files or extracted text.
+          </p>
+        </div>
+        <label className="inline-flex cursor-pointer items-center gap-2 rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground shadow-sm hover:bg-primary/90 has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-50">
+          <Upload className="h-4 w-4" aria-hidden="true" />
+          Replace source
+          <input
+            className="sr-only"
+            type="file"
+            accept="application/pdf,image/jpeg,image/png"
+            disabled={isUpdating || document.status !== "ready"}
+            onChange={(event) => {
+              const file = event.target.files?.[0];
+              if (file) onReplace(file, reason.trim() || undefined);
+              event.target.value = "";
+            }}
+          />
+        </label>
+      </div>
+
+      <label className="mt-5 block max-w-xl text-sm">
+        <span className="mb-1.5 block text-xs font-medium text-muted-foreground">
+          Reason for next replacement
+        </span>
+        <input
+          className="h-10 w-full rounded-md border border-input bg-background px-3 outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          maxLength={255}
+          placeholder="Updated statement, corrected scan, renewed policy..."
+          value={reason}
+          onChange={(event) => setReason(event.target.value)}
+        />
+      </label>
+
+      {actionError ? (
+        <p className="mt-4 rounded-md border border-rose-200 bg-rose-50 p-3 text-sm text-rose-900 dark:border-rose-900 dark:bg-rose-950 dark:text-rose-100">
+          {actionError}
+        </p>
+      ) : null}
+
+      <div className="mt-6 overflow-hidden rounded-lg border border-border bg-card">
+        <div className="hidden grid-cols-[90px_minmax(0,1fr)_140px_170px] gap-4 border-b border-border bg-muted/40 px-4 py-2 text-xs font-medium text-muted-foreground md:grid">
+          <span>Version</span>
+          <span>Source</span>
+          <span>Size</span>
+          <span className="text-right">Actions</span>
+        </div>
+        {versions.map((version) => (
+          <div
+            className="grid gap-3 border-b border-border px-4 py-3 last:border-b-0 md:grid-cols-[90px_minmax(0,1fr)_140px_170px] md:items-center"
+            key={version.id}
+          >
+            <span className="flex items-center gap-2 text-sm font-medium">
+              v{version.version_number}
+              {version.is_current ? (
+                <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
+                  Current
+                </span>
+              ) : null}
+            </span>
+            <span className="min-w-0">
+              <span className="block truncate text-sm">
+                {version.original_filename}
+              </span>
+              <span className="block text-xs text-muted-foreground">
+                {new Date(version.created_at).toLocaleString()} ·{" "}
+                {humanizeLabel(version.change_reason ?? "updated")}
+              </span>
+            </span>
+            <span className="text-xs text-muted-foreground">
+              {formatFileSize(version.file_size_bytes)}
+            </span>
+            <span className="flex justify-end gap-1">
+              <Button
+                aria-label={`Download version ${version.version_number}`}
+                size="icon"
+                type="button"
+                variant="ghost"
+                disabled={isUpdating}
+                title="Download version"
+                onClick={() =>
+                  onDownload(version.id, version.original_filename)
+                }
+              >
+                <Download className="h-4 w-4" aria-hidden="true" />
+              </Button>
+              {!version.is_current ? (
+                <Button
+                  size="sm"
+                  type="button"
+                  variant="ghost"
+                  disabled={isUpdating || document.status !== "ready"}
+                  onClick={() => {
+                    if (
+                      window.confirm(
+                        `Restore version ${version.version_number} as a new current version?`,
+                      )
+                    ) {
+                      onRestore(version.id);
+                    }
+                  }}
+                >
+                  <RotateCcw className="h-4 w-4" aria-hidden="true" />
+                  Restore
+                </Button>
+              ) : null}
+            </span>
+          </div>
+        ))}
+      </div>
+
+      {ordered.length >= 2 ? (
+        <section className="mt-8 border-t border-border pt-6">
+          <div className="flex flex-wrap items-end gap-3">
+            <VersionSelect
+              label="Compare from"
+              value={fromVersionId}
+              versions={ordered}
+              onChange={setFromVersionId}
+            />
+            <VersionSelect
+              label="Compare to"
+              value={toVersionId}
+              versions={ordered}
+              onChange={setToVersionId}
+            />
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={
+                isComparing ||
+                !fromVersionId ||
+                !toVersionId ||
+                fromVersionId === toVersionId
+              }
+              onClick={() => onCompare(fromVersionId, toVersionId)}
+            >
+              <GitCompare className="h-4 w-4" aria-hidden="true" />
+              Compare
+            </Button>
+          </div>
+          {compareError ? (
+            <p className="mt-3 text-sm text-rose-700">{compareError}</p>
+          ) : null}
+          {comparison ? <VersionDiff comparison={comparison} /> : null}
+        </section>
+      ) : null}
+    </section>
+  );
+}
+
+function VersionSelect({
+  label,
+  value,
+  versions,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  versions: DocumentDetail["versions"];
+  onChange: (value: string) => void;
+}) {
+  return (
+    <label className="text-sm">
+      <span className="mb-1 block text-xs text-muted-foreground">{label}</span>
+      <select
+        className="h-10 min-w-40 rounded-md border border-input bg-background px-3"
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+      >
+        {versions.map((version) => (
+          <option key={version.id} value={version.id}>
+            Version {version.version_number}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
+function VersionDiff({ comparison }: { comparison: VersionComparison }) {
+  return (
+    <div className="mt-5 overflow-hidden rounded-lg border border-border">
+      <div className="flex flex-wrap gap-4 border-b border-border bg-muted/40 px-4 py-3 text-xs text-muted-foreground">
+        <span>
+          Version {comparison.from_version} to {comparison.to_version}
+        </span>
+        <span className="text-emerald-700">
+          +{comparison.added_lines} lines
+        </span>
+        <span className="text-rose-700">-{comparison.removed_lines} lines</span>
+        {!comparison.text_available ? (
+          <span>Extracted text unavailable</span>
+        ) : null}
+      </div>
+      {comparison.diff_lines.length ? (
+        <pre className="max-h-96 overflow-auto bg-card p-4 text-xs leading-5">
+          {comparison.diff_lines.join("\n")}
+        </pre>
+      ) : (
+        <p className="p-4 text-sm text-muted-foreground">
+          No extracted-text differences were found.
+        </p>
+      )}
+    </div>
+  );
+}
+
+function formatFileSize(bytes: number) {
+  if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 function DocumentStatusNotice({

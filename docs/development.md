@@ -43,8 +43,11 @@ PAPERVAULT_EMBEDDING_DIMENSIONS=64
 PAPERVAULT_METADATA_LOCALE=en-IN
 ```
 
-These providers require no external credentials. Analysis, embeddings, and grounded
-answers can instead use Ollama:
+These providers require no external credentials. The local analysis and answer
+providers are deterministic baselines: they handle registry classification, structured
+fields, concise summaries, and common labeled amount/date/list questions. Use a model
+provider for richer free-form synthesis. Analysis, embeddings, and grounded answers
+can use Ollama:
 
 ```env
 PAPERVAULT_AI_PROVIDER=ollama

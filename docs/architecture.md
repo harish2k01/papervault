@@ -83,7 +83,7 @@ Tesseract OCR also stores normalized word coordinates and confidence values. Coo
 
 Document-specific metadata schemas live in the document-type registry. Provider output passes through a shared normalization boundary for locale-aware dates, currencies, numbers, booleans, and structured table rows. Missing required fields, invalid values, low classification confidence, and unresolved generic classifications place the document in an owner-scoped review queue.
 
-AI analysis and embeddings use provider interfaces. The default local providers are deterministic and require no external service. Ollama and OpenAI-compatible adapters implement the same contracts. Model output is parsed as structured JSON, categories are checked against the document-type registry, confidence is bounded, and embedding dimensions are validated before persistence.
+AI analysis and embeddings use provider interfaces. The default local providers are deterministic and require no external service. Local classification requires distinctive document signals rather than isolated words, and its summaries are assembled from classified type, extracted fields, amounts, and dates. Ollama and OpenAI-compatible adapters implement the same contracts and are preferred for richer free-form synthesis. Model output is parsed as structured JSON, categories are checked against the document-type registry, confidence is bounded, and embedding dimensions are validated before persistence.
 
 High-confidence suggested tags are normalized and attached automatically with an `ai`
 source and confidence score. Existing manual tag links take precedence. Classification
@@ -91,9 +91,9 @@ and tag changes remain searchable through the eventual OpenSearch projection.
 
 ## Grounded Questions
 
-Question answering is separate from document search. Search returns ranked documents; the question service retrieves page-bound chunks from ready documents owned by the caller and asks a grounded-answer provider to answer only from that evidence.
+Question answering is separate from document search. Search returns ranked documents; the question service retrieves page-bound chunks from ready documents owned by the caller and asks a grounded-answer provider to answer only from that evidence. Retrieval requires minimum concept coverage and boosts the requested document family and chunks containing answer-shaped values.
 
-Chunks and their embeddings are materialized during normal AI processing. The question service lazily backfills chunks for older current extractions, which avoids a blocking data migration. The local answer provider is extractive: it selects a bounded evidence excerpt, reports confidence, cites the document and page, and refuses when too few question concepts appear in the evidence. Ollama and OpenAI-compatible answer providers receive only retrieved evidence and must return citation indexes or refuse. The service validates those indexes and preserves the same citation contract for every provider.
+Chunks and their embeddings are materialized during normal AI processing. The question service lazily backfills chunks for older current extractions, which avoids a blocking data migration. The local answer provider extracts common salary amounts, purchase/due/expiry dates, and document lists from labeled evidence. For other supported evidence it returns a clearly labeled relevant passage, and it refuses when too few question concepts match. Ollama and OpenAI-compatible answer providers receive only retrieved evidence and must return concise answers with valid citation indexes or refuse. The service validates those indexes and preserves the same citation contract for every provider.
 
 The database is the chunk source of truth. Retrieval is currently bounded to 5,000 owned chunks per request; a dedicated OpenSearch chunk projection is the scaling path for larger vaults. Every answer provider preserves the same citation and refusal contract.
 
@@ -106,24 +106,25 @@ Lifecycle and tag changes commit to PostgreSQL first and then refresh the search
 ## Document Lifecycle
 
 - Source binaries are not stored in PostgreSQL.
-- Metadata updates create versioned current records rather than overwriting extraction history.
+- Source replacement creates an immutable source version, clears stale derived projections, and queues normal processing.
+- Restoring an earlier source creates a new current version that references the retained immutable object; history is never rewritten.
+- Text extractions retain source-version lineage, enabling owner-scoped extracted-text comparison between versions.
 - Archive hides documents from normal lists, duplicate candidates, notifications, and search without deleting source data.
 - Permanent deletion is owner-scoped and removes source/version objects, the PostgreSQL document graph, and the rebuildable search projection.
 - Exact duplicate resolution archives redundant copies chosen by the user.
-- Version records hold immutable storage references; replacement and restore workflows remain planned.
-- Timeline events capture uploads, metadata edits, tag changes, archives, and related lifecycle actions.
+- Timeline events capture uploads, metadata edits, tag changes, source versions, archives, and related lifecycle actions. An owner-scoped vault feed provides a cross-document view.
 
 ## Identity And Administration
 
 Local passwords use PBKDF2-SHA256 with per-password salts. JWT access tokens carry issuer, audience, expiry, subject, email, and role claims; each request also checks the current database user state. OIDC uses provider discovery, authorization code exchange, signed callback state, nonce verification, and JWKS-backed ID token validation.
 
-The first account becomes an administrator. Administrators can manage users and override the local-registration policy at runtime. The environment value remains the bootstrap default until a persisted instance setting is saved. Provider names and operational capability flags are visible to administrators, while secrets remain environment or secret-store configuration.
+The first account becomes an administrator. Administrators can manage users, permanently delete non-current accounts and their owned source objects, and override the local-registration policy at runtime. Self-deletion and deletion of the last active administrator are refused. The environment value remains the bootstrap default until a persisted instance setting is saved. Provider names and operational capability flags are visible to administrators, while secrets remain environment or secret-store configuration.
 
 ## Viewer And UI
 
 The PDF viewer is loaded only when a preview opens. PDF.js renders one responsive page at a time with zoom, page navigation, a text layer, and highlighted literal matches. OCR-only documents use stored word geometry to highlight matching text over the rendered PDF or image. Highlights are fetched only for the active page and explicit query.
 
-The application opens on a vault dashboard. A full-width document library remains usable as collections grow, and low-confidence documents have a dedicated review queue plus a compact approval action in document detail. Secondary editors, raw metadata, filters, and search history appear only when requested. Settings and provider health are visible only to administrators. Light and dark themes share the same semantic design tokens.
+The application opens on a vault dashboard. A full-width, Drive-style document library remains usable as collections grow. Opening a document removes the global search surface and presents focused Overview, Details, Activity, and Versions tabs. Ask uses a conversation layout with a persistent composer and compact citations. Low-confidence documents have a dedicated review queue plus a compact approval action. Secondary editors, raw metadata, filters, and search history appear only when requested. Settings and provider health are visible only to administrators. Light and dark themes share the same semantic design tokens.
 
 ## Observability
 

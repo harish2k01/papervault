@@ -45,5 +45,11 @@
     "expected_category": "medical_report",
     "expected_terms": ["clinical", "diagnostics"],
     "expected_metadata": {"provider": "Example Diagnostics"}
+  },
+  {
+    "name": "taxpayer information summary is not a salary slip",
+    "text": "TAXPAYER INFORMATION SUMMARY\nAssessment Year 2026-27\nINFORMATION CATEGORY PROCESSED BY SYSTEM ACCEPTED BY TAXPAYER\nSalary 9,27,308\nOther Salary (TDS Annexure II)\nSFT Interest Income",
+    "expected_category": "tax_return",
+    "expected_terms": ["tax", "reported-income"]
   }
 ]

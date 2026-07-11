@@ -7,6 +7,7 @@ describe("SettingsWorkspace", () => {
   it("updates registration policy and user roles", () => {
     const onRegistrationChange = vi.fn();
     const onUpdateUser = vi.fn();
+    const onDeleteUser = vi.fn();
     render(
       <SettingsWorkspace
         settings={{
@@ -50,6 +51,7 @@ describe("SettingsWorkspace", () => {
         error={null}
         onRegistrationChange={onRegistrationChange}
         onUpdateUser={onUpdateUser}
+        onDeleteUser={onDeleteUser}
       />,
     );
 
@@ -57,8 +59,12 @@ describe("SettingsWorkspace", () => {
     fireEvent.change(screen.getByLabelText("Role for reader@example.com"), {
       target: { value: "admin" },
     });
+    fireEvent.click(
+      screen.getByRole("button", { name: "Delete reader@example.com" }),
+    );
 
     expect(onRegistrationChange).toHaveBeenCalledWith(false);
     expect(onUpdateUser).toHaveBeenCalledWith("user-2", { role: "admin" });
+    expect(onDeleteUser).toHaveBeenCalledWith("user-2", "reader@example.com");
   });
 });

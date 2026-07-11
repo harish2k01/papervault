@@ -140,6 +140,11 @@ export type TimelineEvent = {
   occurred_at: string;
 };
 
+export type VaultTimelineItem = TimelineEvent & {
+  document_id: string | null;
+  document_title: string | null;
+};
+
 export type DocumentTag = {
   id: string;
   name: string;
@@ -167,6 +172,8 @@ export type DocumentTypeDefinition = {
 export type DocumentDetail = {
   document: DocumentItem;
   ai_analysis: {
+    provider: string;
+    model: string;
     summary: string | null;
     keywords: string[];
     entities: Record<string, unknown>[];
@@ -192,12 +199,25 @@ export type DocumentDetail = {
   versions: Array<{
     id: string;
     version_number: number;
+    original_filename: string;
+    content_type: string;
     sha256_hash: string;
     file_size_bytes: number;
     change_reason: string | null;
+    is_current: boolean;
     created_by_id: string | null;
     created_at: string;
   }>;
+};
+
+export type VersionComparison = {
+  from_version: number;
+  to_version: number;
+  source_changed: boolean;
+  text_available: boolean;
+  added_lines: number;
+  removed_lines: number;
+  diff_lines: string[];
 };
 
 export type DocumentTextSearchResult = {
@@ -360,6 +380,10 @@ export async function updateUser(
   });
 }
 
+export async function deleteUser(userId: string) {
+  await apiFetch<void>(`/users/${userId}`, { method: "DELETE" });
+}
+
 export async function getAdminSettings() {
   return apiFetch<AdminSettings>("/admin/settings");
 }
@@ -415,6 +439,10 @@ export async function listReviewQueue() {
   return apiFetch<DocumentItem[]>("/documents/review-queue?limit=500");
 }
 
+export async function listVaultTimeline() {
+  return apiFetch<VaultTimelineItem[]>("/timeline?limit=200");
+}
+
 export async function getDocument(documentId: string) {
   return apiFetch<DocumentDetail>(`/documents/${documentId}`);
 }
@@ -439,6 +467,67 @@ export async function downloadDocumentFile(documentId: string) {
   );
   if (!response.ok) {
     throw new Error(`Failed to download document: ${response.status}`);
+  }
+  return response.blob();
+}
+
+export async function replaceDocumentSource(
+  documentId: string,
+  file: File,
+  changeReason?: string,
+) {
+  const body = new FormData();
+  body.append("file", file);
+  if (changeReason?.trim()) body.append("change_reason", changeReason.trim());
+  return apiFetch<{
+    document: DocumentItem;
+    version: DocumentDetail["versions"][number];
+    processing_task_id: string | null;
+  }>(`/documents/${documentId}/versions`, {
+    method: "POST",
+    body,
+    skipJsonContentType: true,
+  });
+}
+
+export async function restoreDocumentVersion(
+  documentId: string,
+  versionId: string,
+) {
+  return apiFetch<{
+    document: DocumentItem;
+    version: DocumentDetail["versions"][number];
+    processing_task_id: string | null;
+  }>(`/documents/${documentId}/versions/${versionId}/restore`, {
+    method: "POST",
+    body: JSON.stringify({}),
+  });
+}
+
+export async function compareDocumentVersions(
+  documentId: string,
+  fromVersionId: string,
+  toVersionId: string,
+) {
+  const params = new URLSearchParams({
+    from_version: fromVersionId,
+    to_version: toVersionId,
+  });
+  return apiFetch<VersionComparison>(
+    `/documents/${documentId}/versions/compare?${params.toString()}`,
+  );
+}
+
+export async function downloadDocumentVersion(
+  documentId: string,
+  versionId: string,
+) {
+  const response = await fetch(
+    `${appConfig.apiBaseUrl}/documents/${documentId}/versions/${versionId}/file`,
+    { headers: authHeaders() },
+  );
+  if (!response.ok) {
+    throw new Error(`Failed to download document version: ${response.status}`);
   }
   return response.blob();
 }

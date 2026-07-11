@@ -13,6 +13,8 @@ PaperVault is a self-hosted document management system for turning PDFs, scans, 
 - Save searches and revisit recent queries.
 - Read documents in a built-in page-aware viewer with text-layer and OCR-coordinate highlighting.
 - Review incomplete or low-confidence extraction results in a dedicated quality queue.
+- Replace or restore source files without losing immutable version history, and compare extracted text between versions.
+- Browse a vault-wide activity feed and permanently remove users with their owned files.
 - Track metadata edits, tag changes, archive actions, versions, reminders, and duplicate resolution.
 - Use local accounts or OIDC providers such as Authentik and Keycloak.
 - Administer registration, user access, roles, and active runtime providers from the web app.

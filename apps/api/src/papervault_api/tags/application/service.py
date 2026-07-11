@@ -121,9 +121,7 @@ class TagService:
 
         normalized = tuple(
             dict.fromkeys(
-                suggestion.strip()[:80]
-                for suggestion in suggestions
-                if suggestion.strip()
+                suggestion.strip()[:80] for suggestion in suggestions if suggestion.strip()
             )
         )[:5]
         if not normalized:

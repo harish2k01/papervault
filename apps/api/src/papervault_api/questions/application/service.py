@@ -91,6 +91,7 @@ class RetrievedEvidence:
     content_text: str
     score: float
     lexical_score: float
+    document_type: str = "generic_pdf"
 
 
 @dataclass(frozen=True, slots=True)
@@ -138,6 +139,10 @@ class LocalExtractiveAnswerProvider:
                 ),
             )
 
+        direct_answer = build_direct_answer(question, evidence)
+        if direct_answer is not None:
+            return direct_answer
+
         citations = unique_citations(question, evidence)
         primary = citations[0]
         confidence = min(
@@ -146,10 +151,8 @@ class LocalExtractiveAnswerProvider:
         )
         return QuestionAnswer(
             answered=True,
-            answer=(
-                f'According to "{primary.document_title}" on page '
-                f"{primary.page_number}: {primary.snippet}"
-            ),
+            answer=f'PaperVault found this relevant passage in "{primary.document_title}": '
+            f"{primary.snippet}",
             confidence_score=round(confidence, 4),
             citations=citations,
         )
@@ -255,9 +258,7 @@ class QuestionAnsweringService:
         owner_id: UUID,
         question: str,
     ) -> tuple[RetrievedEvidence, ...]:
-        query_embedding = (
-            await asyncio.to_thread(self._embedding_provider.embed, question)
-        ).vector
+        query_embedding = (await asyncio.to_thread(self._embedding_provider.embed, question)).vector
         concepts = question_concepts(question)
         if not concepts:
             return ()
@@ -282,10 +283,13 @@ class QuestionAnsweringService:
                 f"{document.title} {document.document_type.replace('_', ' ')} {chunk.content_text}"
             )
             lexical = concept_match_score(concepts, searchable_text)
-            if lexical == 0:
+            if lexical < MIN_LEXICAL_SCORE:
                 continue
             semantic = max(0.0, cosine_similarity(query_embedding, tuple(chunk.vector)))
-            score = (lexical * 0.75) + (semantic * 0.25)
+            expected_types = question_document_types(question)
+            type_bonus = 1.0 if document.document_type in expected_types else 0.0
+            answer_bonus = answer_signal_score(question, chunk.content_text)
+            score = (lexical * 0.65) + (semantic * 0.15) + (type_bonus * 0.1) + (answer_bonus * 0.1)
             scored.append(
                 RetrievedEvidence(
                     document_id=document.id,
@@ -295,6 +299,7 @@ class QuestionAnsweringService:
                     content_text=chunk.content_text,
                     score=round(score, 6),
                     lexical_score=round(lexical, 6),
+                    document_type=document.document_type,
                 )
             )
         scored.sort(key=lambda item: item.score, reverse=True)
@@ -324,6 +329,154 @@ def concept_match_score(concepts: tuple[frozenset[str], ...], text: str) -> floa
     text_tokens = set(tokenize(text))
     matched = sum(1 for concept in concepts if concept.intersection(text_tokens))
     return matched / len(concepts)
+
+
+def question_document_types(question: str) -> frozenset[str]:
+    normalized = question.casefold()
+    if "salary" in normalized or "payslip" in normalized or "pay slip" in normalized:
+        return frozenset({"salary_slip"})
+    if "credit card" in normalized:
+        return frozenset({"credit_card_statement"})
+    if "bank statement" in normalized:
+        return frozenset({"bank_statement"})
+    if "insurance" in normalized or "policies" in normalized:
+        return frozenset({"insurance_policy"})
+    if "warranty" in normalized:
+        return frozenset({"warranty_document", "invoice", "receipt"})
+    if "tax" in normalized or "form 16" in normalized:
+        return frozenset({"tax_return", "form_16"})
+    return frozenset()
+
+
+def answer_signal_score(question: str, text: str) -> float:
+    normalized = question.casefold()
+    if "salary" in normalized:
+        return 1.0 if find_labeled_amount(text, salary_labels(normalized)) is not None else 0.0
+    if "purchase" in normalized or "bought" in normalized:
+        return 1.0 if find_labeled_date(text, ("purchase date", "invoice date")) else 0.0
+    if "due" in normalized:
+        return 1.0 if find_labeled_date(text, ("due date", "payment due date")) else 0.0
+    if "expir" in normalized or "renew" in normalized:
+        return (
+            1.0 if find_labeled_date(text, ("expiry date", "valid till", "renewal date")) else 0.0
+        )
+    return 0.0
+
+
+def build_direct_answer(
+    question: str,
+    evidence: tuple[RetrievedEvidence, ...],
+) -> QuestionAnswer | None:
+    normalized = question.casefold()
+    expected_types = question_document_types(question)
+
+    if any(term in normalized for term in ("all", "every", "find", "show")) and expected_types:
+        selected_by_document: dict[UUID, RetrievedEvidence] = {}
+        for item in evidence:
+            if item.document_type in expected_types:
+                selected_by_document.setdefault(item.document_id, item)
+        if selected_by_document:
+            selected = tuple(selected_by_document.values())
+            titles = ", ".join(f'"{item.title}"' for item in selected[:10])
+            label = "matching documents" if len(expected_types) > 1 else next(iter(expected_types))
+            return QuestionAnswer(
+                answered=True,
+                answer=(
+                    f"I found {len(selected)} {label.replace('_', ' ')} "
+                    f"document{'s' if len(selected) != 1 else ''}: {titles}."
+                ),
+                confidence_score=round(min(item.lexical_score for item in selected), 4),
+                citations=unique_citations(question, selected),
+            )
+
+    if "salary" in normalized or "payslip" in normalized or "pay slip" in normalized:
+        for item in evidence:
+            amount = find_labeled_amount(item.content_text, salary_labels(normalized))
+            if amount is None:
+                continue
+            label, formatted_amount = amount
+            period = question_period(question)
+            return QuestionAnswer(
+                answered=True,
+                answer=f"Your {label}{period} was {formatted_amount}.",
+                confidence_score=round(min(0.97, 0.75 + (item.lexical_score * 0.2)), 4),
+                citations=unique_citations(question, (item,)),
+            )
+
+    date_intents = (
+        (("purchase", "bought"), ("purchase date", "invoice date"), "purchase date"),
+        (("due",), ("due date", "payment due date"), "due date"),
+        (("expir", "renew"), ("expiry date", "valid till", "renewal date"), "expiry date"),
+    )
+    for question_terms, labels, answer_label in date_intents:
+        if not any(term in normalized for term in question_terms):
+            continue
+        for item in evidence:
+            value = find_labeled_date(item.content_text, labels)
+            if value:
+                return QuestionAnswer(
+                    answered=True,
+                    answer=f'The {answer_label} in "{item.title}" is {value}.',
+                    confidence_score=round(min(0.94, 0.72 + (item.lexical_score * 0.2)), 4),
+                    citations=unique_citations(question, (item,)),
+                )
+    return None
+
+
+def salary_labels(question: str) -> tuple[str, ...]:
+    if "gross" in question:
+        return ("gross salary", "gross pay", "total earnings")
+    return ("net salary", "net pay", "take home", "gross salary", "gross pay")
+
+
+def find_labeled_amount(text: str, labels: tuple[str, ...]) -> tuple[str, str] | None:
+    for label in labels:
+        match = re.search(
+            rf"\b{re.escape(label)}\b[\s:=-]*"
+            r"(?P<currency>\u20b9|INR|Rs\.?|\$)?\s*"
+            r"(?P<amount>\d[\d,]*(?:\.\d{1,2})?)",
+            text,
+            re.IGNORECASE,
+        )
+        if match:
+            currency = match.group("currency") or ""
+            amount = match.group("amount")
+            formatted = f"{currency} {amount}".strip().replace("\u20b9 ", "\u20b9")
+            return label.casefold(), formatted
+    return None
+
+
+def find_labeled_date(text: str, labels: tuple[str, ...]) -> str | None:
+    for label in labels:
+        match = re.search(
+            rf"\b{re.escape(label)}\b[\s:=-]*"
+            r"(?P<date>\d{1,2}[/-](?:\d{1,2}|[A-Za-z]{3,9})[/-]\d{2,4}|"
+            r"\d{4}[/-]\d{1,2}[/-]\d{1,2})",
+            text,
+            re.IGNORECASE,
+        )
+        if match:
+            return match.group("date")
+    return None
+
+
+def question_period(question: str) -> str:
+    month = next(
+        (
+            name
+            for name in CONCEPT_SYNONYMS
+            if name in question.casefold() and name not in {"salary"}
+        ),
+        None,
+    )
+    year_match = re.search(r"\b(?:19|20)\d{2}\b", question)
+    if month and year_match:
+        return f" for {month.title()} {year_match.group()}"
+    if month:
+        return f" for {month.title()}"
+    if year_match:
+        return f" for {year_match.group()}"
+    return ""
 
 
 def best_excerpt(question: str, text: str, max_chars: int = 320) -> str:

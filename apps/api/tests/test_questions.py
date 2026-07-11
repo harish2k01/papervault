@@ -27,9 +27,22 @@ PAYSLIP_TEXT = """
 WORKHALL PRIVATE LIMITED
 Period Beginning 1-Aug-22
 Period Ending 31-Aug-22
+Employee profile and payroll account information repeated before the final totals.
+Employee profile and payroll account information repeated before the final totals.
+Employee profile and payroll account information repeated before the final totals.
+Employee profile and payroll account information repeated before the final totals.
 TOTAL EARNINGS INR 31,000.00
 TOTAL DEDUCTIONS INR 2,825.00
 NET PAY INR 28,175.00
+"""
+
+TAX_SUMMARY_TEXT = """
+TAXPAYER INFORMATION SUMMARY
+Assessment Year 2026-27
+INFORMATION CATEGORY PROCESSED BY SYSTEM ACCEPTED BY TAXPAYER
+Salary 9,27,308
+Other Salary TDS Annexure II
+SFT Interest Income
 """
 
 
@@ -91,6 +104,37 @@ async def test_question_answering_returns_page_citations_and_refuses_unknowns(
             content_text=PAYSLIP_TEXT,
         )
     )
+    tax_document = Document(
+        owner_id=user.id,
+        title="TIS AY 2026 2027",
+        original_filename="tis.pdf",
+        content_type="application/pdf",
+        file_size_bytes=100,
+        sha256_hash="8" * 64,
+        storage_bucket="documents",
+        storage_key="questions/tis.pdf",
+        status=DocumentStatus.READY.value,
+        document_type="salary_slip",
+    )
+    session.add(tax_document)
+    await session.flush()
+    tax_extraction = DocumentTextExtraction(
+        document_id=tax_document.id,
+        source=TextExtractionSource.EMBEDDED_TEXT.value,
+        status=TextExtractionStatus.SUCCEEDED.value,
+        content_text=TAX_SUMMARY_TEXT,
+        page_count=1,
+        is_current=True,
+    )
+    session.add(tax_extraction)
+    await session.flush()
+    session.add(
+        DocumentTextPage(
+            text_extraction_id=tax_extraction.id,
+            page_number=1,
+            content_text=TAX_SUMMARY_TEXT,
+        )
+    )
     await session.commit()
 
     service = QuestionAnsweringService(
@@ -117,6 +161,7 @@ async def test_question_answering_returns_page_citations_and_refuses_unknowns(
     assert answer.answered is True
     assert answer.confidence_score >= 0.7
     assert answer.citations[0].document_id == document.id
+    assert {citation.document_id for citation in answer.citations} == {document.id}
     assert answer.citations[0].page_number == 1
     assert "28,175" in answer.answer
     assert refusal.answered is False

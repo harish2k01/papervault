@@ -22,6 +22,7 @@ from papervault_api.documents.infrastructure.models import (
     DocumentTextBlock,
     DocumentTextExtraction,
     DocumentTextPage,
+    DocumentVersion,
 )
 
 
@@ -66,8 +67,15 @@ class DocumentProcessingService:
         page_texts = tuple(sanitize_extracted_text(text) for text in result.page_texts)
 
         await self._mark_existing_extractions_not_current(document.id)
+        current_version_id = await self._session.scalar(
+            select(DocumentVersion.id).where(
+                DocumentVersion.document_id == document.id,
+                DocumentVersion.is_current.is_(True),
+            )
+        )
         extraction = DocumentTextExtraction(
             document_id=document.id,
+            document_version_id=current_version_id,
             source=result.source.value,
             status=result.status.value,
             content_text=content_text,

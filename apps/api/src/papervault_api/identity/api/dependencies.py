@@ -120,7 +120,8 @@ async def _current_user_from_dev_headers(
             role=UserRole.USER.value,
         )
         session.add(user)
-        await session.flush()
+        await session.commit()
+        await session.refresh(user)
 
     return CurrentUser(
         id=user.id,

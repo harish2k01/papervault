@@ -110,6 +110,35 @@ CATEGORY_KEYWORDS: dict[str, tuple[str, ...]] = {
     "education_certificate": ("certificate", "university", "degree", "marksheet"),
 }
 
+CATEGORY_STRONG_KEYWORDS: dict[str, tuple[str, ...]] = {
+    "salary_slip": ("salary slip", "payslip", "net salary", "net pay", "gross salary"),
+    "credit_card_statement": ("credit card statement", "minimum amount due"),
+    "bank_statement": ("bank statement", "opening balance", "closing balance"),
+    "insurance_policy": ("insurance policy", "policy number", "sum insured"),
+    "invoice": ("tax invoice", "invoice number", "bill to"),
+    "warranty_document": ("warranty certificate", "warranty document"),
+    "receipt": ("payment receipt", "receipt number"),
+    "medical_report": ("medical report", "clinical report", "laboratory report"),
+    "passport": ("passport number", "republic of india passport"),
+    "driving_license": ("driving licence", "driving license"),
+    "pan_card": ("permanent account number", "income tax department"),
+    "aadhaar": ("unique identification authority", "government of india aadhaar"),
+    "form_16": ("form 16", "certificate under section 203"),
+    "tax_return": (
+        "taxpayer information summary",
+        "annual information statement",
+        "income tax return",
+        "information category processed by system",
+    ),
+    "offer_letter": ("offer letter", "letter of offer"),
+    "experience_letter": ("experience letter", "relieving letter"),
+    "employment_contract": ("employment agreement", "employment contract"),
+    "investment_statement": ("investment statement", "portfolio statement"),
+    "mutual_fund_cas": ("consolidated account statement", "mutual fund cas"),
+    "property_document": ("sale deed", "property deed", "sale agreement"),
+    "education_certificate": ("degree certificate", "education certificate"),
+}
+
 FIELD_PATTERNS: dict[str, dict[str, tuple[str, ...]]] = {
     "salary_slip": {
         "employer": ("employer", "company", "organization"),
@@ -148,16 +177,17 @@ class LocalDocumentAIProvider(DocumentAIProvider):
 
     def analyze(self, text: str, current_document_type: str) -> DocumentAIAnalysisResult:
         category, confidence_score = classify_document(text, current_document_type)
+        metadata = extract_metadata(category, text)
         return DocumentAIAnalysisResult(
             provider=self.provider,
             model=self.model,
-            summary=summarize_text(text),
+            summary=summarize_document(category, text, metadata),
             keywords=extract_keywords(text),
             entities=extract_entities(text),
             suggested_tags=suggest_tags(category, text),
             category=category,
             confidence_score=confidence_score,
-            extracted_metadata=extract_metadata(category, text),
+            extracted_metadata=metadata,
         )
 
 
@@ -216,10 +246,7 @@ class ModelDocumentAIProvider(DocumentAIProvider):
                     f" extracted_metadata must use only the selected category's fields: "
                     f"{metadata_schemas}. Use arrays of objects for table fields."
                 ),
-                user=(
-                    f"Current category: {current_document_type}\n"
-                    f"Document text:\n{text[:50000]}"
-                ),
+                user=(f"Current category: {current_document_type}\nDocument text:\n{text[:50000]}"),
             )
         )
         category = validated_category(payload.get("category"), current_document_type)
@@ -340,16 +367,65 @@ def classify_document(text: str, current_document_type: str) -> tuple[str, float
     normalized = normalize_text(text)
     scores: dict[str, int] = {}
     for category, keywords in CATEGORY_KEYWORDS.items():
-        scores[category] = sum(1 for keyword in keywords if keyword in normalized)
+        regular_score = sum(1 for keyword in keywords if keyword in normalized)
+        strong_score = sum(
+            3 for keyword in CATEGORY_STRONG_KEYWORDS.get(category, ()) if keyword in normalized
+        )
+        scores[category] = regular_score + strong_score
 
     best_category, best_score = max(scores.items(), key=lambda item: item[1])
-    if best_score == 0:
+    if best_score < 3:
         if current_document_type != "generic_pdf":
             return current_document_type, 0.5
-        return "generic_pdf", 0.35
+        return "generic_pdf", 0.4
 
-    confidence_score = min(0.95, 0.45 + (best_score * 0.12))
+    runner_up = max(
+        (score for category, score in scores.items() if category != best_category), default=0
+    )
+    margin = max(0, best_score - runner_up)
+    confidence_score = min(0.95, 0.55 + (best_score * 0.035) + (margin * 0.015))
     return best_category, round(confidence_score, 4)
+
+
+def summarize_document(
+    category: str,
+    text: str,
+    metadata: dict[str, object],
+    max_chars: int = 700,
+) -> str:
+    label = category.replace("_", " ").title()
+    parts = [f"This document is classified as {label}."]
+    if metadata:
+        details = "; ".join(
+            f"{key.replace('_', ' ')}: {value}"
+            for key, value in list(metadata.items())[:6]
+            if not isinstance(value, list | dict)
+        )
+        if details:
+            parts.append(f"Extracted details include {details}.")
+
+    entities = extract_entities(text)
+    amounts = [entity.value for entity in entities if entity.kind == "amount"][:3]
+    dates = [entity.value for entity in entities if entity.kind == "date"][:3]
+    if amounts:
+        parts.append(f"Detected amounts: {', '.join(amounts)}.")
+    if dates:
+        parts.append(f"Detected dates: {', '.join(dates)}.")
+
+    if category == "insurance_policy":
+        parts.append("Review the policy coverage, premium, and expiry details.")
+    elif category in {"invoice", "receipt", "warranty_document"}:
+        parts.append("This is a purchase record that may contain payment and warranty details.")
+    elif category in {"tax_return", "form_16"}:
+        parts.append("This is a tax record containing taxpayer and reported-income information.")
+    elif category == "salary_slip":
+        parts.append("Review gross earnings, deductions, and net salary for the pay period.")
+    elif category == "bank_statement":
+        parts.append(
+            "Review the account period, transaction activity, and opening and closing balances."
+        )
+
+    return " ".join(parts)[:max_chars]
 
 
 def summarize_text(text: str, max_chars: int = 700) -> str:

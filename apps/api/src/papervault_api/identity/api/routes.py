@@ -9,6 +9,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from papervault_api.administration.application.service import InstanceSettingsService
 from papervault_api.core.config import Settings, get_settings
 from papervault_api.db.session import get_session
+from papervault_api.documents.api.dependencies import get_object_storage
+from papervault_api.documents.application.storage import ObjectStorage
 from papervault_api.identity.api.dependencies import (
     get_current_user,
     get_oidc_provider,
@@ -23,6 +25,10 @@ from papervault_api.identity.api.schemas import (
     UpdateUserRequest,
 )
 from papervault_api.identity.application.current_user import CurrentUser
+from papervault_api.identity.application.deletion import (
+    InvalidUserDeletionError,
+    UserDeletionService,
+)
 from papervault_api.identity.application.oidc import (
     OIDCConfigurationError,
     OIDCError,
@@ -43,6 +49,7 @@ from papervault_api.identity.application.service import (
 )
 from papervault_api.identity.domain.enums import AuthProvider, UserRole
 from papervault_api.identity.infrastructure.models import User
+from papervault_api.search.api.indexing import reindex_document_best_effort
 
 router = APIRouter(tags=["identity"])
 
@@ -270,6 +277,32 @@ async def update_user(
     )
     assert user is not None
     return user_response(user)
+
+
+@router.delete("/users/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_user(
+    user_id: UUID,
+    admin: Annotated[CurrentUser, Depends(require_roles(UserRole.ADMIN))],
+    session: Annotated[AsyncSession, Depends(get_session)],
+    storage: Annotated[ObjectStorage, Depends(get_object_storage)],
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> None:
+    try:
+        result = await UserDeletionService(session=session, storage=storage).delete_user(
+            admin_id=admin.id,
+            user_id=user_id,
+        )
+    except InvalidUserDeletionError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    if result is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    for document_id in result.deleted_document_ids:
+        await reindex_document_best_effort(
+            session=session,
+            settings=settings,
+            document_id=document_id,
+            reason="user_deleted",
+        )
 
 
 def token_response(*, user: User, service: IdentityService, settings: Settings) -> TokenResponse:
