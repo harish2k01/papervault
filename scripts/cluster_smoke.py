@@ -14,9 +14,7 @@ def main() -> None:
     base_url = args.base_url.rstrip("/")
     email = f"{args.email_prefix}-{int(datetime.now(UTC).timestamp())}@example.test"
 
-    with httpx.Client(
-        verify=not args.insecure, timeout=args.request_timeout_seconds
-    ) as client:
+    with httpx.Client(verify=not args.insecure, timeout=args.request_timeout_seconds) as client:
         token = register(client, base_url, email, args.password)
         headers = {"Authorization": f"Bearer {token}"}
         document_id = upload_document(client, base_url, headers)
@@ -27,9 +25,7 @@ def main() -> None:
             document_id,
             timeout_seconds=args.processing_timeout_seconds,
         )
-        search_results = search_documents(
-            client, base_url, headers, "searchable smoke document"
-        )
+        search_results = search_documents(client, base_url, headers, "searchable smoke document")
 
     extraction = detail.get("text_extraction") or {}
     ai_analysis = detail.get("ai_analysis") or {}
@@ -42,9 +38,7 @@ def main() -> None:
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(
-        description="Run a PaperVault deployed smoke test."
-    )
+    parser = argparse.ArgumentParser(description="Run a PaperVault deployed smoke test.")
     parser.add_argument(
         "--base-url",
         default="http://localhost:8000/api",
@@ -56,9 +50,7 @@ def parse_args() -> argparse.Namespace:
         default=secrets.token_urlsafe(24),
         help="Temporary account password. A random value is generated when omitted.",
     )
-    parser.add_argument(
-        "--insecure", action="store_true", help="Disable TLS certificate checks."
-    )
+    parser.add_argument("--insecure", action="store_true", help="Disable TLS certificate checks.")
     parser.add_argument("--request-timeout-seconds", type=float, default=30.0)
     parser.add_argument("--processing-timeout-seconds", type=float, default=90.0)
     return parser.parse_args()
@@ -74,9 +66,7 @@ def register(client: httpx.Client, base_url: str, email: str, password: str) -> 
     return str(payload["access_token"])
 
 
-def upload_document(
-    client: httpx.Client, base_url: str, headers: dict[str, str]
-) -> str:
+def upload_document(client: httpx.Client, base_url: str, headers: dict[str, str]) -> str:
     response = client.post(
         f"{base_url}/documents/uploads",
         headers=headers,
@@ -112,9 +102,7 @@ def wait_for_processing(
         if status in {"ready", "failed"}:
             return last_detail
         time.sleep(1)
-    raise TimeoutError(
-        f"Document {document_id} did not finish processing: {last_detail}"
-    )
+    raise TimeoutError(f"Document {document_id} did not finish processing: {last_detail}")
 
 
 def search_documents(
@@ -168,8 +156,7 @@ def build_pdf(text: str) -> bytes:
     for offset in offsets:
         output += f"{offset:010d} 00000 n \n".encode("ascii")
     output += (
-        f"trailer\n<< /Size {len(objects) + 1} /Root 1 0 R >>\n"
-        f"startxref\n{xref_offset}\n%%EOF\n"
+        f"trailer\n<< /Size {len(objects) + 1} /Root 1 0 R >>\nstartxref\n{xref_offset}\n%%EOF\n"
     ).encode("ascii")
     return output
 

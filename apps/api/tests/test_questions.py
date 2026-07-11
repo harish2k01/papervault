@@ -38,7 +38,7 @@ NET PAY INR 12,000.00
 
 TAX_SUMMARY_TEXT = """
 TAXPAYER INFORMATION SUMMARY
-Assessment Year 2030-31
+Assessment Year 2040-41
 INFORMATION CATEGORY PROCESSED BY SYSTEM ACCEPTED BY TAXPAYER
 Salary 1,23,456
 Other Salary TDS Annexure II
@@ -106,7 +106,7 @@ async def test_question_answering_returns_page_citations_and_refuses_unknowns(
     )
     tax_document = Document(
         owner_id=user.id,
-        title="Synthetic Tax Summary 2030 2031",
+        title="Synthetic Tax Summary 2040 2041",
         original_filename="synthetic-tax-summary.pdf",
         content_type="application/pdf",
         file_size_bytes=100,
@@ -145,7 +145,7 @@ async def test_question_answering_returns_page_citations_and_refuses_unknowns(
 
     answer = await service.ask(
         owner_id=user.id,
-        question="What was my net pay in March 2030?",
+        question="What was my salary in March 2030?",
     )
     refusal = await service.ask(
         owner_id=user.id,
