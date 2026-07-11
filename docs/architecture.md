@@ -79,13 +79,17 @@ The extraction interface supports embedded PDF text and OCR adapters. The defaul
 
 Page text is stored as immutable children of each extraction. Flattened text remains available for summaries, metadata extraction, embeddings, and global search.
 
-AI analysis and embeddings use provider interfaces. The default local providers are deterministic and require no external service. Model-backed providers can be added without changing processing orchestration or storage contracts.
+AI analysis and embeddings use provider interfaces. The default local providers are deterministic and require no external service. Ollama and OpenAI-compatible adapters implement the same contracts. Model output is parsed as structured JSON, categories are checked against the document-type registry, confidence is bounded, and embedding dimensions are validated before persistence.
+
+High-confidence suggested tags are normalized and attached automatically with an `ai`
+source and confidence score. Existing manual tag links take precedence. Classification
+and tag changes remain searchable through the eventual OpenSearch projection.
 
 ## Grounded Questions
 
 Question answering is separate from document search. Search returns ranked documents; the question service retrieves page-bound chunks from ready documents owned by the caller and asks a grounded-answer provider to answer only from that evidence.
 
-Chunks and their embeddings are materialized during normal AI processing. The question service lazily backfills chunks for older current extractions, which avoids a blocking data migration. The local answer provider is extractive: it selects a bounded evidence excerpt, reports confidence, cites the document and page, and refuses when too few question concepts appear in the evidence. This is intentionally more conservative than an unconstrained generated answer.
+Chunks and their embeddings are materialized during normal AI processing. The question service lazily backfills chunks for older current extractions, which avoids a blocking data migration. The local answer provider is extractive: it selects a bounded evidence excerpt, reports confidence, cites the document and page, and refuses when too few question concepts appear in the evidence. Ollama and OpenAI-compatible answer providers receive only retrieved evidence and must return citation indexes or refuse. The service validates those indexes and preserves the same citation contract for every provider.
 
 The database is the chunk source of truth. Retrieval is currently bounded to 5,000 owned chunks per request; a dedicated OpenSearch chunk projection is the scaling path for larger vaults. A future model-backed answer provider must preserve the same citation and refusal contract.
 
@@ -100,6 +104,7 @@ Lifecycle and tag changes commit to PostgreSQL first and then refresh the search
 - Source binaries are not stored in PostgreSQL.
 - Metadata updates create versioned current records rather than overwriting extraction history.
 - Archive hides documents from normal lists, duplicate candidates, notifications, and search without deleting source data.
+- Permanent deletion is owner-scoped and removes source/version objects, the PostgreSQL document graph, and the rebuildable search projection.
 - Exact duplicate resolution archives redundant copies chosen by the user.
 - Version records hold immutable storage references; replacement and restore workflows remain planned.
 - Timeline events capture uploads, metadata edits, tag changes, archives, and related lifecycle actions.
@@ -114,7 +119,7 @@ The first account becomes an administrator. Administrators can manage users and 
 
 The PDF viewer is loaded only when a preview opens. PDF.js renders one responsive page at a time with zoom, page navigation, a text layer, and highlighted literal matches. OCR-only documents use stored page text for result navigation; precise image overlays require OCR geometry that is not yet persisted.
 
-The application shell keeps primary navigation and search persistent while secondary editors, raw metadata, filters, and administration controls appear only when requested. Settings are visible only to administrators. Light and dark themes share the same semantic design tokens.
+The application opens on a vault dashboard. A full-width document library remains usable as collections grow, and document review uses a separate detail state rather than competing list, preview, and metadata columns. Secondary editors, raw metadata, filters, and search history appear only when requested. Settings and provider health are visible only to administrators. Light and dark themes share the same semantic design tokens.
 
 ## Observability
 

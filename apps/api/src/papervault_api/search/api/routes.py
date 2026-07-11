@@ -47,6 +47,7 @@ async def search_documents(
         session=session,
         embedding_provider_name=settings.embedding_provider,
         embedding_dimensions=settings.embedding_dimensions,
+        settings=settings,
         search_query_index=build_search_query_index(settings),
         query_fallback_enabled=settings.search_query_fallback_enabled,
     )
@@ -89,6 +90,7 @@ async def save_search(
         session=session,
         embedding_provider_name=settings.embedding_provider,
         embedding_dimensions=settings.embedding_dimensions,
+        settings=settings,
     )
     saved_search = await service.save_search(
         owner_id=current_user.id,
@@ -117,6 +119,7 @@ async def list_saved_searches(
         session=session,
         embedding_provider_name=settings.embedding_provider,
         embedding_dimensions=settings.embedding_dimensions,
+        settings=settings,
     )
     saved_searches = await service.list_saved_searches(current_user.id)
     return [
@@ -142,6 +145,7 @@ async def list_recent_searches(
         session=session,
         embedding_provider_name=settings.embedding_provider,
         embedding_dimensions=settings.embedding_dimensions,
+        settings=settings,
     )
     recent_searches = await service.list_recent_searches(current_user.id)
     return [

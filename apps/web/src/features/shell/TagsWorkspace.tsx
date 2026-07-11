@@ -3,6 +3,7 @@ import { Tags } from "lucide-react";
 
 import { Button } from "../../components/ui/button";
 import { TagItem } from "../../lib/api";
+import { humanizeLabel } from "../../lib/utils";
 
 export function TagsWorkspace({
   tags,
@@ -99,10 +100,10 @@ export function TagsWorkspace({
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <h2 className="truncate text-sm font-semibold">
-                      {tag.name}
+                      {humanizeLabel(tag.name)}
                     </h2>
                     <p className="mt-1 text-xs text-muted-foreground">
-                      {tag.source} tag
+                      {humanizeLabel(tag.source)} tag
                     </p>
                   </div>
                   <span

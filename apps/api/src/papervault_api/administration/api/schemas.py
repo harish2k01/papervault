@@ -6,6 +6,7 @@ class AdminSettingsResponse(BaseModel):
     local_auth_enabled: bool
     oidc_configured: bool
     ai_provider: str
+    answer_provider: str
     embedding_provider: str
     ocr_provider: str
     search_backend: str
@@ -15,3 +16,15 @@ class AdminSettingsResponse(BaseModel):
 
 class UpdateAdminSettingsRequest(BaseModel):
     local_registration_enabled: bool
+
+
+class ProviderHealthCheckResponse(BaseModel):
+    capability: str
+    provider: str
+    model: str
+    healthy: bool
+    detail: str
+
+
+class ProviderHealthResponse(BaseModel):
+    checks: list[ProviderHealthCheckResponse]

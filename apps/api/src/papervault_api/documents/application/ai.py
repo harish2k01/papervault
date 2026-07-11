@@ -21,6 +21,7 @@ from papervault_api.documents.infrastructure.models import (
     DocumentTextExtraction,
     DocumentTextPage,
 )
+from papervault_api.tags.application.service import TagService
 
 
 @dataclass(frozen=True, slots=True)
@@ -142,6 +143,13 @@ class DocumentAIProcessingService:
         document.summary = analysis.summary
         if analysis.confidence_score >= self._classification_threshold:
             document.document_type = analysis.category
+
+        await TagService(self._session).apply_automatic_tags(
+            owner_id=document.owner_id,
+            document_id=document.id,
+            suggestions=analysis.suggested_tags,
+            confidence_score=analysis.confidence_score,
+        )
 
         await self._session.commit()
 

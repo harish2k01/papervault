@@ -10,7 +10,7 @@ import {
 
 import { Button } from "../../components/ui/button";
 import { DuplicateGroup } from "../../lib/api";
-import { cn } from "../../lib/utils";
+import { cn, humanizeLabel } from "../../lib/utils";
 
 export function DuplicatesWorkspace({
   groups,
@@ -145,7 +145,7 @@ export function DuplicatesWorkspace({
                         {group.documents.length} matching files
                       </h2>
                       <p className="mt-1 text-xs text-muted-foreground">
-                        {group.method.replaceAll("_", " ")} -{" "}
+                        {humanizeLabel(group.method)} -{" "}
                         {group.documents[0].sha256_hash.slice(0, 16)}
                       </p>
                     </div>

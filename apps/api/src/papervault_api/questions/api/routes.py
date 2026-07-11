@@ -13,10 +13,8 @@ from papervault_api.questions.api.schemas import (
     AskQuestionResponse,
     QuestionCitationResponse,
 )
-from papervault_api.questions.application.service import (
-    LocalExtractiveAnswerProvider,
-    QuestionAnsweringService,
-)
+from papervault_api.questions.application.service import QuestionAnsweringService
+from papervault_api.questions.infrastructure.providers import build_grounded_answer_provider
 
 router = APIRouter(prefix="/questions", tags=["questions"])
 
@@ -33,8 +31,9 @@ async def ask_question(
         embedding_provider=build_embedding_provider(
             settings.embedding_provider,
             settings.embedding_dimensions,
+            settings,
         ),
-        answer_provider=LocalExtractiveAnswerProvider(),
+        answer_provider=build_grounded_answer_provider(settings.answer_provider, settings),
     ).ask(owner_id=current_user.id, question=request.question)
     return AskQuestionResponse(
         answered=result.answered,

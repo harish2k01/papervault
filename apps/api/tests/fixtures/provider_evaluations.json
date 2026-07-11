@@ -1,0 +1,14 @@
+[
+  {
+    "name": "salary slip classification",
+    "text": "ACME PRIVATE LIMITED Salary Slip January 2025 Gross Salary INR 125000 Net Pay INR 108500",
+    "expected_category": "salary_slip",
+    "expected_terms": ["salary", "108500"]
+  },
+  {
+    "name": "insurance policy classification",
+    "text": "Insurance Policy Number PV-100 Provider Acme Insurance Premium INR 12000 Expiry Date 31/12/2026",
+    "expected_category": "insurance_policy",
+    "expected_terms": ["insurance", "expiry"]
+  }
+]

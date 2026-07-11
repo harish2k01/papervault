@@ -29,6 +29,30 @@ The Helm chart deploys PaperVault application workloads and expects production s
 - Keep `OPENSEARCH_DOCUMENTS_INDEX` versioned, for example `papervault-documents-v1`, so mapping changes can be rolled out through a new index and reindex operation.
 - Monitor worker logs for `document_search_indexing_failed`; indexing is eventually consistent and does not fail document processing.
 - Keep `PAPERVAULT_SEARCH_QUERY_FALLBACK_ENABLED=true` unless you intentionally want OpenSearch outages to fail user-facing search.
+- Keep model API keys in a Kubernetes Secret and verify provider health in the administrator Settings screen after deployment.
+- Match `config.embeddingDimensions` to the selected embedding model and use a new versioned OpenSearch index when changing dimensions.
+
+## Model Providers
+
+The built-in `local` providers work without network access. A deployment can select
+`ollama` or `openai_compatible` independently for analysis, embeddings, and grounded
+answers:
+
+```yaml
+config:
+  aiProvider: ollama
+  answerProvider: ollama
+  embeddingProvider: ollama
+  embeddingDimensions: "768"
+  ollamaBaseUrl: http://ollama.ai.svc.cluster.local:11434
+  ollamaChatModel: llama3.2
+  ollamaEmbeddingModel: nomic-embed-text
+```
+
+For an OpenAI-compatible endpoint, set the three providers to `openai_compatible`,
+configure the corresponding base URL and models, and supply
+`PAPERVAULT_OPENAI_COMPATIBLE_API_KEY` through the existing runtime Secret. The
+chart-managed secret value is `secret.values.openaiCompatibleApiKey`.
 
 ## OIDC Login
 
@@ -99,6 +123,7 @@ kubectl create secret generic papervault-runtime \
   --from-literal=S3_ACCESS_KEY_ID='<s3-access-key>' \
   --from-literal=S3_SECRET_ACCESS_KEY='<s3-secret-key>' \
   --from-literal=JWT_SIGNING_KEY='<jwt-signing-key>'
+  --from-literal=PAPERVAULT_OPENAI_COMPATIBLE_API_KEY='<model-api-key>'
 
 helm upgrade --install papervault infra/helm/papervault \
   --namespace papervault \

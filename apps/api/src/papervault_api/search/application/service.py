@@ -9,6 +9,7 @@ import structlog
 from sqlalchemy import Select, and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from papervault_api.core.config import Settings
 from papervault_api.documents.domain.enums import DocumentStatus
 from papervault_api.documents.infrastructure.ai import build_embedding_provider, tokenize
 from papervault_api.documents.infrastructure.models import (
@@ -92,17 +93,19 @@ class DocumentSearchService:
         session: AsyncSession,
         embedding_provider_name: str,
         embedding_dimensions: int,
+        settings: Settings | None = None,
         search_query_index: SearchQueryIndex | None = None,
         query_fallback_enabled: bool = True,
     ) -> None:
         self._session = session
         self._embedding_provider_name = embedding_provider_name
         self._embedding_dimensions = embedding_dimensions
+        self._settings = settings
         self._search_query_index = search_query_index
         self._query_fallback_enabled = query_fallback_enabled
 
     async def search(self, request: SearchRequest) -> tuple[SearchResult, ...]:
-        query_embedding = self._build_query_embedding(request)
+        query_embedding = await self._build_query_embedding(request)
         if request.record_recent:
             await self._record_recent_search(request)
 
@@ -131,24 +134,43 @@ class DocumentSearchService:
         return results
 
     async def _record_recent_search(self, request: SearchRequest) -> None:
+        latest = await self._session.scalar(
+            select(RecentSearch)
+            .where(RecentSearch.owner_id == request.owner_id)
+            .order_by(RecentSearch.searched_at.desc())
+            .limit(1),
+        )
+        filters = request.filters.as_dict()
+        if (
+            latest is not None
+            and latest.query == request.query
+            and latest.mode == request.mode.value
+            and latest.filters == filters
+        ):
+            return
         self._session.add(
             RecentSearch(
                 owner_id=request.owner_id,
                 query=request.query,
                 mode=request.mode.value,
-                filters=request.filters.as_dict(),
+                filters=filters,
             ),
         )
         await self._session.flush()
 
-    def _build_query_embedding(self, request: SearchRequest) -> tuple[float, ...] | None:
+    async def _build_query_embedding(
+        self,
+        request: SearchRequest,
+    ) -> tuple[float, ...] | None:
         if not request.query or request.mode not in {SearchMode.SEMANTIC, SearchMode.HYBRID}:
             return None
         provider = build_embedding_provider(
             self._embedding_provider_name,
             self._embedding_dimensions,
+            self._settings,
         )
-        return provider.embed(request.query).vector
+        embedding = await asyncio.to_thread(provider.embed, request.query)
+        return embedding.vector
 
     async def _search_database(
         self,

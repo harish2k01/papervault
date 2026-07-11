@@ -10,6 +10,7 @@ import {
   getDocument,
   getDocumentFile,
   getMe,
+  getProviderHealth,
   getStoredAccessToken,
   listDuplicates,
   listDocuments,
@@ -43,12 +44,15 @@ vi.mock("../../lib/api", () => ({
     .mockReturnValue("/auth/oidc/start?redirect_to=%2F"),
   clearStoredAccessToken: vi.fn(),
   createTag: vi.fn(),
+  deleteDocument: vi.fn(),
   detachTag: vi.fn(),
+  downloadDocumentFile: vi.fn(),
   getAuthConfig: vi.fn(),
   getAdminSettings: vi.fn(),
   getDocument: vi.fn(),
   getDocumentFile: vi.fn().mockResolvedValue(new Blob(["preview"])),
   getMe: vi.fn(),
+  getProviderHealth: vi.fn().mockResolvedValue({ checks: [] }),
   getStoredAccessToken: vi.fn().mockReturnValue(null),
   listDocumentTypes: vi.fn().mockResolvedValue([]),
   listDocuments: vi.fn().mockResolvedValue([]),
@@ -99,6 +103,17 @@ describe("AppShell", () => {
       oidc_configured: false,
     });
     vi.mocked(listDocuments).mockResolvedValue([]);
+    vi.mocked(getMe).mockResolvedValue({
+      id: "dev-user",
+      email: "local@papervault.dev",
+      display_name: null,
+      role: "user",
+      auth_provider: "development",
+      is_active: true,
+      created_at: "2026-07-11T00:00:00Z",
+      last_login_at: null,
+    });
+    vi.mocked(getProviderHealth).mockResolvedValue({ checks: [] });
     vi.mocked(listDuplicates).mockResolvedValue([]);
     vi.mocked(listNotifications).mockResolvedValue([]);
     vi.mocked(listTags).mockResolvedValue([]);
@@ -127,9 +142,11 @@ describe("AppShell", () => {
     );
 
     expect(
-      await screen.findByRole("heading", { name: "Add your first document." }),
+      await screen.findByRole("heading", { name: "Add your first document" }),
     ).toBeInTheDocument();
-    expect(screen.getByText("Empty vault")).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Your vault" }),
+    ).toBeInTheDocument();
   });
 
   it("renders OIDC sign-in when configured", async () => {
@@ -210,10 +227,12 @@ describe("AppShell", () => {
 
     renderAppShell();
 
+    await openDocumentFromLibrary("iPad Invoice");
+
     fireEvent.click(
       await screen.findByRole(
         "button",
-        { name: "Add warranty" },
+        { name: "Add Warranty" },
         { timeout: 3000 },
       ),
     );
@@ -289,6 +308,8 @@ describe("AppShell", () => {
 
     renderAppShell();
 
+    await openDocumentFromLibrary("Statement 2026MTH04 609599319");
+
     expect(await screen.findByText("Processing failed")).toBeInTheDocument();
     expect(await screen.findByText("Preview not ready")).toBeInTheDocument();
     expect(screen.queryByTitle(document.title)).not.toBeInTheDocument();
@@ -320,6 +341,7 @@ describe("AppShell", () => {
       local_auth_enabled: true,
       oidc_configured: false,
       ai_provider: "local",
+      answer_provider: "local",
       embedding_provider: "local",
       ocr_provider: "tesseract",
       search_backend: "opensearch",
@@ -522,6 +544,8 @@ describe("AppShell", () => {
 
     renderAppShell();
 
+    await openDocumentFromLibrary("Insurance Policy");
+
     expect(
       await screen.findByRole("heading", { name: "Insurance Policy" }),
     ).toBeInTheDocument();
@@ -547,5 +571,12 @@ function renderAppShell() {
     <QueryClientProvider client={queryClient}>
       <AppShell />
     </QueryClientProvider>,
+  );
+}
+
+async function openDocumentFromLibrary(title: string) {
+  fireEvent.click(await screen.findByRole("button", { name: "Documents" }));
+  fireEvent.click(
+    await screen.findByRole("button", { name: new RegExp(title) }),
   );
 }

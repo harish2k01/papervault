@@ -1,16 +1,24 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  useInfiniteQuery,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 import {
   AlertCircle,
+  ArrowLeft,
   Bell,
   CheckCircle2,
   ChevronDown,
   Clock3,
+  Download,
   FileSearch,
   FileText,
   type LucideIcon,
   LogIn,
   LogOut,
+  LayoutDashboard,
   MessageSquareText,
   Moon,
   RefreshCw,
@@ -19,6 +27,7 @@ import {
   ShieldCheck,
   Sun,
   Tags,
+  Trash2,
   Upload,
   UserPlus,
 } from "lucide-react";
@@ -44,11 +53,14 @@ import {
   buildOidcLoginUrl,
   clearStoredAccessToken,
   createTag,
+  deleteDocument,
   detachTag,
+  downloadDocumentFile,
   getAuthConfig,
   getAdminSettings,
   getDocument,
   getMe,
+  getProviderHealth,
   getStoredAccessToken,
   listDocumentTypes,
   listDocuments,
@@ -74,12 +86,13 @@ import {
   updateUser,
   uploadDocument,
 } from "../../lib/api";
-import { cn } from "../../lib/utils";
+import { cn, humanizeLabel } from "../../lib/utils";
 import { SettingsWorkspace } from "../administration/SettingsWorkspace";
 import { QuestionsWorkspace } from "../questions/QuestionsWorkspace";
 import { DuplicatesWorkspace } from "./DuplicatesWorkspace";
 import { NotificationsWorkspace } from "./NotificationsWorkspace";
 import { TagsWorkspace } from "./TagsWorkspace";
+import { HomeWorkspace } from "./HomeWorkspace";
 import {
   compareNotifications,
   formatDateOnly,
@@ -87,6 +100,7 @@ import {
 } from "./notification-utils";
 
 type WorkspaceView =
+  | "home"
   | "documents"
   | "questions"
   | "duplicates"
@@ -100,6 +114,7 @@ const DocumentPreview = lazy(async () => {
 });
 
 const navItems = [
+  { key: "home", label: "Home", icon: LayoutDashboard },
   { key: "documents", label: "Documents", icon: FileText },
   { key: "questions", label: "Ask", icon: MessageSquareText },
   { key: "duplicates", label: "Duplicates", icon: FileSearch },
@@ -144,7 +159,7 @@ export function AppShell() {
   );
   const [showAuthScreen, setShowAuthScreen] = useState(false);
   const [oidcError, setOidcError] = useState<string | null>(null);
-  const [activeView, setActiveView] = useState<WorkspaceView>("documents");
+  const [activeView, setActiveView] = useState<WorkspaceView>("home");
   const [query, setQuery] = useState("");
   const [searchMode, setSearchMode] = useState<SearchMode>("hybrid");
   const [filters, setFilters] = useState<SearchFilters>(defaultSearchFilters);
@@ -165,17 +180,24 @@ export function AppShell() {
   const meQuery = useQuery({
     queryKey: ["auth", "me", accessToken],
     queryFn: getMe,
-    enabled: accessToken !== null,
+    enabled:
+      accessToken !== null ||
+      authConfigQuery.data?.dev_headers_enabled === true,
+    retry: false,
   });
   const canUseDevIdentity = authConfigQuery.data?.dev_headers_enabled === true;
   const canAccessWorkspace = accessToken !== null || canUseDevIdentity;
-  const workspaceEnabled = canAccessWorkspace && !showAuthScreen;
+  const workspaceEnabled =
+    canAccessWorkspace && meQuery.isSuccess && !showAuthScreen;
   const isAdmin = meQuery.data?.role === "admin";
   const visibleNavItems = isAdmin ? [...navItems, settingsNavItem] : navItems;
 
-  const documentsQuery = useQuery({
+  const documentsQuery = useInfiniteQuery({
     queryKey: ["documents"],
-    queryFn: listDocuments,
+    queryFn: ({ pageParam }) => listDocuments({ limit: 50, offset: pageParam }),
+    initialPageParam: 0,
+    getNextPageParam: (lastPage, _pages, lastPageParam) =>
+      lastPage.length === 50 ? lastPageParam + 50 : undefined,
     enabled: workspaceEnabled,
   });
   const documentTypesQuery = useQuery({
@@ -206,6 +228,7 @@ export function AppShell() {
       return results;
     },
     enabled: workspaceEnabled && submittedSearch !== null,
+    refetchOnWindowFocus: false,
   });
   const notificationsQuery = useQuery({
     queryKey: ["notifications"],
@@ -231,6 +254,12 @@ export function AppShell() {
     queryKey: ["admin", "users"],
     queryFn: listUsers,
     enabled: workspaceEnabled && isAdmin,
+  });
+  const providerHealthQuery = useQuery({
+    queryKey: ["admin", "providers", "health"],
+    queryFn: getProviderHealth,
+    enabled: workspaceEnabled && isAdmin && activeView === "settings",
+    refetchInterval: 60_000,
   });
   const uploadMutation = useMutation({
     mutationFn: (file: File) => uploadDocument(file),
@@ -347,6 +376,35 @@ export function AppShell() {
       ]);
     },
   });
+  const downloadMutation = useMutation({
+    mutationFn: downloadDocumentFile,
+    onSuccess: (blob, documentId) => {
+      const filename =
+        detailQuery.data?.document.id === documentId
+          ? detailQuery.data.document.original_filename
+          : "document";
+      const url = URL.createObjectURL(blob);
+      const link = window.document.createElement("a");
+      link.href = url;
+      link.download = filename;
+      link.click();
+      URL.revokeObjectURL(url);
+    },
+  });
+  const deleteMutation = useMutation({
+    mutationFn: deleteDocument,
+    onSuccess: async (_response, documentId) => {
+      setSelectedDocumentId(null);
+      queryClient.removeQueries({ queryKey: ["document", documentId] });
+      queryClient.removeQueries({ queryKey: ["document-file", documentId] });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["documents"] }),
+        queryClient.invalidateQueries({ queryKey: ["search"] }),
+        queryClient.invalidateQueries({ queryKey: ["duplicates"] }),
+        queryClient.invalidateQueries({ queryKey: ["notifications"] }),
+      ]);
+    },
+  });
   const duplicateMergeMutation = useMutation({
     mutationFn: (input: Parameters<typeof mergeDuplicateDocuments>[0]) =>
       mergeDuplicateDocuments(input),
@@ -430,7 +488,7 @@ export function AppShell() {
   function handleSignOut() {
     clearStoredAccessToken();
     setAccessToken(null);
-    setActiveView("documents");
+    setActiveView("home");
     setSelectedDocumentId(null);
     queryClient.clear();
   }
@@ -492,6 +550,15 @@ export function AppShell() {
     setActiveView("documents");
   }
 
+  function confirmDelete(documentId: string, title: string) {
+    const confirmed = window.confirm(
+      `Permanently delete "${title}" and its stored file? This cannot be undone.`,
+    );
+    if (confirmed) {
+      deleteMutation.mutate(documentId);
+    }
+  }
+
   async function invalidateDocumentTags(documentId: string) {
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: ["document", documentId] }),
@@ -528,6 +595,17 @@ export function AppShell() {
   }, [queryClient]);
 
   useEffect(() => {
+    if (!meQuery.isError) {
+      return;
+    }
+    if (accessToken !== null) {
+      clearStoredAccessToken();
+      setAccessToken(null);
+    }
+    setShowAuthScreen(true);
+  }, [accessToken, meQuery.isError]);
+
+  useEffect(() => {
     document.documentElement.classList.toggle("dark", darkMode);
     window.localStorage.setItem(
       "papervault.theme",
@@ -537,7 +615,7 @@ export function AppShell() {
 
   useEffect(() => {
     if (activeView === "settings" && !isAdmin) {
-      setActiveView("documents");
+      setActiveView("home");
     }
   }, [activeView, isAdmin]);
 
@@ -552,27 +630,18 @@ export function AppShell() {
         created_at: result.created_at,
       }));
     }
-    return documentsQuery.data ?? [];
-  }, [documentsQuery.data, searchQuery.data, submittedSearch]);
+    return documentsQuery.data?.pages.flat() ?? [];
+  }, [documentsQuery.data?.pages, searchQuery.data, submittedSearch]);
 
-  useEffect(() => {
-    if (
-      workspaceEnabled &&
-      !selectedDocumentId &&
-      visibleDocuments.length > 0
-    ) {
-      setSelectedDocumentId(visibleDocuments[0].id);
-    }
-  }, [selectedDocumentId, visibleDocuments, workspaceEnabled]);
+  const loadedDocuments = useMemo(
+    () => documentsQuery.data?.pages.flat() ?? [],
+    [documentsQuery.data?.pages],
+  );
 
   const pendingNotifications =
     notificationsQuery.data?.filter((item) => item.status === "pending")
       .length ?? 0;
-  const documentCount = documentsQuery.data?.length ?? 0;
-  const workspaceIsEmpty =
-    !documentsQuery.isLoading &&
-    documentCount === 0 &&
-    submittedSearch === null;
+  const documentCount = loadedDocuments.length;
   const duplicateGroups = duplicatesQuery.data?.length ?? 0;
   const tagCreateError =
     tagCreateMutation.error instanceof Error
@@ -607,9 +676,14 @@ export function AppShell() {
           ? adminSettingsQuery.error.message
           : usersQuery.error instanceof Error
             ? usersQuery.error.message
-            : null;
+            : providerHealthQuery.error instanceof Error
+              ? providerHealthQuery.error.message
+              : null;
 
-  if (!authConfigQuery.data && accessToken === null) {
+  if (
+    (!authConfigQuery.data && accessToken === null) ||
+    (canAccessWorkspace && meQuery.isPending && !showAuthScreen)
+  ) {
     return <AuthLoading />;
   }
 
@@ -628,14 +702,7 @@ export function AppShell() {
 
   return (
     <main className="min-h-screen bg-background text-foreground xl:h-screen xl:overflow-hidden">
-      <div
-        className={cn(
-          "grid min-h-screen content-start xl:h-screen xl:content-normal",
-          workspaceIsEmpty
-            ? "xl:grid-cols-[252px_minmax(0,1fr)]"
-            : "xl:grid-cols-[252px_minmax(0,1fr)]",
-        )}
-      >
+      <div className="grid min-h-screen content-start xl:h-screen xl:grid-cols-[252px_minmax(0,1fr)] xl:content-normal">
         <aside className="flex flex-col border-b border-border bg-card px-4 py-3 xl:h-screen xl:border-b-0 xl:border-r xl:py-5">
           <div className="mb-3 flex items-center justify-between gap-3 px-1 xl:mb-7 xl:justify-start">
             <div className="flex items-center gap-3">
@@ -746,11 +813,23 @@ export function AppShell() {
           </div>
         </aside>
 
-        {activeView === "questions" ? (
+        {activeView === "home" ? (
+          <HomeWorkspace
+            documents={loadedDocuments}
+            notifications={notificationsQuery.data ?? []}
+            isLoading={documentsQuery.isLoading}
+            isUploading={uploadMutation.isPending}
+            onUpload={(file) => uploadMutation.mutate(file)}
+            onOpenDocument={openDocument}
+            onOpenDocuments={() => setActiveView("documents")}
+            onAsk={() => setActiveView("questions")}
+          />
+        ) : activeView === "questions" ? (
           <QuestionsWorkspace onOpenDocument={openDocument} />
         ) : activeView === "settings" && isAdmin ? (
           <SettingsWorkspace
             settings={adminSettingsQuery.data}
+            providerHealth={providerHealthQuery.data}
             users={usersQuery.data ?? []}
             currentUser={meQuery.data}
             isLoading={adminSettingsQuery.isLoading || usersQuery.isLoading}
@@ -770,7 +849,7 @@ export function AppShell() {
         ) : activeView === "notifications" ? (
           <NotificationsWorkspace
             notifications={notificationsQuery.data ?? []}
-            documents={documentsQuery.data ?? []}
+            documents={loadedDocuments}
             isLoading={notificationsQuery.isLoading}
             isUpdating={notificationStatusMutation.isPending}
             error={notificationActionError}
@@ -796,19 +875,19 @@ export function AppShell() {
             error={tagCreateError}
             onCreateTag={createVaultTag}
           />
-        ) : workspaceIsEmpty ? (
-          <EmptyWorkspace
-            isUploading={uploadMutation.isPending}
-            onUpload={(file) => uploadMutation.mutate(file)}
-          />
         ) : (
           <section className="flex min-w-0 flex-col bg-background xl:h-screen xl:min-h-0">
-            <header className="border-b border-border bg-card px-5 py-4 xl:px-6">
+            <header className="border-b border-border bg-card px-5 py-4 xl:px-8">
               <div className="flex flex-col gap-4">
                 <div className="flex flex-wrap items-start justify-between gap-4">
-                  <h1 className="text-xl font-semibold tracking-normal">
-                    Documents
-                  </h1>
+                  <div>
+                    <h1 className="text-xl font-semibold tracking-normal">
+                      Documents
+                    </h1>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      Browse and search your document library.
+                    </p>
+                  </div>
                   <UploadButton
                     disabled={uploadMutation.isPending}
                     onUpload={(file) => uploadMutation.mutate(file)}
@@ -837,86 +916,104 @@ export function AppShell() {
               </div>
             </header>
 
-            <div className="grid min-h-0 flex-1 xl:grid-cols-[390px_minmax(0,1fr)] xl:overflow-hidden">
-              <section className="min-h-0 border-b border-border bg-background/70 p-4 xl:flex xl:flex-col xl:border-b-0 xl:border-r">
-                <div className="mb-3 flex items-center justify-between">
-                  <h2 className="text-sm font-semibold">Documents</h2>
-                  <span className="text-xs text-muted-foreground">
-                    {visibleDocuments.length} shown
-                  </span>
-                </div>
-                <div className="min-h-0 xl:flex-1 xl:overflow-auto">
-                  {documentsQuery.isLoading ? (
-                    <DocumentListSkeleton />
-                  ) : visibleDocuments.length === 0 ? (
-                    <DocumentListEmptyState
-                      hasSearch={submittedSearch !== null}
-                      isUploading={uploadMutation.isPending}
-                      onClear={clearSearch}
-                      onUpload={(file) => uploadMutation.mutate(file)}
-                    />
-                  ) : (
-                    <div className="space-y-2">
-                      {visibleDocuments.map((document) => (
-                        <DocumentListItem
-                          document={document}
-                          key={document.id}
-                          selected={selectedDocumentId === document.id}
-                          onSelect={() => setSelectedDocumentId(document.id)}
-                        />
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </section>
-
-              <DocumentPanel
-                detail={detailQuery.data}
-                duplicateGroups={duplicateGroups}
-                notifications={notificationsQuery.data ?? []}
-                tags={tagsQuery.data ?? []}
-                isLoading={detailQuery.isLoading}
-                isUpdating={
-                  documentUpdateMutation.isPending ||
-                  metadataUpdateMutation.isPending ||
-                  archiveMutation.isPending
-                }
-                isSyncingNotifications={notificationSyncMutation.isPending}
-                isReprocessing={reprocessingMutation.isPending}
-                isTagUpdating={
-                  tagCreateAttachMutation.isPending ||
-                  tagAttachMutation.isPending ||
-                  tagDetachMutation.isPending
-                }
-                tagError={tagMutationError}
-                notificationError={notificationActionError}
-                processingError={reprocessingError}
-                onArchive={(documentId) => archiveMutation.mutate(documentId)}
-                onReprocess={(documentId) =>
-                  reprocessingMutation.mutate(documentId)
-                }
-                onSyncNotifications={(documentId) =>
-                  notificationSyncMutation.mutate(documentId)
-                }
-                onUpdateNotificationStatus={(notificationId, status) =>
-                  notificationStatusMutation.mutate({ notificationId, status })
-                }
-                onUpdateDocument={(documentId, updates) =>
-                  documentUpdateMutation.mutate({ documentId, updates })
-                }
-                onUpdateMetadata={(documentId, metadata) =>
-                  metadataUpdateMutation.mutate({ documentId, metadata })
-                }
-                onAttachTag={(documentId, tagId) =>
-                  tagAttachMutation.mutate({ documentId, tagId })
-                }
-                onCreateAndAttachTag={(documentId, name) =>
-                  tagCreateAttachMutation.mutate({ documentId, name })
-                }
-                onDetachTag={(documentId, tagId) =>
-                  tagDetachMutation.mutate({ documentId, tagId })
-                }
-              />
+            <div className="min-h-0 flex-1 overflow-auto">
+              {selectedDocumentId ? (
+                <DocumentPanel
+                  detail={detailQuery.data}
+                  documentTypes={documentTypesQuery.data ?? []}
+                  duplicateGroups={duplicateGroups}
+                  notifications={notificationsQuery.data ?? []}
+                  tags={tagsQuery.data ?? []}
+                  isLoading={detailQuery.isLoading}
+                  isUpdating={
+                    documentUpdateMutation.isPending ||
+                    metadataUpdateMutation.isPending ||
+                    archiveMutation.isPending ||
+                    deleteMutation.isPending
+                  }
+                  isSyncingNotifications={notificationSyncMutation.isPending}
+                  isReprocessing={reprocessingMutation.isPending}
+                  isTagUpdating={
+                    tagCreateAttachMutation.isPending ||
+                    tagAttachMutation.isPending ||
+                    tagDetachMutation.isPending
+                  }
+                  tagError={tagMutationError}
+                  notificationError={notificationActionError}
+                  processingError={reprocessingError}
+                  onBack={() => setSelectedDocumentId(null)}
+                  onArchive={(documentId) => archiveMutation.mutate(documentId)}
+                  onDownload={(documentId) =>
+                    downloadMutation.mutate(documentId)
+                  }
+                  onDelete={confirmDelete}
+                  onReprocess={(documentId) =>
+                    reprocessingMutation.mutate(documentId)
+                  }
+                  onSyncNotifications={(documentId) =>
+                    notificationSyncMutation.mutate(documentId)
+                  }
+                  onUpdateNotificationStatus={(notificationId, status) =>
+                    notificationStatusMutation.mutate({
+                      notificationId,
+                      status,
+                    })
+                  }
+                  onUpdateDocument={(documentId, updates) =>
+                    documentUpdateMutation.mutate({ documentId, updates })
+                  }
+                  onUpdateMetadata={(documentId, metadata) =>
+                    metadataUpdateMutation.mutate({ documentId, metadata })
+                  }
+                  onAttachTag={(documentId, tagId) =>
+                    tagAttachMutation.mutate({ documentId, tagId })
+                  }
+                  onCreateAndAttachTag={(documentId, name) =>
+                    tagCreateAttachMutation.mutate({ documentId, name })
+                  }
+                  onDetachTag={(documentId, tagId) =>
+                    tagDetachMutation.mutate({ documentId, tagId })
+                  }
+                />
+              ) : (
+                <DocumentLibrary
+                  documents={visibleDocuments}
+                  documentTypes={documentTypesQuery.data ?? []}
+                  isLoading={documentsQuery.isLoading || searchQuery.isLoading}
+                  hasSearch={submittedSearch !== null}
+                  isUploading={uploadMutation.isPending}
+                  hasMore={
+                    documentsQuery.hasNextPage && submittedSearch === null
+                  }
+                  searchOffset={submittedSearch?.offset ?? 0}
+                  hasNextSearchPage={
+                    submittedSearch !== null &&
+                    (searchQuery.data?.length ?? 0) === 50
+                  }
+                  isLoadingMore={documentsQuery.isFetchingNextPage}
+                  onClear={clearSearch}
+                  onLoadMore={() => void documentsQuery.fetchNextPage()}
+                  onNextSearchPage={() =>
+                    setSubmittedSearch((current) =>
+                      current
+                        ? { ...current, offset: (current.offset ?? 0) + 50 }
+                        : current,
+                    )
+                  }
+                  onPreviousSearchPage={() =>
+                    setSubmittedSearch((current) =>
+                      current
+                        ? {
+                            ...current,
+                            offset: Math.max(0, (current.offset ?? 0) - 50),
+                          }
+                        : current,
+                    )
+                  }
+                  onUpload={(file) => uploadMutation.mutate(file)}
+                  onOpen={setSelectedDocumentId}
+                />
+              )}
             </div>
           </section>
         )}
@@ -1281,44 +1378,6 @@ function UploadButton({
   );
 }
 
-function EmptyWorkspace({
-  isUploading,
-  onUpload,
-}: {
-  isUploading: boolean;
-  onUpload: (file: File) => void;
-}) {
-  return (
-    <section className="flex min-h-[420px] min-w-0 items-center justify-center bg-background px-6 py-10 sm:min-h-[480px] xl:min-h-screen xl:px-8">
-      <div className="w-full max-w-2xl text-center">
-        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-          <FileSearch className="h-7 w-7" aria-hidden="true" />
-        </div>
-        <p className="mt-8 text-sm font-medium uppercase tracking-wide text-muted-foreground">
-          Empty vault
-        </p>
-        <h1 className="mt-3 text-3xl font-semibold tracking-normal sm:text-4xl">
-          Add your first document.
-        </h1>
-        <p className="mx-auto mt-4 max-w-xl text-base leading-7 text-muted-foreground">
-          Upload a PDF, scanned document, or image. PaperVault will extract
-          text, classify it, generate a summary, and make it searchable.
-        </p>
-        <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
-          <UploadButton
-            disabled={isUploading}
-            onUpload={onUpload}
-            className="h-11 px-5"
-          />
-          <span className="text-sm text-muted-foreground">
-            PDF, JPG, and PNG are supported
-          </span>
-        </div>
-      </div>
-    </section>
-  );
-}
-
 function DocumentListSkeleton() {
   return (
     <div className="space-y-3">
@@ -1373,52 +1432,151 @@ function DocumentListEmptyState({
   );
 }
 
-function DocumentListItem({
-  document,
-  selected,
-  onSelect,
+function DocumentLibrary({
+  documents,
+  documentTypes,
+  isLoading,
+  hasSearch,
+  isUploading,
+  hasMore,
+  searchOffset,
+  hasNextSearchPage,
+  isLoadingMore,
+  onClear,
+  onLoadMore,
+  onNextSearchPage,
+  onPreviousSearchPage,
+  onUpload,
+  onOpen,
 }: {
-  document: DocumentListEntry;
-  selected: boolean;
-  onSelect: () => void;
+  documents: DocumentListEntry[];
+  documentTypes: DocumentTypeDefinition[];
+  isLoading: boolean;
+  hasSearch: boolean;
+  isUploading: boolean;
+  hasMore: boolean;
+  searchOffset: number;
+  hasNextSearchPage: boolean;
+  isLoadingMore: boolean;
+  onClear: () => void;
+  onLoadMore: () => void;
+  onNextSearchPage: () => void;
+  onPreviousSearchPage: () => void;
+  onUpload: (file: File) => void;
+  onOpen: (documentId: string) => void;
 }) {
+  const typeLabels = new Map(
+    documentTypes.map((documentType) => [documentType.key, documentType.label]),
+  );
+
+  if (isLoading) {
+    return <DocumentListSkeleton />;
+  }
+  if (!documents.length) {
+    return (
+      <DocumentListEmptyState
+        hasSearch={hasSearch}
+        isUploading={isUploading}
+        onClear={onClear}
+        onUpload={onUpload}
+      />
+    );
+  }
+
   return (
-    <button
-      className={cn(
-        "group w-full rounded-lg border bg-card p-4 text-left text-sm transition-colors hover:border-primary/40 hover:bg-primary/5",
-        selected ? "border-primary/60 bg-primary/5" : "border-border",
-      )}
-      type="button"
-      onClick={onSelect}
-    >
-      <div className="flex items-start gap-3">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary">
-          <FileText className="h-5 w-5" aria-hidden="true" />
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="flex items-start justify-between gap-3">
-            <span className="line-clamp-2 font-semibold leading-5">
-              {document.title}
-            </span>
-            <StatusBadge status={document.status} />
-          </div>
-          <p className="mt-1 truncate text-xs text-muted-foreground">
-            {document.original_filename}
+    <section className="mx-auto max-w-7xl p-5 xl:p-8">
+      <div className="mb-4 flex items-end justify-between gap-4">
+        <div>
+          <h2 className="text-base font-semibold">Library</h2>
+          <p className="text-sm text-muted-foreground">
+            {documents.length}{" "}
+            {documents.length === 1 ? "document" : "documents"}
           </p>
-          <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-            <span className="rounded-md bg-muted px-2 py-1 capitalize">
-              {document.document_type.replaceAll("_", " ")}
-            </span>
-            <span>{formatDateTime(document.created_at)}</span>
-          </div>
         </div>
       </div>
-    </button>
+      <div className="overflow-hidden rounded-lg border border-border bg-card">
+        <div className="hidden grid-cols-[minmax(0,1fr)_180px_140px_130px] gap-4 border-b border-border bg-muted/40 px-4 py-2 text-xs font-medium text-muted-foreground md:grid">
+          <span>Document</span>
+          <span>Type</span>
+          <span>Status</span>
+          <span className="text-right">Added</span>
+        </div>
+        <div className="divide-y divide-border">
+          {documents.map((document) => (
+            <button
+              className="grid w-full gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/60 md:grid-cols-[minmax(0,1fr)_180px_140px_130px] md:items-center"
+              key={document.id}
+              type="button"
+              onClick={() => onOpen(document.id)}
+            >
+              <span className="flex min-w-0 items-center gap-3">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
+                  <FileText className="h-4 w-4" aria-hidden="true" />
+                </span>
+                <span className="min-w-0">
+                  <span className="block truncate text-sm font-medium">
+                    {document.title}
+                  </span>
+                  <span className="block truncate text-xs text-muted-foreground">
+                    {document.original_filename}
+                  </span>
+                </span>
+              </span>
+              <span className="text-xs text-muted-foreground">
+                {typeLabels.get(document.document_type) ??
+                  humanizeLabel(document.document_type)}
+              </span>
+              <span>
+                <StatusBadge status={document.status} />
+              </span>
+              <span className="text-xs text-muted-foreground md:text-right">
+                {formatDateTime(document.created_at)}
+              </span>
+            </button>
+          ))}
+        </div>
+      </div>
+      {hasMore ? (
+        <div className="mt-4 flex justify-center">
+          <Button
+            type="button"
+            variant="secondary"
+            disabled={isLoadingMore}
+            onClick={onLoadMore}
+          >
+            {isLoadingMore ? "Loading..." : "Load more documents"}
+          </Button>
+        </div>
+      ) : null}
+      {hasSearch && (searchOffset > 0 || hasNextSearchPage) ? (
+        <div className="mt-4 flex items-center justify-center gap-3">
+          <Button
+            type="button"
+            variant="secondary"
+            disabled={searchOffset === 0}
+            onClick={onPreviousSearchPage}
+          >
+            Previous
+          </Button>
+          <span className="text-xs text-muted-foreground">
+            Page {Math.floor(searchOffset / 50) + 1}
+          </span>
+          <Button
+            type="button"
+            variant="secondary"
+            disabled={!hasNextSearchPage}
+            onClick={onNextSearchPage}
+          >
+            Next
+          </Button>
+        </div>
+      ) : null}
+    </section>
   );
 }
 
 function StatusBadge({ status }: { status: string }) {
-  const normalizedStatus = status.replaceAll("_", " ");
+  const normalizedStatus = humanizeLabel(status);
   const ready = status === "ready";
   const processing = status.includes("processing");
   const failed = status.includes("failed") || status === "error";
@@ -1488,6 +1646,7 @@ function SearchControls({
 }) {
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [saveOpen, setSaveOpen] = useState(false);
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const activeFilterCount = countActiveFilters(filters);
   const canSaveSearch = query.trim().length > 0 || activeFilterCount > 0;
   const hasSearchShortcuts =
@@ -1548,11 +1707,23 @@ function SearchControls({
               aria-hidden="true"
             />
           </button>
-          {canSaveSearch ? (
-            <Button size="sm" variant="ghost" type="button" onClick={onClear}>
-              Clear
-            </Button>
-          ) : null}
+          <div className="flex items-center gap-1">
+            {hasSearchShortcuts ? (
+              <Button
+                size="sm"
+                variant="ghost"
+                type="button"
+                onClick={() => setShortcutsOpen((current) => !current)}
+              >
+                Saved and recent
+              </Button>
+            ) : null}
+            {canSaveSearch ? (
+              <Button size="sm" variant="ghost" type="button" onClick={onClear}>
+                Clear
+              </Button>
+            ) : null}
+          </div>
         </div>
 
         {advancedOpen ? (
@@ -1606,7 +1777,7 @@ function SearchControls({
                 <option value="">Any tag</option>
                 {tags.map((tag) => (
                   <option key={tag.id} value={tag.slug}>
-                    {tag.name}
+                    {humanizeLabel(tag.name)}
                   </option>
                 ))}
               </select>
@@ -1705,7 +1876,7 @@ function SearchControls({
         </div>
       ) : null}
 
-      {hasSearchShortcuts ? (
+      {hasSearchShortcuts && shortcutsOpen ? (
         <div className="mt-3 grid gap-3 md:grid-cols-2">
           {savedSearches.length > 0 ? (
             <SearchShortcutList
@@ -1828,7 +1999,7 @@ function describeSearch(
     parts.push(query.trim());
   }
   if (normalized.document_type) {
-    parts.push(normalized.document_type.replaceAll("_", " "));
+    parts.push(humanizeLabel(normalized.document_type));
   }
   if (normalized.tag) {
     parts.push(`#${normalized.tag}`);
@@ -1913,6 +2084,7 @@ function DocumentOverviewEmptyState() {
 
 function DocumentPanel({
   detail,
+  documentTypes,
   duplicateGroups,
   notifications,
   tags,
@@ -1924,7 +2096,10 @@ function DocumentPanel({
   tagError,
   notificationError,
   processingError,
+  onBack,
   onArchive,
+  onDownload,
+  onDelete,
   onReprocess,
   onSyncNotifications,
   onUpdateNotificationStatus,
@@ -1935,6 +2110,7 @@ function DocumentPanel({
   onDetachTag,
 }: {
   detail: DocumentDetail | undefined;
+  documentTypes: DocumentTypeDefinition[];
   duplicateGroups: number;
   notifications: NotificationItem[];
   tags: TagItem[];
@@ -1946,7 +2122,10 @@ function DocumentPanel({
   tagError: string | null;
   notificationError: string | null;
   processingError: string | null;
+  onBack: () => void;
   onArchive: (documentId: string) => void;
+  onDownload: (documentId: string) => void;
+  onDelete: (documentId: string, title: string) => void;
   onReprocess: (documentId: string) => void;
   onSyncNotifications: (documentId: string) => void;
   onUpdateNotificationStatus: (
@@ -1982,6 +2161,10 @@ function DocumentPanel({
   }
 
   const metadataEntries = Object.entries(detail.metadata?.data ?? {});
+  const documentTypeLabel =
+    documentTypes.find(
+      (documentType) => documentType.key === detail.document.document_type,
+    )?.label ?? humanizeLabel(detail.document.document_type);
   const documentDate =
     detail.document.document_date ?? formatDateTime(detail.document.created_at);
   const confidence = detail.ai_analysis?.confidence_score;
@@ -1996,13 +2179,17 @@ function DocumentPanel({
   );
 
   return (
-    <article className="min-h-screen min-w-0 overflow-auto bg-background xl:h-full xl:min-h-0">
+    <article className="min-w-0 bg-background">
       <header className="border-b border-border bg-card px-5 py-5 xl:px-7">
+        <Button className="mb-4" size="sm" variant="ghost" onClick={onBack}>
+          <ArrowLeft className="h-4 w-4" />
+          Back to documents
+        </Button>
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="min-w-0">
             <div className="mb-2 flex flex-wrap items-center gap-2">
               <span className="rounded-md bg-muted px-2 py-1 text-xs font-medium capitalize text-muted-foreground">
-                {detail.document.document_type.replaceAll("_", " ")}
+                {documentTypeLabel}
               </span>
               <StatusBadge status={detail.document.status} />
             </div>
@@ -2013,15 +2200,39 @@ function DocumentPanel({
               {detail.document.original_filename}
             </p>
           </div>
-          <Button
-            size="sm"
-            variant="secondary"
-            type="button"
-            disabled={detail.document.status === "archived" || isUpdating}
-            onClick={() => onArchive(detail.document.id)}
-          >
-            Archive
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              size="sm"
+              variant="secondary"
+              type="button"
+              onClick={() => onDownload(detail.document.id)}
+            >
+              <Download className="h-4 w-4" />
+              Download
+            </Button>
+            <Button
+              size="sm"
+              variant="secondary"
+              type="button"
+              disabled={detail.document.status === "archived" || isUpdating}
+              onClick={() => onArchive(detail.document.id)}
+            >
+              Archive
+            </Button>
+            <Button
+              className="border-rose-300 text-rose-700 hover:bg-rose-50 dark:border-rose-800 dark:text-rose-300 dark:hover:bg-rose-950"
+              size="sm"
+              variant="outline"
+              type="button"
+              disabled={isUpdating}
+              onClick={() =>
+                onDelete(detail.document.id, detail.document.title)
+              }
+            >
+              <Trash2 className="h-4 w-4" />
+              Delete
+            </Button>
+          </div>
         </div>
       </header>
 
@@ -2078,10 +2289,7 @@ function DocumentPanel({
           <section className="border-t border-border pt-5">
             <h3 className="text-sm font-semibold">Document Details</h3>
             <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-              <ReadOnlyField
-                label="Type"
-                value={detail.document.document_type.replaceAll("_", " ")}
-              />
+              <ReadOnlyField label="Type" value={documentTypeLabel} />
               <ReadOnlyField label="Date" value={documentDate} />
               <ReadOnlyField label="Issuer" value={detail.document.issuer} />
               <ReadOnlyField
@@ -2099,7 +2307,7 @@ function DocumentPanel({
                   {metadataEntries.slice(0, 8).map(([key, value]) => (
                     <ReadOnlyField
                       key={key}
-                      label={key.replaceAll("_", " ")}
+                      label={humanizeLabel(key)}
                       value={formatMetadataValue(value)}
                     />
                   ))}
@@ -2120,6 +2328,7 @@ function DocumentPanel({
               <div className="mt-4 max-w-2xl">
                 <DocumentFieldsEditor
                   document={detail.document}
+                  documentTypes={documentTypes}
                   disabled={isUpdating}
                   onSave={(updates) =>
                     onUpdateDocument(detail.document.id, updates)
@@ -2246,7 +2455,7 @@ function DocumentPanel({
                   <div className="mt-3 space-y-3">
                     {detail.timeline_events.slice(0, 6).map((event) => (
                       <div className="text-sm" key={event.id}>
-                        <p>{event.event_type.replaceAll("_", " ")}</p>
+                        <p>{humanizeLabel(event.event_type)}</p>
                         <p className="text-xs text-muted-foreground">
                           {new Date(event.occurred_at).toLocaleString()}
                         </p>
@@ -2529,7 +2738,7 @@ function TagEditor({
               className="inline-flex items-center gap-2 rounded-md border border-border px-2 py-1 text-xs"
               key={tag.id}
             >
-              {tag.name}
+              {humanizeLabel(tag.name)}
               <button
                 className="text-muted-foreground hover:text-foreground"
                 type="button"
@@ -2560,7 +2769,7 @@ function TagEditor({
                 disabled={disabled}
                 onClick={() => onCreateAndAttachTag(tag)}
               >
-                Add {tag}
+                Add {humanizeLabel(tag)}
               </Button>
             ))}
           </div>
@@ -2591,7 +2800,7 @@ function TagEditor({
                   <option value="">Select a tag</option>
                   {attachableTags.map((tag) => (
                     <option key={tag.id} value={tag.id}>
-                      {tag.name}
+                      {humanizeLabel(tag.name)}
                     </option>
                   ))}
                 </select>
@@ -2661,10 +2870,12 @@ function TagEditor({
 
 function DocumentFieldsEditor({
   document,
+  documentTypes,
   disabled,
   onSave,
 }: {
   document: DocumentItem;
+  documentTypes: DocumentTypeDefinition[];
   disabled: boolean;
   onSave: (updates: Parameters<typeof updateDocument>[1]) => void;
 }) {
@@ -2710,12 +2921,25 @@ function DocumentFieldsEditor({
       <div className="grid gap-3 sm:grid-cols-2">
         <label className="block">
           <span className="mb-1 block text-muted-foreground">Type</span>
-          <input
+          <select
             className="h-9 w-full rounded-md border border-input bg-background px-3 outline-none focus-visible:ring-2 focus-visible:ring-ring"
             value={documentType}
             disabled={disabled}
             onChange={(event) => setDocumentType(event.target.value)}
-          />
+          >
+            {!documentTypes.some(
+              (definition) => definition.key === documentType,
+            ) ? (
+              <option value={documentType}>
+                {humanizeLabel(documentType)}
+              </option>
+            ) : null}
+            {documentTypes.map((definition) => (
+              <option key={definition.key} value={definition.key}>
+                {definition.label}
+              </option>
+            ))}
+          </select>
         </label>
         <label className="block">
           <span className="mb-1 block text-muted-foreground">Date</span>

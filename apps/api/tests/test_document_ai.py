@@ -19,6 +19,7 @@ from papervault_api.documents.infrastructure.models import (
     DocumentTextExtraction,
 )
 from papervault_api.identity.infrastructure.models import User
+from papervault_api.tags.infrastructure.models import DocumentTag, Tag
 
 SALARY_TEXT = """
 Salary Slip
@@ -120,6 +121,13 @@ async def test_ai_processing_service_persists_analysis_embedding_and_metadata(
     analysis = analyses.one()
     embedding = embeddings.one()
     metadata = metadata_records.one()
+    automatic_tags = (
+        await session.execute(
+            select(Tag)
+            .join(DocumentTag, DocumentTag.tag_id == Tag.id)
+            .where(DocumentTag.document_id == document.id),
+        )
+    ).scalars()
 
     assert refreshed_document is not None
     assert refreshed_document.document_type == "salary_slip"
@@ -131,3 +139,4 @@ async def test_ai_processing_service_persists_analysis_embedding_and_metadata(
     assert len(embedding.vector) == 16
     assert metadata.schema_name == "salary_slip"
     assert metadata.data["net_salary"] == 120000.0
+    assert "salary-slip" in {tag.slug for tag in automatic_tags}

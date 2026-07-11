@@ -1,3 +1,4 @@
+import asyncio
 import hashlib
 import re
 from dataclasses import dataclass
@@ -137,17 +138,7 @@ class LocalExtractiveAnswerProvider:
                 ),
             )
 
-        citations = tuple(
-            QuestionCitation(
-                document_id=item.document_id,
-                document_title=item.title,
-                original_filename=item.original_filename,
-                page_number=item.page_number,
-                snippet=best_excerpt(question, item.content_text),
-                relevance_score=round(item.score, 4),
-            )
-            for item in evidence[:MAX_CITATIONS]
-        )
+        citations = unique_citations(question, evidence)
         primary = citations[0]
         confidence = min(
             0.97,
@@ -183,7 +174,11 @@ class QuestionAnsweringService:
 
         await self._materialize_missing_chunks(owner_id)
         evidence = await self._retrieve(owner_id, normalized_question)
-        return self._answer_provider.answer(normalized_question, evidence)
+        return await asyncio.to_thread(
+            self._answer_provider.answer,
+            normalized_question,
+            evidence,
+        )
 
     async def _materialize_missing_chunks(self, owner_id: UUID) -> None:
         result = await self._session.execute(
@@ -229,7 +224,10 @@ class QuestionAnsweringService:
             )
             for page_number, page_text in page_texts:
                 for chunk in chunk_page_text(page_number, page_text):
-                    embedding = self._embedding_provider.embed(chunk.content_text)
+                    embedding = await asyncio.to_thread(
+                        self._embedding_provider.embed,
+                        chunk.content_text,
+                    )
                     self._session.add(
                         DocumentTextChunk(
                             document_id=document.id,
@@ -257,7 +255,9 @@ class QuestionAnsweringService:
         owner_id: UUID,
         question: str,
     ) -> tuple[RetrievedEvidence, ...]:
-        query_embedding = self._embedding_provider.embed(question).vector
+        query_embedding = (
+            await asyncio.to_thread(self._embedding_provider.embed, question)
+        ).vector
         concepts = question_concepts(question)
         if not concepts:
             return ()
@@ -351,3 +351,29 @@ def best_excerpt(question: str, text: str, max_chars: int = 320) -> str:
     prefix = "..." if best_start > 0 else ""
     suffix = "..." if best_start + max_chars < len(normalized) else ""
     return f"{prefix}{normalized[best_start : best_start + max_chars].strip()}{suffix}"
+
+
+def unique_citations(
+    question: str,
+    evidence: tuple[RetrievedEvidence, ...],
+) -> tuple[QuestionCitation, ...]:
+    citations: list[QuestionCitation] = []
+    seen: set[tuple[UUID, int]] = set()
+    for item in evidence:
+        key = (item.document_id, item.page_number)
+        if key in seen:
+            continue
+        citations.append(
+            QuestionCitation(
+                document_id=item.document_id,
+                document_title=item.title,
+                original_filename=item.original_filename,
+                page_number=item.page_number,
+                snippet=best_excerpt(question, item.content_text),
+                relevance_score=round(item.score, 4),
+            )
+        )
+        seen.add(key)
+        if len(citations) >= MAX_CITATIONS:
+            break
+    return tuple(citations)

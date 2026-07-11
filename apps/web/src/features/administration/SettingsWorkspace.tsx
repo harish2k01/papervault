@@ -1,4 +1,5 @@
-import { AuthUser, AdminSettings } from "../../lib/api";
+import { AuthUser, AdminSettings, ProviderHealth } from "../../lib/api";
+import { humanizeLabel } from "../../lib/utils";
 import { Button } from "../../components/ui/button";
 import {
   CheckCircle2,
@@ -11,6 +12,7 @@ import {
 
 export function SettingsWorkspace({
   settings,
+  providerHealth,
   users,
   currentUser,
   isLoading,
@@ -20,6 +22,7 @@ export function SettingsWorkspace({
   onUpdateUser,
 }: {
   settings: AdminSettings | undefined;
+  providerHealth: ProviderHealth | undefined;
   users: AuthUser[];
   currentUser: AuthUser | undefined;
   isLoading: boolean;
@@ -118,6 +121,11 @@ export function SettingsWorkspace({
                   value={settings.ai_provider}
                 />
                 <RuntimeItem
+                  icon={CheckCircle2}
+                  label="Grounded answers"
+                  value={settings.answer_provider}
+                />
+                <RuntimeItem
                   icon={HardDrive}
                   label="Embeddings"
                   value={settings.embedding_provider}
@@ -136,6 +144,31 @@ export function SettingsWorkspace({
                   label="OCR"
                   value={settings.ocr_provider}
                 />
+              </div>
+            ) : null}
+            {providerHealth ? (
+              <div className="mt-3 overflow-hidden rounded-lg border border-border bg-card">
+                {providerHealth.checks.map((check) => (
+                  <div
+                    className="grid gap-2 border-b border-border px-4 py-3 last:border-b-0 sm:grid-cols-[140px_minmax(0,1fr)_100px] sm:items-center"
+                    key={check.capability}
+                  >
+                    <span className="text-sm font-medium">
+                      {check.capability}
+                    </span>
+                    <span className="truncate text-xs text-muted-foreground">
+                      {humanizeLabel(check.provider)} &middot; {check.model}
+                    </span>
+                    <span
+                      className={
+                        check.healthy ? "text-emerald-700" : "text-rose-700"
+                      }
+                      title={check.detail}
+                    >
+                      {check.healthy ? "Healthy" : "Unavailable"}
+                    </span>
+                  </div>
+                ))}
               </div>
             ) : null}
           </section>
@@ -164,7 +197,7 @@ export function SettingsWorkspace({
                       {user.display_name || user.email}
                     </p>
                     <p className="truncate text-xs text-muted-foreground">
-                      {user.email} - {user.auth_provider}
+                      {user.email} - {humanizeLabel(user.auth_provider)}
                     </p>
                   </div>
                   <label className="flex items-center gap-2 text-xs text-muted-foreground md:block">
@@ -226,7 +259,7 @@ function RuntimeItem({
         <span className="text-xs">{label}</span>
       </div>
       <p className="mt-2 truncate text-sm font-medium capitalize">
-        {value.replaceAll("_", " ")}
+        {humanizeLabel(value)}
       </p>
     </div>
   );

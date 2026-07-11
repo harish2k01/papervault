@@ -80,10 +80,11 @@ async def _process_document(document_id: UUID) -> None:
         async with AsyncSessionFactory() as session:
             ai_processing_service = DocumentAIProcessingService(
                 session=session,
-                ai_provider=build_document_ai_provider(settings.ai_provider),
+                ai_provider=build_document_ai_provider(settings.ai_provider, settings),
                 embedding_provider=build_embedding_provider(
                     settings.embedding_provider,
                     settings.embedding_dimensions,
+                    settings,
                 ),
                 classification_threshold=settings.ai_classification_threshold,
             )

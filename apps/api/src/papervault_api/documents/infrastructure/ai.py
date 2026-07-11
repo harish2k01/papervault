@@ -2,13 +2,25 @@ import hashlib
 import math
 import re
 from collections import Counter
+from typing import Any
 
+from papervault_api.core.config import Settings
+from papervault_api.core.model_clients import (
+    ModelClient,
+    build_model_client,
+    parse_json_object,
+)
 from papervault_api.documents.application.ai import (
     DocumentAIAnalysisResult,
     DocumentAIProvider,
     EmbeddingProvider,
     EmbeddingResult,
     ExtractedEntity,
+)
+from papervault_api.documents.domain.document_types import (
+    UnknownDocumentTypeError,
+    get_document_type,
+    list_document_types,
 )
 
 WORD_PATTERN = re.compile(r"[A-Za-z][A-Za-z0-9_-]{2,}")
@@ -178,16 +190,139 @@ class HashingEmbeddingProvider(EmbeddingProvider):
         )
 
 
-def build_document_ai_provider(provider: str) -> DocumentAIProvider:
+class ModelDocumentAIProvider(DocumentAIProvider):
+    def __init__(self, client: ModelClient) -> None:
+        self._client = client
+
+    def analyze(self, text: str, current_document_type: str) -> DocumentAIAnalysisResult:
+        categories = ", ".join(definition.key for definition in list_document_types())
+        payload = parse_json_object(
+            self._client.complete(
+                system=(
+                    "You classify and extract personal documents. Return only JSON with keys: "
+                    "summary, keywords, entities, suggested_tags, category, confidence_score, "
+                    "extracted_metadata. Every claim must come from the supplied text. "
+                    f"category must be one of: {categories}. entities is an array of objects with "
+                    "kind, value, and optional confidence_score."
+                ),
+                user=(
+                    f"Current category: {current_document_type}\n"
+                    f"Document text:\n{text[:50000]}"
+                ),
+            )
+        )
+        category = validated_category(payload.get("category"), current_document_type)
+        confidence = bounded_float(payload.get("confidence_score"), default=0.5)
+        entities = tuple(
+            ExtractedEntity(
+                kind=str(item.get("kind", "entity"))[:80],
+                value=str(item.get("value", ""))[:500],
+                confidence_score=bounded_float(
+                    item.get("confidence_score"),
+                    default=confidence,
+                ),
+            )
+            for item in object_list(payload.get("entities"))[:30]
+            if str(item.get("value", "")).strip()
+        )
+        return DocumentAIAnalysisResult(
+            provider=self._client.provider,
+            model=self._client.chat_model,
+            summary=str(payload.get("summary", "")).strip()[:2000],
+            keywords=string_tuple(payload.get("keywords"), limit=20),
+            entities=entities,
+            suggested_tags=string_tuple(payload.get("suggested_tags"), limit=8),
+            category=category,
+            confidence_score=confidence,
+            extracted_metadata=object_dict(payload.get("extracted_metadata")),
+        )
+
+
+class ModelEmbeddingProvider(EmbeddingProvider):
+    def __init__(self, client: ModelClient, expected_dimensions: int) -> None:
+        self._client = client
+        self._expected_dimensions = expected_dimensions
+
+    def embed(self, text: str) -> EmbeddingResult:
+        vector = self._client.embed(text)
+        if len(vector) != self._expected_dimensions:
+            raise ValueError(
+                "Embedding dimension mismatch: "
+                f"provider returned {len(vector)}, configured {self._expected_dimensions}"
+            )
+        norm = math.sqrt(sum(value * value for value in vector))
+        return EmbeddingResult(
+            provider=self._client.provider,
+            model=self._client.embedding_model,
+            dimensions=len(vector),
+            vector=vector,
+            vector_norm=round(norm, 8),
+        )
+
+
+def build_document_ai_provider(
+    provider: str,
+    settings: Settings | None = None,
+) -> DocumentAIProvider:
     if provider == "local":
         return LocalDocumentAIProvider()
+    if settings is None:
+        raise ValueError(f"Settings are required for AI provider: {provider}")
+    if provider in {"ollama", "openai_compatible"}:
+        return ModelDocumentAIProvider(build_model_client(provider, settings))
     raise ValueError(f"Unsupported AI provider: {provider}")
 
 
-def build_embedding_provider(provider: str, dimensions: int) -> EmbeddingProvider:
+def build_embedding_provider(
+    provider: str,
+    dimensions: int,
+    settings: Settings | None = None,
+) -> EmbeddingProvider:
     if provider == "local":
         return HashingEmbeddingProvider(dimensions)
+    if settings is None:
+        raise ValueError(f"Settings are required for embedding provider: {provider}")
+    if provider in {"ollama", "openai_compatible"}:
+        return ModelEmbeddingProvider(
+            build_model_client(provider, settings),
+            expected_dimensions=dimensions,
+        )
     raise ValueError(f"Unsupported embedding provider: {provider}")
+
+
+def validated_category(value: Any, fallback: str) -> str:
+    candidate = str(value or fallback).strip().lower()
+    try:
+        get_document_type(candidate)
+    except UnknownDocumentTypeError:
+        return fallback if fallback else "generic_pdf"
+    return candidate
+
+
+def bounded_float(value: Any, *, default: float) -> float:
+    try:
+        return round(min(1.0, max(0.0, float(value))), 4)
+    except (TypeError, ValueError):
+        return default
+
+
+def string_tuple(value: Any, *, limit: int) -> tuple[str, ...]:
+    if not isinstance(value, list):
+        return ()
+    normalized = (str(item).strip()[:120] for item in value)
+    return tuple(dict.fromkeys(item for item in normalized if item))[:limit]
+
+
+def object_list(value: Any) -> list[dict[str, Any]]:
+    if not isinstance(value, list):
+        return []
+    return [item for item in value if isinstance(item, dict)]
+
+
+def object_dict(value: Any) -> dict[str, object]:
+    if not isinstance(value, dict):
+        return {}
+    return {str(key)[:120]: item for key, item in list(value.items())[:50]}
 
 
 def classify_document(text: str, current_document_type: str) -> tuple[str, float]:

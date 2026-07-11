@@ -142,6 +142,13 @@ def test_admin_can_disable_runtime_local_registration() -> None:
         assert update_response.status_code == 200
         assert update_response.json()["local_registration_enabled"] is False
 
+        provider_health = client.get(
+            "/admin/settings/providers/health",
+            headers=headers,
+        )
+        assert provider_health.status_code == 200
+        assert all(check["healthy"] for check in provider_health.json()["checks"])
+
         config_response = client.get("/auth/config")
         assert config_response.status_code == 200
         assert config_response.json()["local_registration_enabled"] is False

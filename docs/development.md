@@ -37,11 +37,30 @@ AI processing is enabled by default with local deterministic providers:
 ```env
 PAPERVAULT_AI_ENABLED=true
 PAPERVAULT_AI_PROVIDER=local
+PAPERVAULT_ANSWER_PROVIDER=local
 PAPERVAULT_EMBEDDING_PROVIDER=local
 PAPERVAULT_EMBEDDING_DIMENSIONS=64
 ```
 
-These providers require no external credentials. Model-backed providers can be added behind the same interfaces.
+These providers require no external credentials. Analysis, embeddings, and grounded
+answers can instead use Ollama:
+
+```env
+PAPERVAULT_AI_PROVIDER=ollama
+PAPERVAULT_ANSWER_PROVIDER=ollama
+PAPERVAULT_EMBEDDING_PROVIDER=ollama
+PAPERVAULT_EMBEDDING_DIMENSIONS=768
+PAPERVAULT_OLLAMA_BASE_URL=http://host.docker.internal:11434
+PAPERVAULT_OLLAMA_CHAT_MODEL=llama3.2
+PAPERVAULT_OLLAMA_EMBEDDING_MODEL=nomic-embed-text
+```
+
+For an OpenAI-compatible endpoint, use `openai_compatible` for the three provider
+values and configure `PAPERVAULT_OPENAI_COMPATIBLE_BASE_URL`, API key, chat model,
+and embedding model. `PAPERVAULT_EMBEDDING_DIMENSIONS` must exactly match the
+selected embedding model. Change the OpenSearch index name and rebuild the index
+when changing embedding models or dimensions. Administrators can inspect active
+provider reachability from Settings without exposing credentials.
 
 OCR is enabled by default through local Tesseract and Poppler commands:
 

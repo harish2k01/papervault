@@ -37,6 +37,7 @@ from papervault_api.documents.api.schemas import (
     UpdateMetadataRequest,
     UploadDocumentResponse,
 )
+from papervault_api.documents.application.deletion import DocumentDeletionService
 from papervault_api.documents.application.lifecycle import (
     DocumentLifecycleService,
     DocumentUpdateCommand,
@@ -513,6 +514,7 @@ async def get_document_file(
     current_user: Annotated[CurrentUser, Depends(get_current_user)],
     session: Annotated[AsyncSession, Depends(get_session)],
     storage: Annotated[ObjectStorage, Depends(get_object_storage)],
+    download: bool = Query(default=False),
 ) -> FileResponse:
     service = DocumentReadService(session)
     document = await service.get_document_file(document_id=document_id, owner_id=current_user.id)
@@ -530,7 +532,31 @@ async def get_document_file(
         temp_path,
         media_type=document.content_type,
         filename=document.original_filename,
+        content_disposition_type="attachment" if download else "inline",
         background=BackgroundTask(lambda: temp_path.unlink(missing_ok=True)),
+    )
+
+
+@router.delete("/{document_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_document(
+    document_id: UUID,
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    session: Annotated[AsyncSession, Depends(get_session)],
+    storage: Annotated[ObjectStorage, Depends(get_object_storage)],
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> None:
+    deleted = await DocumentDeletionService(session=session, storage=storage).delete_document(
+        owner_id=current_user.id,
+        document_id=document_id,
+    )
+    if not deleted:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
+
+    await reindex_document_best_effort(
+        session=session,
+        settings=settings,
+        document_id=document_id,
+        reason="document_deleted",
     )
 
 

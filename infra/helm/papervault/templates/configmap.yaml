@@ -11,9 +11,17 @@ data:
   PAPERVAULT_MAX_UPLOAD_SIZE_BYTES: {{ .Values.config.maxUploadSizeBytes | quote }}
   PAPERVAULT_AI_ENABLED: {{ .Values.config.aiEnabled | quote }}
   PAPERVAULT_AI_PROVIDER: {{ .Values.config.aiProvider | quote }}
+  PAPERVAULT_ANSWER_PROVIDER: {{ .Values.config.answerProvider | quote }}
   PAPERVAULT_EMBEDDING_PROVIDER: {{ .Values.config.embeddingProvider | quote }}
   PAPERVAULT_EMBEDDING_DIMENSIONS: {{ .Values.config.embeddingDimensions | quote }}
   PAPERVAULT_AI_CLASSIFICATION_THRESHOLD: {{ .Values.config.aiClassificationThreshold | quote }}
+  PAPERVAULT_MODEL_PROVIDER_TIMEOUT_SECONDS: {{ .Values.config.modelProviderTimeoutSeconds | quote }}
+  PAPERVAULT_OLLAMA_BASE_URL: {{ .Values.config.ollamaBaseUrl | quote }}
+  PAPERVAULT_OLLAMA_CHAT_MODEL: {{ .Values.config.ollamaChatModel | quote }}
+  PAPERVAULT_OLLAMA_EMBEDDING_MODEL: {{ .Values.config.ollamaEmbeddingModel | quote }}
+  PAPERVAULT_OPENAI_COMPATIBLE_BASE_URL: {{ .Values.config.openaiCompatibleBaseUrl | quote }}
+  PAPERVAULT_OPENAI_COMPATIBLE_CHAT_MODEL: {{ .Values.config.openaiCompatibleChatModel | quote }}
+  PAPERVAULT_OPENAI_COMPATIBLE_EMBEDDING_MODEL: {{ .Values.config.openaiCompatibleEmbeddingModel | quote }}
   PAPERVAULT_AUTH_ALLOW_DEV_HEADERS: {{ .Values.config.authAllowDevHeaders | quote }}
   PAPERVAULT_LOCAL_AUTH_ENABLED: {{ .Values.config.localAuthEnabled | quote }}
   PAPERVAULT_LOCAL_REGISTRATION_ENABLED: {{ .Values.config.localRegistrationEnabled | quote }}

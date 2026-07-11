@@ -70,9 +70,17 @@ config:
   maxUploadSizeBytes: "104857600"
   aiEnabled: "true"
   aiProvider: local
+  answerProvider: local
   embeddingProvider: local
   embeddingDimensions: "64"
   aiClassificationThreshold: "0.55"
+  modelProviderTimeoutSeconds: "60"
+  ollamaBaseUrl: http://ollama:11434
+  ollamaChatModel: llama3.2
+  ollamaEmbeddingModel: nomic-embed-text
+  openaiCompatibleBaseUrl: https://api.openai.com/v1
+  openaiCompatibleChatModel: gpt-4.1-mini
+  openaiCompatibleEmbeddingModel: text-embedding-3-small
   authAllowDevHeaders: "false"
   localAuthEnabled: "true"
   localRegistrationEnabled: "false"
@@ -115,6 +123,7 @@ secret:
     opensearchUsername: ""
     opensearchPassword: ""
     oidcClientSecret: ""
+    openaiCompatibleApiKey: ""
 
 service:
   api:

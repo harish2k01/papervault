@@ -31,14 +31,15 @@ Successful uploads persist the original file in object storage, create document 
 
 Additional document endpoints:
 
-- `GET /documents`: list documents
+- `GET /documents`: list documents with `limit` and `offset` pagination
 - `GET /documents/types`: list supported document type keys, labels, and metadata field definitions
 - `GET /documents/{document_id}`: document detail with AI summary, metadata, tags, timeline, and extraction status
 - `PATCH /documents/{document_id}`: edit document title, type, date, issuer, or organization
 - `PUT /documents/{document_id}/metadata`: replace current structured metadata with a manual metadata version
 - `POST /documents/{document_id}/archive`: archive a document and hide it from default list/search results
 - `POST /documents/{document_id}/reprocess`: retry a failed or stale queued document without uploading the source again
-- `GET /documents/{document_id}/file`: authenticated document file response for the built-in viewer
+- `GET /documents/{document_id}/file`: authenticated inline document response for the built-in viewer; add `download=true` for an attachment
+- `DELETE /documents/{document_id}`: permanently delete owned metadata, versions, search projection, and stored source objects
 - `GET /documents/{document_id}/text-search?query=salary&limit=50`: owner-scoped literal search over the current extracted text, returning bounded excerpts and page numbers when available
 - `GET /documents/{document_id}/timeline`: document timeline events
 - `GET /documents/duplicates/candidates`: exact-hash duplicate candidate groups
@@ -72,7 +73,7 @@ The request accepts a `question` between 3 and 1,000 characters. The response st
 - `POST /documents/{document_id}/tags/{tag_id}`: attach a tag
 - `DELETE /documents/{document_id}/tags/{tag_id}`: detach a tag
 
-Tag assignment endpoints are owner-scoped, append `tags_changed` timeline events, and refresh the affected document's OpenSearch projection on a best-effort basis after PostgreSQL commits. Accepted AI-suggested tags use the same manual tag endpoints.
+Tag assignment endpoints are owner-scoped, append `tags_changed` timeline events, and refresh the affected document's OpenSearch projection on a best-effort basis after PostgreSQL commits. High-confidence AI suggestions are attached automatically with their source and confidence retained; manual assignments are never overwritten by automatic tagging.
 
 ## Notifications
 
@@ -92,6 +93,7 @@ Tag assignment endpoints are owner-scoped, append `tags_changed` timeline events
 - `PATCH /users/{user_id}`: admin-only role, display name, or active-state update
 - `GET /admin/settings`: admin-only effective registration policy and non-secret runtime provider information
 - `PATCH /admin/settings`: admin-only update of the persisted local-registration policy
+- `GET /admin/settings/providers/health`: admin-only health and active-model information for analysis, embedding, and answer providers
 
 The first registered local user is assigned the `admin` role. Later users are assigned `user` by default.
 The first OIDC-created user is also assigned `admin` when no users exist. OIDC login is advertised

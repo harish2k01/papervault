@@ -33,9 +33,9 @@ export function DocumentPreview({ document }: { document: DocumentItem }) {
   const canLoadPreview = document.status === "ready";
   const fileQuery = useQuery({
     queryKey: ["document-file", document.id],
-    queryFn: async () =>
-      URL.createObjectURL(await getDocumentFile(document.id)),
+    queryFn: () => getDocumentFile(document.id),
     enabled: canLoadPreview,
+    staleTime: 5 * 60 * 1000,
   });
   const [queryInput, setQueryInput] = useState("");
   const [submittedQuery, setSubmittedQuery] = useState("");
@@ -55,13 +55,21 @@ export function DocumentPreview({ document }: { document: DocumentItem }) {
   });
   const matches = searchQuery.data?.matches ?? [];
 
+  const imageUrl = useMemo(
+    () =>
+      document.content_type.startsWith("image/") && fileQuery.data
+        ? URL.createObjectURL(fileQuery.data)
+        : null,
+    [document.content_type, fileQuery.data],
+  );
+
   useEffect(() => {
     return () => {
-      if (fileQuery.data) {
-        URL.revokeObjectURL(fileQuery.data);
+      if (imageUrl) {
+        URL.revokeObjectURL(imageUrl);
       }
     };
-  }, [fileQuery.data]);
+  }, [imageUrl]);
 
   useEffect(() => {
     if (!viewerRef.current || typeof ResizeObserver === "undefined") {
@@ -212,7 +220,7 @@ export function DocumentPreview({ document }: { document: DocumentItem }) {
             <img
               alt={document.title}
               className="max-h-[680px] max-w-full rounded-sm bg-white object-contain shadow-sm"
-              src={fileQuery.data}
+              src={imageUrl ?? undefined}
             />
           ) : (
             <Document

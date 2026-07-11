@@ -1,4 +1,5 @@
 import re
+from decimal import Decimal
 from uuid import UUID
 
 from sqlalchemy import select
@@ -107,7 +108,81 @@ class TagService:
         await self._session.commit()
         return True
 
+    async def apply_automatic_tags(
+        self,
+        *,
+        owner_id: UUID,
+        document_id: UUID,
+        suggestions: tuple[str, ...],
+        confidence_score: float,
+    ) -> tuple[Tag, ...]:
+        if confidence_score < 0.6:
+            return ()
+
+        normalized = tuple(
+            dict.fromkeys(
+                suggestion.strip()[:80]
+                for suggestion in suggestions
+                if suggestion.strip()
+            )
+        )[:5]
+        if not normalized:
+            return ()
+
+        applied: list[Tag] = []
+        for suggestion in normalized:
+            slug = slugify(suggestion)
+            tag = await self._session.scalar(
+                select(Tag).where(Tag.owner_id == owner_id, Tag.slug == slug),
+            )
+            if tag is None:
+                tag = Tag(
+                    owner_id=owner_id,
+                    name=display_name(suggestion),
+                    slug=slug,
+                    source=TagSource.AI.value,
+                )
+                self._session.add(tag)
+                await self._session.flush()
+
+            link = await self._session.get(
+                DocumentTag,
+                {"document_id": document_id, "tag_id": tag.id},
+            )
+            if link is None:
+                self._session.add(
+                    DocumentTag(
+                        document_id=document_id,
+                        tag_id=tag.id,
+                        source=TagSource.AI.value,
+                        confidence_score=Decimal(str(confidence_score)),
+                    ),
+                )
+                applied.append(tag)
+            elif link.source == TagSource.AI.value:
+                link.confidence_score = Decimal(str(confidence_score))
+
+        if applied:
+            self._session.add(
+                TimelineEvent(
+                    owner_id=owner_id,
+                    actor_id=None,
+                    document_id=document_id,
+                    event_type=TimelineEventType.TAGS_CHANGED.value,
+                    payload={
+                        "action": "automatic_tags_applied",
+                        "tags": [tag.slug for tag in applied],
+                        "confidence_score": confidence_score,
+                    },
+                ),
+            )
+        return tuple(applied)
+
 
 def slugify(value: str) -> str:
     slug = SLUG_PATTERN.sub("-", value.strip().lower()).strip("-")
     return slug or "tag"
+
+
+def display_name(value: str) -> str:
+    return " ".join(part.capitalize() for part in SLUG_PATTERN.split(value) if part)[:80]

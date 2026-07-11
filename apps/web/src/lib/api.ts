@@ -242,11 +242,22 @@ export type AdminSettings = {
   local_auth_enabled: boolean;
   oidc_configured: boolean;
   ai_provider: string;
+  answer_provider: string;
   embedding_provider: string;
   ocr_provider: string;
   search_backend: string;
   search_index_enabled: boolean;
   max_upload_size_bytes: number;
+};
+
+export type ProviderHealth = {
+  checks: Array<{
+    capability: string;
+    provider: string;
+    model: string;
+    healthy: boolean;
+    detail: string;
+  }>;
 };
 
 export function getDevUserId() {
@@ -338,6 +349,10 @@ export async function getAdminSettings() {
   return apiFetch<AdminSettings>("/admin/settings");
 }
 
+export async function getProviderHealth() {
+  return apiFetch<ProviderHealth>("/admin/settings/providers/health");
+}
+
 export async function updateAdminSettings(input: {
   local_registration_enabled: boolean;
 }) {
@@ -367,8 +382,14 @@ export async function loginAccount(input: { email: string; password: string }) {
   });
 }
 
-export async function listDocuments() {
-  return apiFetch<DocumentItem[]>("/documents");
+export async function listDocuments(
+  input: { limit?: number; offset?: number } = {},
+) {
+  const params = new URLSearchParams({
+    limit: String(input.limit ?? 50),
+    offset: String(input.offset ?? 0),
+  });
+  return apiFetch<DocumentItem[]>(`/documents?${params.toString()}`);
 }
 
 export async function listDocumentTypes() {
@@ -388,6 +409,17 @@ export async function getDocumentFile(documentId: string) {
   );
   if (!response.ok) {
     throw new Error(`Failed to fetch document file: ${response.status}`);
+  }
+  return response.blob();
+}
+
+export async function downloadDocumentFile(documentId: string) {
+  const response = await fetch(
+    `${appConfig.apiBaseUrl}/documents/${documentId}/file?download=true`,
+    { headers: authHeaders() },
+  );
+  if (!response.ok) {
+    throw new Error(`Failed to download document: ${response.status}`);
   }
   return response.blob();
 }
@@ -499,6 +531,10 @@ export async function archiveDocument(documentId: string) {
     method: "POST",
     body: JSON.stringify({}),
   });
+}
+
+export async function deleteDocument(documentId: string) {
+  await apiFetch<void>(`/documents/${documentId}`, { method: "DELETE" });
 }
 
 export async function reprocessDocument(documentId: string) {

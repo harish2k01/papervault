@@ -118,6 +118,38 @@ def test_upload_rejects_unsupported_content_type() -> None:
     asyncio.run(engine.dispose())
 
 
+def test_document_file_can_be_downloaded_and_permanently_deleted() -> None:
+    app, storage, engine = build_upload_test_app()
+    app.dependency_overrides[get_settings] = lambda: Settings(search_index_enabled=False)
+    headers = {
+        "X-PaperVault-User-Id": str(uuid4()),
+        "X-PaperVault-User-Email": "owner@example.com",
+    }
+
+    with TestClient(app) as client:
+        upload = client.post(
+            "/documents/uploads",
+            headers=headers,
+            files={"file": ("statement.pdf", b"%PDF-1.4\n", "application/pdf")},
+        )
+        document_id = upload.json()["document"]["id"]
+
+        download = client.get(
+            f"/documents/{document_id}/file?download=true",
+            headers=headers,
+        )
+        deleted = client.delete(f"/documents/{document_id}", headers=headers)
+        missing = client.get(f"/documents/{document_id}", headers=headers)
+
+    assert download.status_code == 200
+    assert download.content == b"%PDF-1.4\n"
+    assert "attachment" in download.headers["content-disposition"]
+    assert deleted.status_code == 204
+    assert missing.status_code == 404
+    assert storage.objects == {}
+    asyncio.run(engine.dispose())
+
+
 def test_only_stale_pending_document_can_be_requeued() -> None:
     app, _storage, engine = build_upload_test_app()
     user_id = uuid4()

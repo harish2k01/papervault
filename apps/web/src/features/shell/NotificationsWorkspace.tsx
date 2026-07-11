@@ -14,7 +14,7 @@ import {
   NotificationItem,
   NotificationStatus,
 } from "../../lib/api";
-import { cn } from "../../lib/utils";
+import { cn, humanizeLabel } from "../../lib/utils";
 import {
   compareNotifications,
   formatDateOnly,
@@ -228,7 +228,7 @@ function NotificationRow({
   const dueState = getDueState(notification.due_date);
   const sourceField =
     typeof notification.payload.source_field === "string"
-      ? notification.payload.source_field.replaceAll("_", " ")
+      ? humanizeLabel(notification.payload.source_field)
       : null;
 
   return (
@@ -254,7 +254,7 @@ function NotificationRow({
               {formatNotificationKind(notification.kind)}
             </span>
             <span className="rounded-full bg-muted px-2.5 py-1 text-xs capitalize text-muted-foreground">
-              {notification.status}
+              {humanizeLabel(notification.status)}
             </span>
           </div>
           <h3 className="mt-3 break-words text-sm font-semibold">

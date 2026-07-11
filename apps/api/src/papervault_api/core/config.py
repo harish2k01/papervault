@@ -25,11 +25,45 @@ class Settings(BaseSettings):
     )
     ai_enabled: bool = Field(default=True, alias="PAPERVAULT_AI_ENABLED")
     ai_provider: str = Field(default="local", alias="PAPERVAULT_AI_PROVIDER")
+    answer_provider: str = Field(default="local", alias="PAPERVAULT_ANSWER_PROVIDER")
     embedding_provider: str = Field(default="local", alias="PAPERVAULT_EMBEDDING_PROVIDER")
     embedding_dimensions: int = Field(default=64, alias="PAPERVAULT_EMBEDDING_DIMENSIONS")
     ai_classification_threshold: float = Field(
         default=0.55,
         alias="PAPERVAULT_AI_CLASSIFICATION_THRESHOLD",
+    )
+    model_provider_timeout_seconds: float = Field(
+        default=60.0,
+        gt=0,
+        alias="PAPERVAULT_MODEL_PROVIDER_TIMEOUT_SECONDS",
+    )
+    ollama_base_url: str = Field(
+        default="http://localhost:11434",
+        alias="PAPERVAULT_OLLAMA_BASE_URL",
+    )
+    ollama_chat_model: str = Field(
+        default="llama3.2",
+        alias="PAPERVAULT_OLLAMA_CHAT_MODEL",
+    )
+    ollama_embedding_model: str = Field(
+        default="nomic-embed-text",
+        alias="PAPERVAULT_OLLAMA_EMBEDDING_MODEL",
+    )
+    openai_compatible_base_url: str = Field(
+        default="https://api.openai.com/v1",
+        alias="PAPERVAULT_OPENAI_COMPATIBLE_BASE_URL",
+    )
+    openai_compatible_api_key: str | None = Field(
+        default=None,
+        alias="PAPERVAULT_OPENAI_COMPATIBLE_API_KEY",
+    )
+    openai_compatible_chat_model: str = Field(
+        default="gpt-4.1-mini",
+        alias="PAPERVAULT_OPENAI_COMPATIBLE_CHAT_MODEL",
+    )
+    openai_compatible_embedding_model: str = Field(
+        default="text-embedding-3-small",
+        alias="PAPERVAULT_OPENAI_COMPATIBLE_EMBEDDING_MODEL",
     )
     ocr_provider: str = Field(default="tesseract", alias="PAPERVAULT_OCR_PROVIDER")
     ocr_languages: str = Field(default="eng", alias="PAPERVAULT_OCR_LANGUAGES")
@@ -120,6 +154,7 @@ class Settings(BaseSettings):
         "oidc_client_secret",
         "oidc_redirect_uri",
         "otel_exporter_otlp_endpoint",
+        "openai_compatible_api_key",
         "ocr_max_pdf_pages",
         mode="before",
     )
@@ -136,6 +171,16 @@ class Settings(BaseSettings):
         if backend not in {"database", "opensearch"}:
             raise ValueError("Search query backend must be 'database' or 'opensearch'")
         return backend
+
+    @field_validator("ai_provider", "answer_provider", "embedding_provider", mode="before")
+    @classmethod
+    def validate_model_provider(cls, value: Any) -> str:
+        provider = str(value or "local").strip().lower().replace("-", "_")
+        if provider not in {"local", "ollama", "openai_compatible"}:
+            raise ValueError(
+                "Model provider must be 'local', 'ollama', or 'openai_compatible'"
+            )
+        return provider
 
     @property
     def cors_origins(self) -> list[str]:

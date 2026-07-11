@@ -105,6 +105,16 @@ async def test_search_service_keyword_semantic_recent_and_saved(session: AsyncSe
     assert saved.name == "Credit cards"
     assert recent[0].query == "credit card due"
 
+    await service.search(
+        SearchRequest(
+            owner_id=user.id,
+            query="credit card due",
+            mode=SearchMode.HYBRID,
+            filters=SearchFilters(),
+        ),
+    )
+    assert len(await service.list_recent_searches(user.id)) == 1
+
 
 async def test_search_service_uses_query_index_and_records_recent(
     session: AsyncSession,

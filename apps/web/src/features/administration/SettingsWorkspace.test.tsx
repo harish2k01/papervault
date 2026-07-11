@@ -14,12 +14,14 @@ describe("SettingsWorkspace", () => {
           local_auth_enabled: true,
           oidc_configured: false,
           ai_provider: "local",
+          answer_provider: "local",
           embedding_provider: "local",
           ocr_provider: "tesseract",
           search_backend: "opensearch",
           search_index_enabled: true,
           max_upload_size_bytes: 104857600,
         }}
+        providerHealth={{ checks: [] }}
         users={[
           {
             id: "user-1",
