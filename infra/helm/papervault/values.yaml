@@ -74,6 +74,9 @@ config:
   embeddingProvider: local
   embeddingDimensions: "64"
   aiClassificationThreshold: "0.55"
+  duplicateContentSimilarityThreshold: "0.88"
+  duplicateOcrSimilarityThreshold: "0.84"
+  duplicateSimilarityMinTokens: "24"
   metadataLocale: en-IN
   modelProviderTimeoutSeconds: "60"
   ollamaBaseUrl: http://ollama:11434

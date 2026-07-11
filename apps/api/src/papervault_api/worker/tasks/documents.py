@@ -7,6 +7,7 @@ from papervault_api.core.config import get_settings
 from papervault_api.db import models as _models  # noqa: F401
 from papervault_api.db.session import AsyncSessionFactory, engine
 from papervault_api.documents.application.ai import DocumentAIProcessingService
+from papervault_api.documents.application.duplicates import DuplicateDetectionService
 from papervault_api.documents.application.processing import (
     DocumentProcessingService,
     mark_document_processing_failed,
@@ -76,6 +77,8 @@ async def _process_document(document_id: UUID) -> None:
         )
         await document_processing_service.process_document(document_id)
 
+    await _refresh_duplicate_fingerprint(document_id)
+
     if settings.ai_enabled:
         async with AsyncSessionFactory() as session:
             ai_processing_service = DocumentAIProcessingService(
@@ -113,5 +116,22 @@ async def _index_document(document_id: UUID) -> None:
     except Exception:
         logger.exception(
             "document_search_indexing_failed",
+            document_id=str(document_id),
+        )
+
+
+async def _refresh_duplicate_fingerprint(document_id: UUID) -> None:
+    settings = get_settings()
+    try:
+        async with AsyncSessionFactory() as session:
+            await DuplicateDetectionService(
+                session,
+                content_similarity_threshold=(settings.duplicate_content_similarity_threshold),
+                ocr_similarity_threshold=settings.duplicate_ocr_similarity_threshold,
+                min_tokens=settings.duplicate_similarity_min_tokens,
+            ).refresh_document(document_id)
+    except Exception:
+        logger.exception(
+            "document_duplicate_fingerprint_failed",
             document_id=str(document_id),
         )

@@ -18,6 +18,7 @@ from papervault_api.documents.domain.enums import DocumentReviewStatus, Document
 from papervault_api.documents.infrastructure.models import (
     Document,
     DocumentAIAnalysis,
+    DocumentDuplicateFingerprint,
     DocumentEmbedding,
     DocumentMetadataRecord,
     DocumentTextExtraction,
@@ -327,6 +328,11 @@ class DocumentVersionService:
         )
         await self._session.execute(
             delete(Notification).where(Notification.document_id == document.id)
+        )
+        await self._session.execute(
+            delete(DocumentDuplicateFingerprint).where(
+                DocumentDuplicateFingerprint.document_id == document.id
+            )
         )
         payload: dict[str, object] = {
             "action": action,

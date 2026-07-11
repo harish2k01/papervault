@@ -2,6 +2,8 @@ from papervault_api.administration.infrastructure.models import InstanceSettings
 from papervault_api.documents.infrastructure.models import (
     Document,
     DocumentAIAnalysis,
+    DocumentDuplicateBucket,
+    DocumentDuplicateFingerprint,
     DocumentEmbedding,
     DocumentMetadataRecord,
     DocumentTextBlock,
@@ -19,6 +21,8 @@ from papervault_api.timeline.infrastructure.models import TimelineEvent
 __all__ = [
     "Document",
     "DocumentAIAnalysis",
+    "DocumentDuplicateBucket",
+    "DocumentDuplicateFingerprint",
     "DocumentEmbedding",
     "DocumentMetadataRecord",
     "DocumentTag",

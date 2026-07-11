@@ -135,6 +135,12 @@ class Document(UuidPrimaryKeyMixin, TimestampMixin, Base):
         cascade="all, delete-orphan",
         passive_deletes=True,
     )
+    duplicate_fingerprint: Mapped[DocumentDuplicateFingerprint | None] = relationship(
+        back_populates="document",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        uselist=False,
+    )
     tag_links: Mapped[list[DocumentTag]] = relationship(
         back_populates="document",
         cascade="all, delete-orphan",
@@ -347,6 +353,87 @@ class DocumentTextExtraction(UuidPrimaryKeyMixin, TimestampMixin, Base):
         passive_deletes=True,
         order_by="DocumentTextChunk.chunk_index",
     )
+
+
+class DocumentDuplicateFingerprint(UuidPrimaryKeyMixin, TimestampMixin, Base):
+    __tablename__ = "document_duplicate_fingerprints"
+    __table_args__ = (
+        CheckConstraint(
+            "algorithm_version > 0",
+            name="algorithm_version_positive",
+        ),
+        CheckConstraint(
+            "token_count > 0",
+            name="token_count_positive",
+        ),
+        CheckConstraint(
+            "shingle_count > 0",
+            name="shingle_count_positive",
+        ),
+        CheckConstraint(
+            "character_count > 0",
+            name="character_count_positive",
+        ),
+        UniqueConstraint("document_id", name="uq_duplicate_fingerprints_document"),
+        Index("ix_duplicate_fingerprints_normalized_hash", "normalized_text_sha256"),
+        Index("ix_duplicate_fingerprints_extraction", "text_extraction_id"),
+    )
+
+    document_id: Mapped[UUID] = mapped_column(
+        ForeignKey(
+            "documents.id",
+            name="fk_duplicate_fingerprints_document",
+            ondelete="CASCADE",
+        ),
+        nullable=False,
+    )
+    text_extraction_id: Mapped[UUID] = mapped_column(
+        ForeignKey(
+            "document_text_extractions.id",
+            name="fk_duplicate_fingerprints_extraction",
+            ondelete="CASCADE",
+        ),
+        nullable=False,
+    )
+    source: Mapped[str] = mapped_column(String(32), nullable=False)
+    algorithm_version: Mapped[int] = mapped_column(Integer, nullable=False)
+    normalized_text_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    minhash_signature: Mapped[list[int]] = mapped_column(JSON, nullable=False)
+    token_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    shingle_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    character_count: Mapped[int] = mapped_column(Integer, nullable=False)
+
+    document: Mapped[Document] = relationship(back_populates="duplicate_fingerprint")
+    buckets: Mapped[list[DocumentDuplicateBucket]] = relationship(
+        back_populates="fingerprint",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+
+
+class DocumentDuplicateBucket(UuidPrimaryKeyMixin, Base):
+    __tablename__ = "document_duplicate_buckets"
+    __table_args__ = (
+        UniqueConstraint(
+            "fingerprint_id",
+            "band_index",
+            name="uq_duplicate_buckets_fingerprint_band",
+        ),
+        Index("ix_duplicate_buckets_lookup", "band_index", "bucket_hash"),
+    )
+
+    fingerprint_id: Mapped[UUID] = mapped_column(
+        ForeignKey(
+            "document_duplicate_fingerprints.id",
+            name="fk_duplicate_buckets_fingerprint",
+            ondelete="CASCADE",
+        ),
+        nullable=False,
+    )
+    band_index: Mapped[int] = mapped_column(Integer, nullable=False)
+    bucket_hash: Mapped[str] = mapped_column(String(32), nullable=False)
+
+    fingerprint: Mapped[DocumentDuplicateFingerprint] = relationship(back_populates="buckets")
 
 
 class DocumentTextPage(UuidPrimaryKeyMixin, Base):

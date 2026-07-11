@@ -190,17 +190,48 @@ class DuplicateCandidateDocumentResponse(BaseModel):
     title: str
     original_filename: str
     sha256_hash: str
+    document_type: str
+    file_size_bytes: int
+    page_count: int | None
     created_at: datetime
 
 
+class DuplicateSignalsResponse(BaseModel):
+    text_similarity: float
+    length_similarity: float
+    shared_bands: int
+
+
 class DuplicateCandidateGroupResponse(BaseModel):
-    method: str
+    method: Literal[
+        "sha256_hash",
+        "normalized_text",
+        "content_similarity",
+        "ocr_similarity",
+    ]
+    confidence: float
+    requires_confirmation: bool
+    explanation: str
+    signals: DuplicateSignalsResponse
     documents: list[DuplicateCandidateDocumentResponse]
+
+
+class RefreshDuplicateFingerprintsResponse(BaseModel):
+    scanned: int
+    updated: int
+    skipped: int
 
 
 class MergeDuplicateDocumentsRequest(BaseModel):
     keep_document_id: UUID
     duplicate_document_ids: list[UUID] = Field(min_length=1)
+    match_method: Literal[
+        "sha256_hash",
+        "normalized_text",
+        "content_similarity",
+        "ocr_similarity",
+    ] = "sha256_hash"
+    confirm_non_exact: bool = False
 
 
 class MergeDuplicateDocumentsResponse(BaseModel):

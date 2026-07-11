@@ -15,6 +15,9 @@ data:
   PAPERVAULT_EMBEDDING_PROVIDER: {{ .Values.config.embeddingProvider | quote }}
   PAPERVAULT_EMBEDDING_DIMENSIONS: {{ .Values.config.embeddingDimensions | quote }}
   PAPERVAULT_AI_CLASSIFICATION_THRESHOLD: {{ .Values.config.aiClassificationThreshold | quote }}
+  PAPERVAULT_DUPLICATE_CONTENT_SIMILARITY_THRESHOLD: {{ .Values.config.duplicateContentSimilarityThreshold | default "0.88" | quote }}
+  PAPERVAULT_DUPLICATE_OCR_SIMILARITY_THRESHOLD: {{ .Values.config.duplicateOcrSimilarityThreshold | default "0.84" | quote }}
+  PAPERVAULT_DUPLICATE_SIMILARITY_MIN_TOKENS: {{ .Values.config.duplicateSimilarityMinTokens | default "24" | quote }}
   PAPERVAULT_METADATA_LOCALE: {{ .Values.config.metadataLocale | quote }}
   PAPERVAULT_MODEL_PROVIDER_TIMEOUT_SECONDS: {{ .Values.config.modelProviderTimeoutSeconds | quote }}
   PAPERVAULT_OLLAMA_BASE_URL: {{ .Values.config.ollamaBaseUrl | quote }}

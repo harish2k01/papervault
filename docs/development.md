@@ -41,6 +41,9 @@ PAPERVAULT_ANSWER_PROVIDER=local
 PAPERVAULT_EMBEDDING_PROVIDER=local
 PAPERVAULT_EMBEDDING_DIMENSIONS=64
 PAPERVAULT_METADATA_LOCALE=en-IN
+PAPERVAULT_DUPLICATE_CONTENT_SIMILARITY_THRESHOLD=0.88
+PAPERVAULT_DUPLICATE_OCR_SIMILARITY_THRESHOLD=0.84
+PAPERVAULT_DUPLICATE_SIMILARITY_MIN_TOKENS=24
 ```
 
 These providers require no external credentials. The local analysis and answer
@@ -69,6 +72,11 @@ provider reachability from Settings without exposing credentials.
 `PAPERVAULT_METADATA_LOCALE` controls ambiguous numeric date parsing. `en-IN` and
 other non-US values use day-first dates; `en-US` uses month-first dates. ISO dates
 remain unambiguous for every locale.
+
+Duplicate fingerprints are generated automatically for newly processed documents. Use
+`POST /documents/duplicates/refresh` or the **Scan library** action to backfill existing
+documents. Raising the similarity thresholds reduces false positives; lowering them
+increases recall and should be paired with evaluation against the operator's OCR corpus.
 
 OCR is enabled by default through local Tesseract and Poppler commands:
 

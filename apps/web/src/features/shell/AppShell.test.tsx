@@ -69,6 +69,11 @@ vi.mock("../../lib/api", () => ({
   listVaultTimeline: vi.fn().mockResolvedValue([]),
   loginAccount: vi.fn(),
   mergeDuplicateDocuments: vi.fn(),
+  refreshDuplicateFingerprints: vi.fn().mockResolvedValue({
+    scanned: 0,
+    updated: 0,
+    skipped: 0,
+  }),
   parseOidcCallbackHash: vi.fn().mockReturnValue(null),
   registerAccount: vi.fn(),
   reprocessDocument: vi.fn(),
@@ -467,12 +472,23 @@ describe("AppShell", () => {
     vi.mocked(listDuplicates).mockResolvedValueOnce([
       {
         method: "sha256_hash",
+        confidence: 1,
+        requires_confirmation: false,
+        explanation: "Files have identical SHA-256 hashes.",
+        signals: {
+          text_similarity: 1,
+          length_similarity: 1,
+          shared_bands: 8,
+        },
         documents: [
           {
             id: keptDocument.id,
             title: keptDocument.title,
             original_filename: keptDocument.original_filename,
             sha256_hash: keptDocument.sha256_hash,
+            document_type: keptDocument.document_type,
+            file_size_bytes: keptDocument.file_size_bytes,
+            page_count: 1,
             created_at: keptDocument.created_at,
           },
           {
@@ -480,6 +496,9 @@ describe("AppShell", () => {
             title: duplicateDocument.title,
             original_filename: duplicateDocument.original_filename,
             sha256_hash: duplicateDocument.sha256_hash,
+            document_type: duplicateDocument.document_type,
+            file_size_bytes: duplicateDocument.file_size_bytes,
+            page_count: 1,
             created_at: duplicateDocument.created_at,
           },
         ],
@@ -500,7 +519,7 @@ describe("AppShell", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: /Duplicates/ }));
     expect(
-      await screen.findByRole("heading", { name: "Duplicates" }),
+      await screen.findByRole("heading", { name: "Duplicate review" }),
     ).toBeInTheDocument();
 
     fireEvent.click(
@@ -511,6 +530,8 @@ describe("AppShell", () => {
       expect(mergeDuplicateDocuments).toHaveBeenCalledWith({
         keep_document_id: "document-keep",
         duplicate_document_ids: ["document-duplicate"],
+        match_method: "sha256_hash",
+        confirm_non_exact: false,
       });
     });
   });

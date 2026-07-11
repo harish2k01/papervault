@@ -8,6 +8,10 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from papervault_api.documents.application.duplicates import (
+    EXACT_FILE_METHOD,
+    DuplicateDetectionService,
+)
 from papervault_api.documents.domain.document_types import get_document_type
 from papervault_api.documents.domain.enums import (
     DocumentReviewStatus,
@@ -55,6 +59,8 @@ class DuplicateMergeCommand:
     actor_id: UUID
     keep_document_id: UUID
     duplicate_document_ids: tuple[UUID, ...]
+    match_method: str = EXACT_FILE_METHOD
+    confirm_non_exact: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -73,8 +79,21 @@ class DuplicateMergeResult:
 
 
 class DocumentLifecycleService:
-    def __init__(self, session: AsyncSession) -> None:
+    def __init__(
+        self,
+        session: AsyncSession,
+        *,
+        duplicate_content_similarity_threshold: float = 0.88,
+        duplicate_ocr_similarity_threshold: float = 0.84,
+        duplicate_similarity_min_tokens: int = 24,
+    ) -> None:
         self._session = session
+        self._duplicate_detector = DuplicateDetectionService(
+            session,
+            content_similarity_threshold=duplicate_content_similarity_threshold,
+            ocr_similarity_threshold=duplicate_ocr_similarity_threshold,
+            min_tokens=duplicate_similarity_min_tokens,
+        )
 
     async def update_document(self, command: DocumentUpdateCommand) -> Document | None:
         document = await self._get_document(command.document_id, command.owner_id)
@@ -285,13 +304,26 @@ class DocumentLifecycleService:
             document.status == DocumentStatus.ARCHIVED.value for document in duplicate_documents
         ):
             raise InvalidDuplicateMergeError("Archived documents cannot be merged")
-        if any(
-            document.sha256_hash != kept_document.sha256_hash for document in duplicate_documents
-        ):
-            raise InvalidDuplicateMergeError("Only exact-hash duplicate documents can be merged")
+        validations = []
+        for document in duplicate_documents:
+            validation = await self._duplicate_detector.validate_pair(
+                owner_id=command.owner_id,
+                keep_document=kept_document,
+                duplicate_document=document,
+                requested_method=command.match_method,
+            )
+            if validation is None:
+                raise InvalidDuplicateMergeError(
+                    "Documents no longer meet the selected duplicate threshold"
+                )
+            if validation.requires_confirmation and not command.confirm_non_exact:
+                raise InvalidDuplicateMergeError(
+                    "Non-exact duplicate matches require explicit confirmation"
+                )
+            validations.append(validation)
 
         archived_at = datetime.now(UTC)
-        for document in duplicate_documents:
+        for document, validation in zip(duplicate_documents, validations, strict=True):
             document.status = DocumentStatus.ARCHIVED.value
             document.archived_at = archived_at
             self._session.add(
@@ -303,7 +335,8 @@ class DocumentLifecycleService:
                     payload={
                         "action": "duplicate_merged",
                         "kept_document_id": str(kept_document.id),
-                        "sha256_hash": kept_document.sha256_hash,
+                        "match_method": validation.method,
+                        "confidence": validation.confidence,
                     },
                 ),
             )
@@ -317,7 +350,8 @@ class DocumentLifecycleService:
                 payload={
                     "action": "duplicates_merged",
                     "archived_document_ids": [str(document.id) for document in duplicate_documents],
-                    "sha256_hash": kept_document.sha256_hash,
+                    "match_method": command.match_method,
+                    "confidence_scores": [validation.confidence for validation in validations],
                 },
             ),
         )

@@ -26,11 +26,13 @@ from papervault_api.documents.api.schemas import (
     DocumentVersionResponse,
     DuplicateCandidateDocumentResponse,
     DuplicateCandidateGroupResponse,
+    DuplicateSignalsResponse,
     MergeDuplicateDocumentsRequest,
     MergeDuplicateDocumentsResponse,
     MetadataFieldDefinitionResponse,
     MetadataResponse,
     OcrTextBlockResponse,
+    RefreshDuplicateFingerprintsResponse,
     ReprocessDocumentResponse,
     ReviewDocumentRequest,
     TextExtractionResponse,
@@ -42,6 +44,7 @@ from papervault_api.documents.api.schemas import (
     VersionComparisonResponse,
 )
 from papervault_api.documents.application.deletion import DocumentDeletionService
+from papervault_api.documents.application.duplicates import DuplicateDetectionService
 from papervault_api.documents.application.lifecycle import (
     DocumentLifecycleService,
     DocumentUpdateCommand,
@@ -135,25 +138,64 @@ async def list_review_queue(
 async def list_duplicate_candidates(
     current_user: Annotated[CurrentUser, Depends(get_current_user)],
     session: Annotated[AsyncSession, Depends(get_session)],
+    settings: Annotated[Settings, Depends(get_settings)],
 ) -> list[DuplicateCandidateGroupResponse]:
-    service = DocumentReadService(session)
-    groups = await service.get_duplicate_candidates(current_user.id)
+    groups = await DuplicateDetectionService(
+        session,
+        content_similarity_threshold=settings.duplicate_content_similarity_threshold,
+        ocr_similarity_threshold=settings.duplicate_ocr_similarity_threshold,
+        min_tokens=settings.duplicate_similarity_min_tokens,
+    ).list_candidates(current_user.id)
     return [
         DuplicateCandidateGroupResponse(
-            method="sha256_hash",
+            method=group.method,
+            confidence=group.confidence,
+            requires_confirmation=group.requires_confirmation,
+            explanation=group.explanation,
+            signals=DuplicateSignalsResponse(
+                text_similarity=group.signals.text_similarity,
+                length_similarity=group.signals.length_similarity,
+                shared_bands=group.signals.shared_bands,
+            ),
             documents=[
                 DuplicateCandidateDocumentResponse(
                     id=document.id,
                     title=document.title,
                     original_filename=document.original_filename,
                     sha256_hash=document.sha256_hash,
+                    document_type=document.document_type,
+                    file_size_bytes=document.file_size_bytes,
+                    page_count=document.page_count,
                     created_at=document.created_at,
                 )
-                for document in group
+                for document in group.documents
             ],
         )
         for group in groups
     ]
+
+
+@router.post(
+    "/duplicates/refresh",
+    response_model=RefreshDuplicateFingerprintsResponse,
+)
+async def refresh_duplicate_fingerprints(
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    session: Annotated[AsyncSession, Depends(get_session)],
+    settings: Annotated[Settings, Depends(get_settings)],
+    limit: Annotated[int, Query(ge=1, le=500)] = 100,
+) -> RefreshDuplicateFingerprintsResponse:
+    result = await DuplicateDetectionService(
+        session,
+        content_similarity_threshold=settings.duplicate_content_similarity_threshold,
+        ocr_similarity_threshold=settings.duplicate_ocr_similarity_threshold,
+        min_tokens=settings.duplicate_similarity_min_tokens,
+    ).refresh_owner(current_user.id, limit=limit)
+    return RefreshDuplicateFingerprintsResponse(
+        scanned=result.scanned,
+        updated=result.updated,
+        skipped=result.skipped,
+    )
 
 
 @router.post(
@@ -167,12 +209,21 @@ async def merge_duplicate_documents(
     request: MergeDuplicateDocumentsRequest,
 ) -> MergeDuplicateDocumentsResponse:
     try:
-        result = await DocumentLifecycleService(session).merge_duplicates(
+        result = await DocumentLifecycleService(
+            session,
+            duplicate_content_similarity_threshold=(
+                settings.duplicate_content_similarity_threshold
+            ),
+            duplicate_ocr_similarity_threshold=(settings.duplicate_ocr_similarity_threshold),
+            duplicate_similarity_min_tokens=settings.duplicate_similarity_min_tokens,
+        ).merge_duplicates(
             DuplicateMergeCommand(
                 owner_id=current_user.id,
                 actor_id=current_user.id,
                 keep_document_id=request.keep_document_id,
                 duplicate_document_ids=tuple(request.duplicate_document_ids),
+                match_method=request.match_method,
+                confirm_non_exact=request.confirm_non_exact,
             ),
         )
     except InvalidDuplicateMergeError as exc:

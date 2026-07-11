@@ -83,6 +83,7 @@ import {
   mergeDuplicateDocuments,
   parseOidcCallbackHash,
   registerAccount,
+  refreshDuplicateFingerprints,
   reprocessDocument,
   replaceDocumentSource,
   restoreDocumentVersion,
@@ -559,6 +560,12 @@ export function AppShell() {
       setSelectedDocumentId(result.kept_document.id);
     },
   });
+  const duplicateRefreshMutation = useMutation({
+    mutationFn: refreshDuplicateFingerprints,
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["duplicates"] });
+    },
+  });
   const tagAttachMutation = useMutation({
     mutationFn: (input: { documentId: string; tagId: string }) =>
       attachTag(input.documentId, input.tagId),
@@ -787,7 +794,9 @@ export function AppShell() {
   const duplicateMergeError =
     duplicateMergeMutation.error instanceof Error
       ? duplicateMergeMutation.error.message
-      : null;
+      : duplicateRefreshMutation.error instanceof Error
+        ? duplicateRefreshMutation.error.message
+        : null;
   const notificationActionError =
     notificationStatusMutation.error instanceof Error
       ? notificationStatusMutation.error.message
@@ -1047,9 +1056,12 @@ export function AppShell() {
               groups={duplicatesQuery.data ?? []}
               isLoading={duplicatesQuery.isLoading}
               isResolving={duplicateMergeMutation.isPending}
+              isScanning={duplicateRefreshMutation.isPending}
+              scanResult={duplicateRefreshMutation.data}
               error={duplicateMergeError}
               onOpenDocument={openDocument}
               onMerge={(input) => duplicateMergeMutation.mutate(input)}
+              onScan={() => duplicateRefreshMutation.mutate()}
             />
           ) : activeView === "tags" ? (
             <TagsWorkspace

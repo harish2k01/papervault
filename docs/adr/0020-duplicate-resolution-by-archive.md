@@ -4,6 +4,9 @@
 
 Accepted
 
+Amended by [ADR 0028](0028-explainable-duplicate-similarity.md), which extends the
+same archive-based resolution model to confirmation-gated similarity candidates.
+
 ## Context
 
 PaperVault can detect exact duplicate files by SHA-256 hash. Users need a way to resolve those candidates, but deleting document rows or object-storage blobs is risky for a long-lived personal archive. Content and OCR similarity require separate confidence models; this decision covers exact-hash confidence only.
@@ -21,4 +24,4 @@ Document processing treats archive as terminal. A queued worker exits without pr
 - Duplicate cleanup is reversible at the data level because rows and blobs are retained.
 - The default document list, search, and duplicate candidate query stop showing archived copies.
 - The merge workflow does not consolidate metadata, tags, or versions into the kept document yet.
-- Fuzzy duplicate detection and physical object cleanup remain future work.
+- Physical object cleanup and metadata consolidation remain separate future decisions.

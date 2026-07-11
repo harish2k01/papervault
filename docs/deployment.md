@@ -26,6 +26,7 @@ The Helm chart deploys PaperVault application workloads and expects production s
 - Configure OIDC before relying on external identity providers.
 - Install required Tesseract language packs and set `PAPERVAULT_OCR_LANGUAGES` to match your document corpus.
 - Tune `PAPERVAULT_OCR_MAX_PDF_PAGES`, `PAPERVAULT_OCR_TIMEOUT_SECONDS`, and worker concurrency based on CPU capacity.
+- Evaluate `PAPERVAULT_DUPLICATE_CONTENT_SIMILARITY_THRESHOLD` and `PAPERVAULT_DUPLICATE_OCR_SIMILARITY_THRESHOLD` against representative documents before lowering the conservative defaults.
 - Keep `OPENSEARCH_DOCUMENTS_INDEX` versioned, for example `papervault-documents-v1`, so mapping changes can be rolled out through a new index and reindex operation.
 - Monitor worker logs for `document_search_indexing_failed`; indexing is eventually consistent and does not fail document processing.
 - Keep `PAPERVAULT_SEARCH_QUERY_FALLBACK_ENABLED=true` unless you intentionally want OpenSearch outages to fail user-facing search.

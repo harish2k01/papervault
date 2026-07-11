@@ -49,8 +49,9 @@ Additional document endpoints:
 - `POST /documents/{document_id}/versions/{version_id}/restore`: restore a retained source as a new current version
 - `GET /documents/{document_id}/versions/{version_id}/file`: download a retained source version
 - `GET /documents/{document_id}/versions/compare?from_version=...&to_version=...`: compare source hashes and bounded extracted-text differences
-- `GET /documents/duplicates/candidates`: exact-hash duplicate candidate groups
-- `POST /documents/duplicates/merge`: keep one exact-hash duplicate and archive selected redundant copies
+- `GET /documents/duplicates/candidates`: explainable exact-file, exact-text, content-similarity, and OCR-similarity candidate groups
+- `POST /documents/duplicates/refresh`: build missing current-extraction fingerprints for an owner-scoped batch of existing documents
+- `POST /documents/duplicates/merge`: keep one document and archive selected redundant copies; non-exact methods require explicit confirmation and are revalidated server-side
 
 Document text search accepts a case-insensitive literal query between 2 and 200 characters and returns at most 100 matches. `total_matches` reports the complete count even when the response is limited. Legacy extractions without page rows remain searchable, but return `page_mapping_available=false` until they are reprocessed.
 

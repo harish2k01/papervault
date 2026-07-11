@@ -256,15 +256,35 @@ export type NotificationItem = {
   created_at: string;
 };
 
+export type DuplicateMethod =
+  "sha256_hash" | "normalized_text" | "content_similarity" | "ocr_similarity";
+
 export type DuplicateGroup = {
-  method: string;
+  method: DuplicateMethod;
+  confidence: number;
+  requires_confirmation: boolean;
+  explanation: string;
+  signals: {
+    text_similarity: number;
+    length_similarity: number;
+    shared_bands: number;
+  };
   documents: Array<{
     id: string;
     title: string;
     original_filename: string;
     sha256_hash: string;
+    document_type: string;
+    file_size_bytes: number;
+    page_count: number | null;
     created_at: string;
   }>;
+};
+
+export type DuplicateRefreshResult = {
+  scanned: number;
+  updated: number;
+  skipped: number;
 };
 
 export type DuplicateMergeResult = {
@@ -733,9 +753,18 @@ export async function listDuplicates() {
   return apiFetch<DuplicateGroup[]>("/documents/duplicates/candidates");
 }
 
+export async function refreshDuplicateFingerprints() {
+  return apiFetch<DuplicateRefreshResult>("/documents/duplicates/refresh", {
+    method: "POST",
+    body: JSON.stringify({}),
+  });
+}
+
 export async function mergeDuplicateDocuments(input: {
   keep_document_id: string;
   duplicate_document_ids: string[];
+  match_method: DuplicateMethod;
+  confirm_non_exact: boolean;
 }) {
   return apiFetch<DuplicateMergeResult>("/documents/duplicates/merge", {
     method: "POST",

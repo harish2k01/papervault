@@ -111,7 +111,8 @@ Lifecycle and tag changes commit to PostgreSQL first and then refresh the search
 - Text extractions retain source-version lineage, enabling owner-scoped extracted-text comparison between versions.
 - Archive hides documents from normal lists, duplicate candidates, notifications, and search without deleting source data.
 - Permanent deletion is owner-scoped and removes source/version objects, the PostgreSQL document graph, and the rebuildable search projection.
-- Exact duplicate resolution archives redundant copies chosen by the user.
+- Duplicate fingerprints are generated from the current successful text extraction during worker processing. Normalized-text hashes detect identical extracted content, while deterministic MinHash signatures and indexed locality-sensitive bands produce bounded content/OCR similarity candidates without comparing every document pair.
+- Duplicate results carry their method, confidence, text/length similarity, and a plain-language explanation. Exact-file matches can be resolved directly; every non-exact match requires user confirmation and fresh server-side fingerprint validation before redundant documents are archived.
 - Timeline events capture uploads, metadata edits, tag changes, source versions, archives, and related lifecycle actions. An owner-scoped vault feed provides a cross-document view.
 
 ## Identity And Administration

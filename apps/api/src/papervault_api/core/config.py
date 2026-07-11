@@ -32,6 +32,24 @@ class Settings(BaseSettings):
         default=0.55,
         alias="PAPERVAULT_AI_CLASSIFICATION_THRESHOLD",
     )
+    duplicate_content_similarity_threshold: float = Field(
+        default=0.88,
+        ge=0.5,
+        le=1.0,
+        alias="PAPERVAULT_DUPLICATE_CONTENT_SIMILARITY_THRESHOLD",
+    )
+    duplicate_ocr_similarity_threshold: float = Field(
+        default=0.84,
+        ge=0.5,
+        le=1.0,
+        alias="PAPERVAULT_DUPLICATE_OCR_SIMILARITY_THRESHOLD",
+    )
+    duplicate_similarity_min_tokens: int = Field(
+        default=24,
+        ge=12,
+        le=500,
+        alias="PAPERVAULT_DUPLICATE_SIMILARITY_MIN_TOKENS",
+    )
     metadata_locale: str = Field(default="en-IN", alias="PAPERVAULT_METADATA_LOCALE")
     model_provider_timeout_seconds: float = Field(
         default=60.0,
