@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import secrets
 import time
 from datetime import datetime, timezone
 from typing import Any
@@ -8,15 +9,14 @@ from typing import Any
 import httpx
 
 
-DEFAULT_PASSWORD = "ClusterSmoke123!"
-
-
 def main() -> None:
     args = parse_args()
     base_url = args.base_url.rstrip("/")
     email = f"{args.email_prefix}-{int(datetime.now(timezone.utc).timestamp())}@example.test"
 
-    with httpx.Client(verify=not args.insecure, timeout=args.request_timeout_seconds) as client:
+    with httpx.Client(
+        verify=not args.insecure, timeout=args.request_timeout_seconds
+    ) as client:
         token = register(client, base_url, email, args.password)
         headers = {"Authorization": f"Bearer {token}"}
         document_id = upload_document(client, base_url, headers)
@@ -27,7 +27,9 @@ def main() -> None:
             document_id,
             timeout_seconds=args.processing_timeout_seconds,
         )
-        search_results = search_documents(client, base_url, headers, "searchable smoke document")
+        search_results = search_documents(
+            client, base_url, headers, "searchable smoke document"
+        )
 
     extraction = detail.get("text_extraction") or {}
     ai_analysis = detail.get("ai_analysis") or {}
@@ -40,15 +42,23 @@ def main() -> None:
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Run a PaperVault deployed smoke test.")
+    parser = argparse.ArgumentParser(
+        description="Run a PaperVault deployed smoke test."
+    )
     parser.add_argument(
         "--base-url",
         default="http://localhost:8000/api",
         help="API base URL, including the /api prefix when routed through the web host.",
     )
     parser.add_argument("--email-prefix", default="cluster-smoke")
-    parser.add_argument("--password", default=DEFAULT_PASSWORD)
-    parser.add_argument("--insecure", action="store_true", help="Disable TLS certificate checks.")
+    parser.add_argument(
+        "--password",
+        default=secrets.token_urlsafe(24),
+        help="Temporary account password. A random value is generated when omitted.",
+    )
+    parser.add_argument(
+        "--insecure", action="store_true", help="Disable TLS certificate checks."
+    )
     parser.add_argument("--request-timeout-seconds", type=float, default=30.0)
     parser.add_argument("--processing-timeout-seconds", type=float, default=90.0)
     return parser.parse_args()
@@ -64,7 +74,9 @@ def register(client: httpx.Client, base_url: str, email: str, password: str) -> 
     return str(payload["access_token"])
 
 
-def upload_document(client: httpx.Client, base_url: str, headers: dict[str, str]) -> str:
+def upload_document(
+    client: httpx.Client, base_url: str, headers: dict[str, str]
+) -> str:
     response = client.post(
         f"{base_url}/documents/uploads",
         headers=headers,
@@ -100,7 +112,9 @@ def wait_for_processing(
         if status in {"ready", "failed"}:
             return last_detail
         time.sleep(1)
-    raise TimeoutError(f"Document {document_id} did not finish processing: {last_detail}")
+    raise TimeoutError(
+        f"Document {document_id} did not finish processing: {last_detail}"
+    )
 
 
 def search_documents(
@@ -112,7 +126,13 @@ def search_documents(
     response = client.post(
         f"{base_url}/search",
         headers=headers,
-        json={"query": query, "mode": "hybrid", "filters": {}, "limit": 10, "offset": 0},
+        json={
+            "query": query,
+            "mode": "hybrid",
+            "filters": {},
+            "limit": 10,
+            "offset": 0,
+        },
     )
     response.raise_for_status()
     payload = response.json()
