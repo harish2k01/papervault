@@ -3,7 +3,7 @@ from __future__ import annotations
 import argparse
 import secrets
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 import httpx
@@ -12,7 +12,7 @@ import httpx
 def main() -> None:
     args = parse_args()
     base_url = args.base_url.rstrip("/")
-    email = f"{args.email_prefix}-{int(datetime.now(timezone.utc).timestamp())}@example.test"
+    email = f"{args.email_prefix}-{int(datetime.now(UTC).timestamp())}@example.test"
 
     with httpx.Client(
         verify=not args.insecure, timeout=args.request_timeout_seconds
