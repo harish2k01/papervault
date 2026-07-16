@@ -17,7 +17,10 @@ PostgreSQL stores metadata and relationships. Original PDFs and images remain in
 - `document_text_chunks`: page-bound retrieval chunks, embedding provider metadata, vectors, and source hashes.
 - `document_ai_analyses`: summaries, keywords, entities, suggested tags, category, confidence, and extracted metadata.
 - `document_embeddings`: provider/model metadata, vectors, and source hashes.
-- `tags` and `document_tags`: user-owned tags and assignments.
+- `tags` and `document_tags`: user-owned tags and materialized manual, AI, or smart assignments.
+- `smart_tag_rules`: deterministic matching rules and last evaluation timestamps for smart tags.
+- `document_collections`: user-owned manual or dynamic collection definitions and preferred grid/list view.
+- `collection_documents`: explicit membership links for manual collections.
 - `timeline_events`: append-only user/document activity.
 - `saved_searches` and `recent_searches`: reusable queries and search history.
 - `notifications`: due-date and expiry reminders.

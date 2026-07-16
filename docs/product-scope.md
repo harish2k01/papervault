@@ -17,7 +17,7 @@ the intended product direction.
 | Questions | Natural-language questions over page chunks with tenant isolation, concept-coverage and document-type ranking, direct local answers for common amount/date/list intents, model-backed grounded answers, confidence, citations, and refusal when evidence is insufficient |
 | Viewer | Responsive PDF/image viewer, page navigation, zoom, literal in-document search, page-aware results, text-layer highlighting, and OCR coordinate overlays |
 | Lifecycle | Metadata editing, confidence review, source replacement, immutable versions, restore, download, extracted-text comparison, document and vault timelines, archive, permanent deletion, diagnostics, and retry |
-| Organization | Manual and confidence-gated automatic tags, tag filtering, and explainable exact-file, exact-text, content-similarity, and OCR-similarity duplicate review with confirmation-gated archival |
+| Organization | Manual and confidence-gated automatic tags, deterministic smart tags, reusable manual and dynamic collections, grid/list collection views, tag filtering, and explainable exact-file, exact-text, content-similarity, and OCR-similarity duplicate review with confirmation-gated archival |
 | Notifications | Due date, expiry, renewal, and warranty reminders derived from document metadata with user-controlled status |
 | Identity | Local login, JWT access tokens, OIDC authorization-code login, admin/user RBAC, runtime registration policy, user activation/role management, and guarded permanent deletion with owned-file cleanup |
 | Administration | User and registration management plus non-secret runtime provider and provider-health visibility |
@@ -41,15 +41,17 @@ the intended product direction.
 - Similarity thresholds are conservative defaults, not universal truth. Operators with
   unusual OCR languages or highly repetitive forms should evaluate and tune them before
   resolving non-exact candidates.
+- Explicit smart-tag refresh evaluates the owner's current library synchronously.
+  Routine ingestion and edits update one document incrementally, but very large
+  one-time rule changes may need a future background refresh job.
 
 ## Roadmap
 
-1. Smart tags, reusable collections, and optional folder-style views.
-2. A dedicated chunk index, embedding-version migration, index aliases, and search relevance evaluation.
-3. Scheduled reminder generation, notification preferences, digests, email, and webhook delivery.
-4. Configurable source-version retention and legal holds.
-5. Password reset, optional email verification, refresh-token session management, MFA integration, and active-session revocation.
-6. Backup, restore, disaster-recovery verification, export/import, and documented storage lifecycle procedures.
-7. Malware scanning, configurable quotas, rate limiting, stronger content validation, and security event auditing.
-8. Full browser end-to-end, accessibility, upgrade, rollback, backup, and restore suites in CI.
-9. International OCR language packs, locale-aware classification, and per-locale evaluation corpora.
+1. A dedicated chunk index, embedding-version migration, index aliases, and search relevance evaluation.
+2. Scheduled reminder generation, notification preferences, digests, email, and webhook delivery.
+3. Configurable source-version retention and legal holds.
+4. Password reset, optional email verification, refresh-token session management, MFA integration, and active-session revocation.
+5. Backup, restore, disaster-recovery verification, export/import, and documented storage lifecycle procedures.
+6. Malware scanning, configurable quotas, rate limiting, stronger content validation, and security event auditing.
+7. Full browser end-to-end, accessibility, upgrade, rollback, backup, and restore suites in CI.
+8. International OCR language packs, locale-aware classification, and per-locale evaluation corpora.

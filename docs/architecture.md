@@ -30,6 +30,7 @@ The backend is a modular monolith organized by feature:
 - `administration`: persisted instance policy and runtime administration views.
 - `search`: database and OpenSearch query/index adapters plus search history.
 - `questions`: tenant-scoped chunk retrieval, grounded answer policy, citations, and refusal behavior.
+- `collections`: manual membership and dynamically evaluated document views.
 - `tags`: tag ownership and document assignment.
 - `notifications`: reminder projection and user status.
 - `timeline`: append-only document activity.
@@ -40,7 +41,7 @@ HTTP routes validate transport data and call application services. Celery tasks 
 The frontend follows the same feature-first approach:
 
 - `app`: providers and routing.
-- `features`: documents, questions, administration, tags, duplicates, notifications, and shell workflows.
+- `features`: documents, questions, administration, collections, tags, duplicates, notifications, and shell workflows.
 - `components/ui`: shared interaction primitives.
 - `lib`: typed API client, configuration, and small utilities.
 
@@ -67,7 +68,7 @@ sequenceDiagram
   Worker->>Worker: Normalize unsafe control characters
   Worker->>DB: Store extraction, page text, and OCR geometry
   Worker->>Worker: Analyze, classify, embed, and build page chunks
-  Worker->>DB: Store metadata, AI output, reminders, completion state
+  Worker->>DB: Store metadata, AI output, smart tags, reminders, completion state
   Worker->>Search: Update document projection
 ```
 
@@ -89,6 +90,13 @@ High-confidence suggested tags are normalized and attached automatically with an
 source and confidence score. Existing manual tag links take precedence. Classification
 and tag changes remain searchable through the eventual OpenSearch projection.
 
+Smart tags use the same owned-document rule vocabulary as dynamic collections. Rules
+can match document types, dates, title, issuer, and organization. They are deterministic,
+cannot depend on another tag, and materialize ordinary document-tag links so search and
+the rest of the application do not need a second tag model. A full refresh reconciles
+an existing vault, while normal processing and document edits synchronize only the
+affected document. Manual and AI assignments are not removed by smart-rule refreshes.
+
 ## Grounded Questions
 
 Question answering is separate from document search. Search returns ranked documents; the question service retrieves page-bound chunks from ready documents owned by the caller and asks a grounded-answer provider to answer only from that evidence. Retrieval requires minimum concept coverage and boosts the requested document family and chunks containing answer-shaped values.
@@ -103,6 +111,20 @@ The worker projects owned document fields, current text, AI output, metadata, ta
 
 Lifecycle and tag changes commit to PostgreSQL first and then refresh the search projection on a best-effort basis. Indexing failure is observable but does not roll back a successful metadata edit.
 
+## Collections And Organization
+
+Collections are user-owned views over the document library. A manual collection stores
+only membership links; it never copies or moves the source object. A dynamic collection
+stores a typed rule and evaluates current PostgreSQL document state when it is opened,
+so membership cannot become stale. Conditions are combined with AND, while multiple
+values within one condition use OR.
+
+Dynamic collections can use existing tag slugs as a condition. Smart tags deliberately
+cannot use tags as input because recursive tag rules would introduce cycles and
+non-deterministic update order. Archived documents are excluded unless a dynamic
+collection explicitly includes them. Collection create, edit, delete, add, and remove
+actions are recorded in the vault timeline.
+
 ## Document Lifecycle
 
 - Source binaries are not stored in PostgreSQL.
@@ -113,7 +135,7 @@ Lifecycle and tag changes commit to PostgreSQL first and then refresh the search
 - Permanent deletion is owner-scoped and removes source/version objects, the PostgreSQL document graph, and the rebuildable search projection.
 - Duplicate fingerprints are generated from the current successful text extraction during worker processing. Normalized-text hashes detect identical extracted content, while deterministic MinHash signatures and indexed locality-sensitive bands produce bounded content/OCR similarity candidates without comparing every document pair.
 - Duplicate results carry their method, confidence, text/length similarity, and a plain-language explanation. Exact-file matches can be resolved directly; every non-exact match requires user confirmation and fresh server-side fingerprint validation before redundant documents are archived.
-- Timeline events capture uploads, metadata edits, tag changes, source versions, archives, and related lifecycle actions. An owner-scoped vault feed provides a cross-document view.
+- Timeline events capture uploads, metadata edits, tag and collection changes, source versions, archives, and related lifecycle actions. An owner-scoped vault feed provides a cross-document view.
 
 ## Identity And Administration
 
@@ -125,7 +147,7 @@ The first account becomes an administrator. Administrators can manage users, per
 
 The PDF viewer is loaded only when a preview opens. PDF.js renders one responsive page at a time with zoom, page navigation, a text layer, and highlighted literal matches. OCR-only documents use stored word geometry to highlight matching text over the rendered PDF or image. Highlights are fetched only for the active page and explicit query.
 
-The application opens on a vault dashboard. A full-width, Drive-style document library remains usable as collections grow. Opening a document removes the global search surface and presents focused Overview, Details, Activity, and Versions tabs. Ask uses a conversation layout with a persistent composer and compact citations. Low-confidence documents have a dedicated review queue plus a compact approval action. Secondary editors, raw metadata, filters, and search history appear only when requested. Settings and provider health are visible only to administrators. Light and dark themes share the same semantic design tokens.
+The application opens on a vault dashboard. A full-width, Drive-style document library remains usable as collections grow. Collections provide a compact rail, grid/list document views, dynamic rules, and an integrated tag workspace without adding another top-level navigation item. Opening a document removes the global search surface and presents focused Overview, Details, Activity, and Versions tabs. Ask uses a conversation layout with a persistent composer and compact citations. Low-confidence documents have a dedicated review queue plus a compact approval action. Secondary editors, raw metadata, filters, and search history appear only when requested. Settings and provider health are visible only to administrators. Light and dark themes share the same semantic design tokens.
 
 ## Observability
 

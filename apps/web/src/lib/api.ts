@@ -155,7 +155,63 @@ export type DocumentTag = {
 export type TagItem = DocumentTag & {
   description: string | null;
   source: string;
+  document_count: number;
+  smart_rule: DocumentRule | null;
+  last_evaluated_at: string | null;
   created_at: string;
+};
+
+export type DocumentRule = {
+  document_types: string[];
+  title_contains: string | null;
+  issuer_contains: string | null;
+  organization_contains: string | null;
+  date_from: string | null;
+  date_to: string | null;
+  tags_any: string[];
+  include_archived: boolean;
+};
+
+export type CollectionKind = "manual" | "dynamic";
+export type CollectionView = "grid" | "list";
+
+export type CollectionItem = {
+  id: string;
+  name: string;
+  slug: string;
+  description: string | null;
+  color: string | null;
+  kind: CollectionKind;
+  view_mode: CollectionView;
+  rule: DocumentRule;
+  document_count: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export type CollectionDocument = {
+  id: string;
+  title: string;
+  original_filename: string;
+  document_type: string;
+  document_date: string | null;
+  issuer: string | null;
+  organization: string | null;
+  status: string;
+  file_size_bytes: number;
+  created_at: string;
+};
+
+export type CollectionDocumentPage = {
+  documents: CollectionDocument[];
+  total: number;
+};
+
+export type SmartTagRefreshResult = {
+  evaluated: number;
+  matched: number;
+  attached: number;
+  detached: number;
 };
 
 export type DocumentTypeDefinition = {
@@ -731,6 +787,117 @@ export async function createTag(input: {
     method: "POST",
     body: JSON.stringify(input),
   });
+}
+
+export async function createSmartTag(input: {
+  name: string;
+  description?: string | null;
+  color?: string | null;
+  rule: DocumentRule;
+}) {
+  return apiFetch<TagItem>("/tags/smart", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function updateSmartTagRule(tagId: string, rule: DocumentRule) {
+  return apiFetch<TagItem>(`/tags/${tagId}/smart-rule`, {
+    method: "PATCH",
+    body: JSON.stringify({ rule }),
+  });
+}
+
+export async function refreshSmartTag(tagId: string) {
+  return apiFetch<SmartTagRefreshResult>(`/tags/${tagId}/refresh`, {
+    method: "POST",
+    body: JSON.stringify({}),
+  });
+}
+
+export async function deleteTag(tagId: string) {
+  await apiFetch<void>(`/tags/${tagId}`, { method: "DELETE" });
+}
+
+export async function listCollections() {
+  return apiFetch<CollectionItem[]>("/collections");
+}
+
+export async function createCollection(input: {
+  name: string;
+  description?: string | null;
+  color?: string | null;
+  kind: CollectionKind;
+  view_mode: CollectionView;
+  rule: DocumentRule;
+}) {
+  return apiFetch<CollectionItem>("/collections", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function updateCollection(
+  collectionId: string,
+  input: Partial<{
+    name: string;
+    description: string | null;
+    color: string | null;
+    view_mode: CollectionView;
+    rule: DocumentRule;
+  }>,
+) {
+  return apiFetch<CollectionItem>(`/collections/${collectionId}`, {
+    method: "PATCH",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function deleteCollection(collectionId: string) {
+  await apiFetch<void>(`/collections/${collectionId}`, { method: "DELETE" });
+}
+
+export async function listCollectionDocuments(
+  collectionId: string,
+  input: { limit?: number; offset?: number } = {},
+) {
+  const params = new URLSearchParams({
+    limit: String(input.limit ?? 100),
+    offset: String(input.offset ?? 0),
+  });
+  return apiFetch<CollectionDocumentPage>(
+    `/collections/${collectionId}/documents?${params.toString()}`,
+  );
+}
+
+export async function listCollectionCandidates(
+  collectionId: string,
+  query: string,
+) {
+  const params = new URLSearchParams({ query, limit: "50", offset: "0" });
+  return apiFetch<CollectionDocumentPage>(
+    `/collections/${collectionId}/candidates?${params.toString()}`,
+  );
+}
+
+export async function addDocumentToCollection(
+  collectionId: string,
+  documentId: string,
+) {
+  return apiFetch<{ changed: boolean }>(
+    `/collections/${collectionId}/documents/${documentId}`,
+    { method: "POST", body: JSON.stringify({}) },
+  );
+}
+
+export async function removeDocumentFromCollection(
+  collectionId: string,
+  documentId: string,
+) {
+  return apiFetch<{ changed: boolean }>(
+    `/collections/${collectionId}/documents/${documentId}`,
+    { method: "DELETE" },
+  );
 }
 
 export async function attachTag(documentId: string, tagId: string) {

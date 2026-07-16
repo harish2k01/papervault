@@ -1,4 +1,5 @@
 from papervault_api.administration.infrastructure.models import InstanceSettings
+from papervault_api.collections.infrastructure.models import CollectionDocument, VaultCollection
 from papervault_api.documents.infrastructure.models import (
     Document,
     DocumentAIAnalysis,
@@ -15,10 +16,11 @@ from papervault_api.documents.infrastructure.models import (
 from papervault_api.identity.infrastructure.models import User
 from papervault_api.notifications.infrastructure.models import Notification
 from papervault_api.search.infrastructure.models import RecentSearch, SavedSearch
-from papervault_api.tags.infrastructure.models import DocumentTag, Tag
+from papervault_api.tags.infrastructure.models import DocumentTag, SmartTagRule, Tag
 from papervault_api.timeline.infrastructure.models import TimelineEvent
 
 __all__ = [
+    "CollectionDocument",
     "Document",
     "DocumentAIAnalysis",
     "DocumentDuplicateBucket",
@@ -35,7 +37,9 @@ __all__ = [
     "Notification",
     "RecentSearch",
     "SavedSearch",
+    "SmartTagRule",
     "Tag",
     "TimelineEvent",
     "User",
+    "VaultCollection",
 ]

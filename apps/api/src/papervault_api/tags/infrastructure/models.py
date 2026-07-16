@@ -2,10 +2,11 @@ from __future__ import annotations
 
 from datetime import datetime
 from decimal import Decimal
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
 from sqlalchemy import (
+    JSON,
     CheckConstraint,
     DateTime,
     ForeignKey,
@@ -54,6 +55,12 @@ class Tag(UuidPrimaryKeyMixin, TimestampMixin, Base):
         cascade="all, delete-orphan",
         passive_deletes=True,
     )
+    smart_rule: Mapped[SmartTagRule | None] = relationship(
+        back_populates="tag",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        uselist=False,
+    )
 
 
 class DocumentTag(Base):
@@ -91,3 +98,16 @@ class DocumentTag(Base):
 
     document: Mapped[Document] = relationship(back_populates="tag_links")
     tag: Mapped[Tag] = relationship(back_populates="document_links")
+
+
+class SmartTagRule(Base):
+    __tablename__ = "smart_tag_rules"
+
+    tag_id: Mapped[UUID] = mapped_column(
+        ForeignKey("tags.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    rule: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    last_evaluated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    tag: Mapped[Tag] = relationship(back_populates="smart_rule")

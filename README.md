@@ -16,6 +16,7 @@ PaperVault is a self-hosted document management system for turning PDFs, scans, 
 - Replace or restore source files without losing immutable version history, and compare extracted text between versions.
 - Browse a vault-wide activity feed and permanently remove users with their owned files.
 - Detect exact-file, exact-text, content-similar, and OCR-similar duplicates with explainable scores and confirmation-gated archival.
+- Group documents in manual or rule-driven collections, switch between grid and list views, and maintain deterministic smart tags.
 - Track metadata edits, tag changes, archive actions, versions, reminders, and duplicate resolution.
 - Use local accounts or OIDC providers such as Authentik and Keycloak.
 - Administer registration, user access, roles, and active runtime providers from the web app.
@@ -32,7 +33,7 @@ PaperVault is a modular monolith with separate runtime processes:
 - `infra`: Docker Compose, Kubernetes, Helm, Gateway API, and deployment configuration.
 - `docs`: architecture, operations, API reference, and decision records.
 
-HTTP routes and Celery tasks are orchestration boundaries. Document, identity, administration, search, question answering, tagging, notification, and lifecycle behavior belongs to feature-owned application services. OCR, AI, embeddings, grounded answers, storage, OIDC, and search engines are accessed through provider interfaces.
+HTTP routes and Celery tasks are orchestration boundaries. Document, identity, administration, search, question answering, collections, tagging, notification, and lifecycle behavior belongs to feature-owned application services. OCR, AI, embeddings, grounded answers, storage, OIDC, and search engines are accessed through provider interfaces.
 
 See [Architecture](docs/architecture.md) for the system model and data flows.
 

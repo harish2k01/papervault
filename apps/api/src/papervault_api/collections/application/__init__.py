@@ -1,0 +1,1 @@
+"""Collection application services."""

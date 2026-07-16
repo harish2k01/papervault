@@ -47,8 +47,12 @@ def upgrade() -> None:
         sa.CheckConstraint("page_number > 0", name="ck_document_text_chunks_chunk_page_positive"),
         sa.CheckConstraint("chunk_index >= 0", name="ck_document_text_chunks_chunk_index_valid"),
         sa.CheckConstraint("token_count > 0", name="ck_document_text_chunks_chunk_tokens_positive"),
-        sa.CheckConstraint("dimensions > 0", name="ck_document_text_chunks_chunk_dimensions_positive"),
-        sa.CheckConstraint("vector_norm >= 0", name="ck_document_text_chunks_chunk_norm_non_negative"),
+        sa.CheckConstraint(
+            "dimensions > 0", name="ck_document_text_chunks_chunk_dimensions_positive"
+        ),
+        sa.CheckConstraint(
+            "vector_norm >= 0", name="ck_document_text_chunks_chunk_norm_non_negative"
+        ),
         sa.ForeignKeyConstraint(
             ["document_id"],
             ["documents.id"],

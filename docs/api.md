@@ -78,12 +78,37 @@ The request accepts a `question` between 3 and 1,000 characters. The response st
 
 ## Tags
 
-- `GET /tags`: list tags
+- `GET /tags`: list tags with active-document counts and smart-rule details
 - `POST /tags`: create a manual tag
+- `POST /tags/smart`: create a deterministic smart tag and reconcile matching documents
+- `PATCH /tags/{tag_id}/smart-rule`: replace a smart tag rule and reconcile membership
+- `POST /tags/{tag_id}/refresh`: explicitly reconcile a smart tag against the current library
+- `DELETE /tags/{tag_id}`: delete a tag and its assignments
 - `POST /documents/{document_id}/tags/{tag_id}`: attach a tag
 - `DELETE /documents/{document_id}/tags/{tag_id}`: detach a tag
 
 Tag assignment endpoints are owner-scoped, append `tags_changed` timeline events, and refresh the affected document's OpenSearch projection on a best-effort basis after PostgreSQL commits. High-confidence AI suggestions are attached automatically with their source and confidence retained; manual assignments are never overwritten by automatic tagging.
+
+Smart-tag rules can match document type, title, issuer, organization, and document date.
+They exclude archived documents and cannot depend on other tags. Conditions use AND;
+multiple document types use OR. Manual or AI assignments take precedence over a smart
+assignment when the same tag/document link already exists.
+
+## Collections
+
+- `GET /collections`: list owned collections with current document counts
+- `POST /collections`: create a manual or dynamic collection
+- `PATCH /collections/{collection_id}`: update name, description, color, view, or dynamic rule
+- `DELETE /collections/{collection_id}`: delete the collection without deleting documents
+- `GET /collections/{collection_id}/documents`: list current collection documents
+- `GET /collections/{collection_id}/candidates`: search documents available to a manual collection
+- `POST /collections/{collection_id}/documents/{document_id}`: add a document to a manual collection
+- `DELETE /collections/{collection_id}/documents/{document_id}`: remove a document from a manual collection
+
+Manual collections persist membership links. Dynamic collections persist a typed rule
+and evaluate current PostgreSQL state when listed. Dynamic rules additionally support
+tag slugs and optional archived-document inclusion. Source files remain in object
+storage and are never copied or moved by collection operations.
 
 ## Notifications
 

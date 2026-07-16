@@ -90,6 +90,7 @@ from papervault_api.documents.infrastructure.models import Document, DocumentVer
 from papervault_api.identity.api.dependencies import get_current_user
 from papervault_api.identity.application.current_user import CurrentUser
 from papervault_api.search.api.indexing import reindex_document_best_effort
+from papervault_api.tags.application.service import TagService
 
 router = APIRouter(prefix="/documents", tags=["documents"])
 
@@ -731,6 +732,11 @@ async def update_document(
     if document is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
 
+    await TagService(session).synchronize_document(
+        owner_id=current_user.id,
+        document_id=document.id,
+        actor_id=current_user.id,
+    )
     await reindex_document_best_effort(
         session=session,
         settings=settings,
@@ -773,6 +779,11 @@ async def replace_document_metadata(
     if metadata is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
 
+    await TagService(session).synchronize_document(
+        owner_id=current_user.id,
+        document_id=document_id,
+        actor_id=current_user.id,
+    )
     await reindex_document_best_effort(
         session=session,
         settings=settings,

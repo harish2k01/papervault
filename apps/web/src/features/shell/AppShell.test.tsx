@@ -37,6 +37,7 @@ vi.mock("react-pdf", () => ({
 }));
 
 vi.mock("../../lib/api", () => ({
+  addDocumentToCollection: vi.fn(),
   archiveDocument: vi.fn(),
   askQuestion: vi.fn(),
   attachTag: vi.fn(),
@@ -44,8 +45,12 @@ vi.mock("../../lib/api", () => ({
     .fn()
     .mockReturnValue("/auth/oidc/start?redirect_to=%2F"),
   clearStoredAccessToken: vi.fn(),
+  createCollection: vi.fn(),
+  createSmartTag: vi.fn(),
   createTag: vi.fn(),
+  deleteCollection: vi.fn(),
   deleteDocument: vi.fn(),
+  deleteTag: vi.fn(),
   deleteUser: vi.fn(),
   detachTag: vi.fn(),
   downloadDocumentFile: vi.fn(),
@@ -59,6 +64,10 @@ vi.mock("../../lib/api", () => ({
   getStoredAccessToken: vi.fn().mockReturnValue(null),
   listDocumentTypes: vi.fn().mockResolvedValue([]),
   listDocuments: vi.fn().mockResolvedValue([]),
+  listCollectionDocuments: vi
+    .fn()
+    .mockResolvedValue({ documents: [], total: 0 }),
+  listCollections: vi.fn().mockResolvedValue([]),
   listDuplicates: vi.fn().mockResolvedValue([]),
   listNotifications: vi.fn().mockResolvedValue([]),
   listReviewQueue: vi.fn().mockResolvedValue([]),
@@ -74,10 +83,12 @@ vi.mock("../../lib/api", () => ({
     updated: 0,
     skipped: 0,
   }),
+  refreshSmartTag: vi.fn(),
   parseOidcCallbackHash: vi.fn().mockReturnValue(null),
   registerAccount: vi.fn(),
   reprocessDocument: vi.fn(),
   replaceDocumentSource: vi.fn(),
+  removeDocumentFromCollection: vi.fn(),
   restoreDocumentVersion: vi.fn(),
   compareDocumentVersions: vi.fn(),
   saveSearch: vi.fn(),
@@ -91,9 +102,11 @@ vi.mock("../../lib/api", () => ({
   storeAccessToken: vi.fn(),
   syncDocumentNotifications: vi.fn().mockResolvedValue([]),
   updateDocument: vi.fn(),
+  updateCollection: vi.fn(),
   updateDocumentMetadata: vi.fn(),
   updateAdminSettings: vi.fn(),
   updateNotificationStatus: vi.fn(),
+  updateSmartTagRule: vi.fn(),
   updateDocumentReview: vi.fn(),
   updateUser: vi.fn(),
   uploadDocument: vi.fn(),
@@ -157,7 +170,11 @@ describe("AppShell", () => {
     );
 
     expect(
-      await screen.findByRole("heading", { name: "Add your first document" }),
+      await screen.findByRole(
+        "heading",
+        { name: "Add your first document" },
+        { timeout: 5_000 },
+      ),
     ).toBeInTheDocument();
     expect(
       screen.getByRole("heading", { name: "Your vault" }),
@@ -263,8 +280,8 @@ describe("AppShell", () => {
     const document = {
       id: "document-failed",
       owner_id: "user-1",
-      title: "Statement 2026MTH04 609599319",
-      original_filename: "Statement_2026MTH04_609599319.pdf",
+      title: "Example account statement",
+      original_filename: "example-account-statement.pdf",
       content_type: "application/pdf",
       file_size_bytes: 67584,
       sha256_hash: "b".repeat(64),
@@ -323,7 +340,7 @@ describe("AppShell", () => {
 
     renderAppShell();
 
-    await openDocumentFromLibrary("Statement 2026MTH04 609599319");
+    await openDocumentFromLibrary("Example account statement");
 
     expect(await screen.findByText("Processing failed")).toBeInTheDocument();
     expect(await screen.findByText("Preview not ready")).toBeInTheDocument();

@@ -16,11 +16,13 @@ from papervault_api.documents.infrastructure.ai import (
     build_document_ai_provider,
     build_embedding_provider,
 )
+from papervault_api.documents.infrastructure.models import Document
 from papervault_api.documents.infrastructure.storage import S3ObjectStorage
 from papervault_api.documents.infrastructure.text_extractors import build_default_text_extractor
 from papervault_api.notifications.application.service import NotificationService
 from papervault_api.search.application.indexing import SearchIndexingService
 from papervault_api.search.infrastructure.opensearch import build_search_document_index
+from papervault_api.tags.application.service import TagService
 from papervault_api.worker.celery_app import celery_app
 
 logger = structlog.get_logger(__name__)
@@ -94,6 +96,8 @@ async def _process_document(document_id: UUID) -> None:
             )
             await ai_processing_service.process_document(document_id)
 
+    await _sync_smart_tags(document_id)
+
     async with AsyncSessionFactory() as session:
         notification_service = NotificationService(session)
         await notification_service.generate_for_document(document_id)
@@ -133,5 +137,23 @@ async def _refresh_duplicate_fingerprint(document_id: UUID) -> None:
     except Exception:
         logger.exception(
             "document_duplicate_fingerprint_failed",
+            document_id=str(document_id),
+        )
+
+
+async def _sync_smart_tags(document_id: UUID) -> None:
+    try:
+        async with AsyncSessionFactory() as session:
+            document = await session.get(Document, document_id)
+            if document is None:
+                return
+            await TagService(session).synchronize_document(
+                owner_id=document.owner_id,
+                document_id=document_id,
+                actor_id=None,
+            )
+    except Exception:
+        logger.exception(
+            "document_smart_tag_sync_failed",
             document_id=str(document_id),
         )

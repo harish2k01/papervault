@@ -16,6 +16,7 @@ import {
   Download,
   FileSearch,
   FileText,
+  FolderKanban,
   GitCompare,
   History,
   type LucideIcon,
@@ -30,7 +31,6 @@ import {
   Settings2,
   ShieldCheck,
   Sun,
-  Tags,
   Trash2,
   Upload,
   UserPlus,
@@ -53,12 +53,17 @@ import {
   TagItem,
   TokenResponse,
   VersionComparison,
+  addDocumentToCollection,
   archiveDocument,
   attachTag,
   buildOidcLoginUrl,
   clearStoredAccessToken,
+  createCollection,
+  createSmartTag,
   createTag,
+  deleteCollection,
   deleteDocument,
+  deleteTag,
   deleteUser,
   detachTag,
   downloadDocumentFile,
@@ -71,6 +76,8 @@ import {
   getStoredAccessToken,
   listDocumentTypes,
   listDocuments,
+  listCollectionDocuments,
+  listCollections,
   listDuplicates,
   listNotifications,
   listReviewQueue,
@@ -84,8 +91,10 @@ import {
   parseOidcCallbackHash,
   registerAccount,
   refreshDuplicateFingerprints,
+  refreshSmartTag,
   reprocessDocument,
   replaceDocumentSource,
+  removeDocumentFromCollection,
   restoreDocumentVersion,
   compareDocumentVersions,
   saveSearch,
@@ -93,9 +102,11 @@ import {
   storeAccessToken,
   syncDocumentNotifications,
   updateDocument,
+  updateCollection,
   updateDocumentMetadata,
   updateAdminSettings,
   updateNotificationStatus,
+  updateSmartTagRule,
   updateDocumentReview,
   updateUser,
   uploadDocument,
@@ -116,7 +127,7 @@ type WorkspaceView =
   | "review"
   | "timeline"
   | "duplicates"
-  | "tags"
+  | "collections"
   | "notifications"
   | "settings";
 
@@ -150,9 +161,9 @@ const ReviewWorkspace = lazy(async () => {
   return { default: module.ReviewWorkspace };
 });
 
-const TagsWorkspace = lazy(async () => {
-  const module = await import("./TagsWorkspace");
-  return { default: module.TagsWorkspace };
+const CollectionsWorkspace = lazy(async () => {
+  const module = await import("./CollectionsWorkspace");
+  return { default: module.CollectionsWorkspace };
 });
 
 const TimelineWorkspace = lazy(async () => {
@@ -167,7 +178,7 @@ const navItems = [
   { key: "review", label: "Review", icon: ClipboardCheck },
   { key: "timeline", label: "Activity", icon: History },
   { key: "duplicates", label: "Duplicates", icon: FileSearch },
-  { key: "tags", label: "Tags", icon: Tags },
+  { key: "collections", label: "Collections", icon: FolderKanban },
   { key: "notifications", label: "Notifications", icon: Bell },
 ] satisfies Array<{
   key: WorkspaceView;
@@ -218,6 +229,9 @@ export function AppShell() {
   const [selectedDocumentId, setSelectedDocumentId] = useState<string | null>(
     null,
   );
+  const [selectedCollectionId, setSelectedCollectionId] = useState<
+    string | null
+  >(null);
   const [darkMode, setDarkMode] = useState(
     () => window.localStorage.getItem("papervault.theme") === "dark",
   );
@@ -258,6 +272,16 @@ export function AppShell() {
     queryKey: ["tags"],
     queryFn: listTags,
     enabled: workspaceEnabled,
+  });
+  const collectionsQuery = useQuery({
+    queryKey: ["collections"],
+    queryFn: listCollections,
+    enabled: workspaceEnabled,
+  });
+  const collectionDocumentsQuery = useQuery({
+    queryKey: ["collections", selectedCollectionId, "documents"],
+    queryFn: () => listCollectionDocuments(selectedCollectionId!),
+    enabled: workspaceEnabled && selectedCollectionId !== null,
   });
   const savedSearchesQuery = useQuery({
     queryKey: ["search", "saved"],
@@ -601,9 +625,109 @@ export function AppShell() {
     },
   });
   const tagCreateMutation = useMutation({
-    mutationFn: (name: string) => createTag({ name: name.trim() }),
+    mutationFn: createTag,
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["tags"] });
+    },
+  });
+  const collectionCreateMutation = useMutation({
+    mutationFn: (input: Parameters<typeof createCollection>[0]) =>
+      createCollection(input),
+    onSuccess: async (collection) => {
+      setSelectedCollectionId(collection.id);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["collections"] }),
+        queryClient.invalidateQueries({ queryKey: ["timeline"] }),
+      ]);
+    },
+  });
+  const collectionUpdateMutation = useMutation({
+    mutationFn: (input: {
+      collectionId: string;
+      updates: Parameters<typeof updateCollection>[1];
+    }) => updateCollection(input.collectionId, input.updates),
+    onSuccess: async (collection) => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["collections"] }),
+        queryClient.invalidateQueries({
+          queryKey: ["collections", collection.id, "documents"],
+        }),
+        queryClient.invalidateQueries({ queryKey: ["timeline"] }),
+      ]);
+    },
+  });
+  const collectionDeleteMutation = useMutation({
+    mutationFn: deleteCollection,
+    onSuccess: async (_response, collectionId) => {
+      setSelectedCollectionId((current) =>
+        current === collectionId ? null : current,
+      );
+      queryClient.removeQueries({
+        queryKey: ["collections", collectionId],
+      });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["collections"] }),
+        queryClient.invalidateQueries({ queryKey: ["timeline"] }),
+      ]);
+    },
+  });
+  const collectionAddMutation = useMutation({
+    mutationFn: (input: { collectionId: string; documentId: string }) =>
+      addDocumentToCollection(input.collectionId, input.documentId),
+    onSuccess: async (_response, input) => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["collections"] }),
+        queryClient.invalidateQueries({
+          queryKey: ["collections", input.collectionId, "documents"],
+        }),
+        queryClient.invalidateQueries({
+          queryKey: ["collections", "candidates"],
+        }),
+        queryClient.invalidateQueries({ queryKey: ["timeline"] }),
+      ]);
+    },
+  });
+  const collectionRemoveMutation = useMutation({
+    mutationFn: (input: { collectionId: string; documentId: string }) =>
+      removeDocumentFromCollection(input.collectionId, input.documentId),
+    onSuccess: async (_response, input) => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["collections"] }),
+        queryClient.invalidateQueries({
+          queryKey: ["collections", input.collectionId, "documents"],
+        }),
+        queryClient.invalidateQueries({
+          queryKey: ["collections", "candidates"],
+        }),
+        queryClient.invalidateQueries({ queryKey: ["timeline"] }),
+      ]);
+    },
+  });
+  const smartTagCreateMutation = useMutation({
+    mutationFn: createSmartTag,
+    onSuccess: async () => {
+      await invalidateOrganization();
+    },
+  });
+  const smartTagUpdateMutation = useMutation({
+    mutationFn: (input: {
+      tagId: string;
+      rule: Parameters<typeof updateSmartTagRule>[1];
+    }) => updateSmartTagRule(input.tagId, input.rule),
+    onSuccess: async () => {
+      await invalidateOrganization();
+    },
+  });
+  const smartTagRefreshMutation = useMutation({
+    mutationFn: refreshSmartTag,
+    onSuccess: async () => {
+      await invalidateOrganization();
+    },
+  });
+  const tagDeleteMutation = useMutation({
+    mutationFn: deleteTag,
+    onSuccess: async () => {
+      await invalidateOrganization();
     },
   });
   const saveSearchMutation = useMutation({
@@ -632,6 +756,7 @@ export function AppShell() {
     setAccessToken(null);
     setActiveView("home");
     setSelectedDocumentId(null);
+    setSelectedCollectionId(null);
     queryClient.clear();
   }
 
@@ -676,14 +801,6 @@ export function AppShell() {
     });
   }
 
-  function createVaultTag(name: string) {
-    const normalizedName = name.trim();
-    if (!normalizedName) {
-      return;
-    }
-    tagCreateMutation.mutate(normalizedName);
-  }
-
   function openDocument(documentId: string | null) {
     if (!documentId) {
       return;
@@ -704,6 +821,17 @@ export function AppShell() {
   async function invalidateDocumentTags(documentId: string) {
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: ["document", documentId] }),
+      queryClient.invalidateQueries({ queryKey: ["search"] }),
+      queryClient.invalidateQueries({ queryKey: ["timeline"] }),
+    ]);
+  }
+
+  async function invalidateOrganization() {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ["tags"] }),
+      queryClient.invalidateQueries({ queryKey: ["collections"] }),
+      queryClient.invalidateQueries({ queryKey: ["documents"] }),
+      queryClient.invalidateQueries({ queryKey: ["document"] }),
       queryClient.invalidateQueries({ queryKey: ["search"] }),
       queryClient.invalidateQueries({ queryKey: ["timeline"] }),
     ]);
@@ -787,10 +915,33 @@ export function AppShell() {
   const documentCount = loadedDocuments.length;
   const duplicateGroups = duplicatesQuery.data?.length ?? 0;
   const reviewCount = reviewQueueQuery.data?.length ?? 0;
-  const tagCreateError =
-    tagCreateMutation.error instanceof Error
-      ? tagCreateMutation.error.message
-      : null;
+  const organizationError =
+    [
+      collectionsQuery.error,
+      collectionDocumentsQuery.error,
+      collectionCreateMutation.error,
+      collectionUpdateMutation.error,
+      collectionDeleteMutation.error,
+      collectionAddMutation.error,
+      collectionRemoveMutation.error,
+      tagCreateMutation.error,
+      smartTagCreateMutation.error,
+      smartTagUpdateMutation.error,
+      smartTagRefreshMutation.error,
+      tagDeleteMutation.error,
+    ].find((error): error is Error => error instanceof Error)?.message ?? null;
+  const organizationMutating = [
+    collectionCreateMutation,
+    collectionUpdateMutation,
+    collectionDeleteMutation,
+    collectionAddMutation,
+    collectionRemoveMutation,
+    tagCreateMutation,
+    smartTagCreateMutation,
+    smartTagUpdateMutation,
+    smartTagRefreshMutation,
+    tagDeleteMutation,
+  ].some((mutation) => mutation.isPending);
   const duplicateMergeError =
     duplicateMergeMutation.error instanceof Error
       ? duplicateMergeMutation.error.message
@@ -1063,13 +1214,62 @@ export function AppShell() {
               onMerge={(input) => duplicateMergeMutation.mutate(input)}
               onScan={() => duplicateRefreshMutation.mutate()}
             />
-          ) : activeView === "tags" ? (
-            <TagsWorkspace
+          ) : activeView === "collections" ? (
+            <CollectionsWorkspace
+              collections={collectionsQuery.data ?? []}
+              selectedCollectionId={selectedCollectionId}
+              collectionDocuments={
+                collectionDocumentsQuery.data?.documents ?? []
+              }
+              collectionDocumentTotal={
+                collectionDocumentsQuery.data?.total ?? 0
+              }
               tags={tagsQuery.data ?? []}
-              isLoading={tagsQuery.isLoading}
-              isCreating={tagCreateMutation.isPending}
-              error={tagCreateError}
-              onCreateTag={createVaultTag}
+              documentTypes={documentTypesQuery.data ?? []}
+              isLoading={collectionsQuery.isLoading || tagsQuery.isLoading}
+              isLoadingDocuments={collectionDocumentsQuery.isLoading}
+              isMutating={organizationMutating}
+              error={organizationError}
+              onSelectCollection={setSelectedCollectionId}
+              onOpenDocument={openDocument}
+              onCreateCollection={(input) =>
+                collectionCreateMutation.mutate(input)
+              }
+              onUpdateCollection={(collectionId, updates) =>
+                collectionUpdateMutation.mutate({ collectionId, updates })
+              }
+              onDeleteCollection={(collectionId, name) => {
+                if (
+                  window.confirm(
+                    `Delete the collection "${name}"? Documents and source files will not be deleted.`,
+                  )
+                ) {
+                  collectionDeleteMutation.mutate(collectionId);
+                }
+              }}
+              onAddDocument={(collectionId, documentId) =>
+                collectionAddMutation.mutate({ collectionId, documentId })
+              }
+              onRemoveDocument={(collectionId, documentId) =>
+                collectionRemoveMutation.mutate({ collectionId, documentId })
+              }
+              onCreateTag={(input) => tagCreateMutation.mutate(input)}
+              onCreateSmartTag={(input) => smartTagCreateMutation.mutate(input)}
+              onUpdateSmartTag={(tagId, rule) =>
+                smartTagUpdateMutation.mutate({ tagId, rule })
+              }
+              onRefreshSmartTag={(tagId) =>
+                smartTagRefreshMutation.mutate(tagId)
+              }
+              onDeleteTag={(tagId, name) => {
+                if (
+                  window.confirm(
+                    `Delete the tag "${name}"? Existing document files are unaffected.`,
+                  )
+                ) {
+                  tagDeleteMutation.mutate(tagId);
+                }
+              }}
             />
           ) : (
             <section className="flex min-w-0 flex-col bg-background xl:h-screen xl:min-h-0">
