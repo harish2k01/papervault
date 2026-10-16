@@ -8,13 +8,43 @@ from papervault_api.documents.application.ai import EmbeddingResult
 from papervault_api.documents.infrastructure.models import Document, DocumentTextExtraction
 from papervault_api.identity.infrastructure.models import User
 from papervault_api.search.application import service as search_module
-from papervault_api.search.application.service import DocumentSearchService, SearchRequest
+from papervault_api.search.application.service import (
+    DocumentSearchService,
+    SearchRequest,
+    build_highlights,
+    score_keyword,
+)
 from papervault_api.search.domain.enums import SearchMode
 
 
 class UnavailableEmbeddingProvider:
     def embed(self, text: str) -> EmbeddingResult:
         raise ConnectionError("Embedding service unavailable")
+
+
+@pytest.mark.parametrize(
+    ("query", "text"),
+    [
+        ("672839", "Receipt reference 672839"),
+        ("12", "Document number 12"),
+        ("Li", "Statement issued to Li"),
+        ("東京", "東京 receipt"),
+    ],
+)
+def test_keyword_search_and_excerpts_preserve_numbers_short_names_and_unicode(
+    query: str, text: str
+) -> None:
+    assert score_keyword(query, text) == 1
+    assert query.lower() in build_highlights(query, text)[0].lower()
+
+
+async def test_search_finds_numeric_reference_in_extracted_text(session: AsyncSession) -> None:
+    owner_id, document_id = await add_searchable_document(session)
+    results = await DocumentSearchService(
+        session=session, embedding_provider_name="local", embedding_dimensions=16
+    ).search(SearchRequest(owner_id=owner_id, query="672839", mode=SearchMode.KEYWORD))
+    assert [result.document_id for result in results] == [document_id]
+    assert "672839" in results[0].highlights[0]
 
 
 async def add_searchable_document(session: AsyncSession) -> tuple[UUID, UUID]:
@@ -40,7 +70,7 @@ async def add_searchable_document(session: AsyncSession) -> tuple[UUID, UUID]:
             document_id=document.id,
             source="embedded_text",
             status="succeeded",
-            content_text="Replacement compressor reference ZXQ918273",
+            content_text="Replacement compressor reference ZXQ918273. Receipt number 672839.",
             is_current=True,
         )
     )

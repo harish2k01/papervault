@@ -100,6 +100,7 @@ Detailed setup, Windows commands, provider configuration, and validation steps a
 - [Database](docs/database.md)
 - [API](docs/api.md)
 - [Deployment](docs/deployment.md)
+- [Olympus deployment](docs/homelab-deployment.md)
 - [Contributing](CONTRIBUTING.md)
 - [Architecture decision records](docs/adr)
 

@@ -30,7 +30,7 @@ spec:
         {{- toYaml .Values.podSecurityContext.web | nindent 8 }}
       containers:
         - name: web
-          image: "{{ .Values.image.web.repository }}:{{ .Values.image.web.tag }}"
+          image: {{ include "papervault.image" .Values.image.web | quote }}
           imagePullPolicy: {{ .Values.image.web.pullPolicy }}
           securityContext:
             {{- toYaml .Values.containerSecurityContext.web | nindent 12 }}

@@ -47,3 +47,11 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- define "papervault.configMapName" -}}
 {{- printf "%s-config" (include "papervault.fullname" .) -}}
 {{- end -}}
+
+{{- define "papervault.image" -}}
+{{- if .digest -}}
+{{- printf "%s@%s" .repository .digest -}}
+{{- else -}}
+{{- printf "%s:%s" .repository .tag -}}
+{{- end -}}
+{{- end -}}

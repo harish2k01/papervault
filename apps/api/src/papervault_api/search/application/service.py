@@ -1,4 +1,5 @@
 import asyncio
+import re
 from collections.abc import AsyncIterator
 from dataclasses import dataclass, field, replace
 from datetime import date, datetime
@@ -14,7 +15,7 @@ from sqlalchemy.sql.elements import ColumnElement
 
 from papervault_api.core.config import Settings
 from papervault_api.documents.domain.enums import DocumentStatus
-from papervault_api.documents.infrastructure.ai import build_embedding_provider, tokenize
+from papervault_api.documents.infrastructure.ai import build_embedding_provider
 from papervault_api.documents.infrastructure.models import (
     Document,
     DocumentEmbedding,
@@ -25,6 +26,7 @@ from papervault_api.search.infrastructure.models import RecentSearch, SavedSearc
 from papervault_api.tags.infrastructure.models import DocumentTag, Tag
 
 logger = structlog.get_logger(__name__)
+SEARCH_TOKEN_PATTERN = re.compile(r"[^\W_]+(?:[-_][^\W_]+)*")
 
 
 @dataclass(frozen=True, slots=True)
@@ -359,17 +361,23 @@ def build_filter_clauses(filters: SearchFilters) -> list[ColumnElement[bool]]:
 
 
 def score_keyword(query: str, text: str) -> float:
-    query_tokens = tokenize(query)
+    query_tokens = search_tokens(query)
     if not query_tokens:
         return 0.0
 
-    text_tokens = tokenize(text)
+    text_tokens = search_tokens(text)
     if not text_tokens:
         return 0.0
 
     text_token_set = set(text_tokens)
     matches = sum(1 for token in query_tokens if token in text_token_set)
     return matches / len(query_tokens)
+
+
+def search_tokens(text: str) -> tuple[str, ...]:
+    # Analysis keywords omit short words and numbers. Search must retain references,
+    # short names, and non-Latin text without changing existing embedding vectors.
+    return tuple(match.group().lower() for match in SEARCH_TOKEN_PATTERN.finditer(text))
 
 
 def cosine_similarity(left: tuple[float, ...], right: tuple[float, ...]) -> float:
@@ -396,7 +404,7 @@ def build_highlights(query: str, text: str, limit: int = 3) -> tuple[str, ...]:
         return ()
     lower_text = text.lower()
     highlights: list[str] = []
-    for token in tokenize(query):
+    for token in search_tokens(query):
         position = lower_text.find(token)
         if position == -1:
             continue

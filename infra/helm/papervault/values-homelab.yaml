@@ -1,0 +1,60 @@
+# Dependency resources are managed separately under infra/k8s/homelab.
+# Application images are verified against source revision 15902276cf157f32e226255c53ad3aa34f441ceb.
+image:
+  api:
+    repository: ghcr.io/harish2k01/papervault/api
+    tag: sha-1590227
+    digest: sha256:35cbd52c6f3a7bb7237da091bfc29c5c85f15336dec3234b15e0adc537e94fbb
+  worker:
+    repository: ghcr.io/harish2k01/papervault/worker
+    tag: sha-1590227
+    digest: sha256:12667b85d1a5c7abcec23ade7f782f0a551d669b1218f44b92f752704562bb89
+  web:
+    repository: ghcr.io/harish2k01/papervault/web
+    tag: sha-1590227
+    digest: sha256:b6149bf78461a2b5d36a552926aad40191e8872df00a1f85821416f1847341c7
+
+secret:
+  create: false
+  existingSecret: papervault-runtime
+
+config:
+  environment: production
+  authAllowDevHeaders: "false"
+  localRegistrationEnabled: "false"
+  webAppUrl: https://papervault.k8s.harish2k01.xyz
+  corsOrigins: https://papervault.k8s.harish2k01.xyz
+  s3EndpointUrl: http://papervault-object-storage:9000
+  # Exact-content retrieval is the first deployment's primary workflow.
+  # PostgreSQL is authoritative; no optional OpenSearch dependency is required.
+  searchIndexEnabled: "false"
+  searchQueryBackend: database
+
+gateway:
+  httpRoute:
+    enabled: true
+    gatewayName: traefik-gateway
+    gatewayNamespace: traefik
+    sectionName: websecure
+    hostnames: [papervault.k8s.harish2k01.xyz]
+
+resources:
+  api:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      memory: 1Gi
+  worker:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: "2"
+      memory: 2Gi
+  web:
+    requests:
+      cpu: 10m
+      memory: 32Mi
+    limits:
+      memory: 128Mi
