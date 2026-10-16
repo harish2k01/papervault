@@ -167,18 +167,20 @@ class DocumentUploadService:
         )
 
     async def _enqueue_processing(self, document: Document) -> str | None:
+        document.status = DocumentStatus.PENDING_PROCESSING.value
+        await self._session.commit()
         try:
             task_id = self._processing_queue.enqueue_document_processing(document.id)
         except Exception:
-            document.status = DocumentStatus.FAILED.value
-            document.processing_error = (
-                "Document processing could not be queued. Check the worker and retry."
-            )
-            await self._session.commit()
+            await self._session.refresh(document)
+            if document.status == DocumentStatus.PENDING_PROCESSING.value:
+                document.status = DocumentStatus.FAILED.value
+                document.processing_error = (
+                    "Document processing could not be queued. Check the worker and retry."
+                )
+                await self._session.commit()
             await self._session.refresh(document)
             return None
-        document.status = DocumentStatus.PENDING_PROCESSING.value
-        await self._session.commit()
         await self._session.refresh(document)
         return task_id
 

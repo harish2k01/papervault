@@ -134,9 +134,7 @@ def test_smart_tag_api_materializes_and_refreshes_rule_matches() -> None:
         assert created.json()["document_count"] == 1
         assert refreshed.status_code == 200
         assert refreshed.json()["matched"] == 1
-        assert tags.json()[0]["smart_rule"]["document_types"] == [
-            "insurance_policy"
-        ]
+        assert tags.json()[0]["smart_rule"]["document_types"] == ["insurance_policy"]
         assert tags.json()[0]["document_count"] == 1
         assert tags.json()[0]["last_evaluated_at"] is not None
         assert document_id
@@ -167,9 +165,7 @@ def build_test_app() -> tuple[
 
     app = create_app()
     app.dependency_overrides[get_session] = override_session
-    app.dependency_overrides[get_settings] = lambda: Settings(
-        search_index_enabled=False
-    )
+    app.dependency_overrides[get_settings] = lambda: Settings(search_index_enabled=False)
     return app, engine, session_factory
 
 

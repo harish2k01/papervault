@@ -4,32 +4,42 @@
 
 @layer base {
   :root {
-    --background: 216 33% 97%;
-    --foreground: 222 40% 11%;
+    color-scheme: light;
+    --background: 226 100% 97%;
+    --foreground: 223 46% 23%;
     --card: 0 0% 100%;
-    --card-foreground: 222 40% 11%;
-    --muted: 216 28% 92%;
-    --muted-foreground: 218 17% 39%;
-    --border: 218 20% 84%;
-    --input: 218 20% 82%;
-    --ring: 221 83% 45%;
-    --primary: 221 83% 45%;
+    --card-foreground: 223 46% 23%;
+    --muted: 224 75% 94%;
+    --muted-foreground: 223 22% 40%;
+    --border: 224 45% 86%;
+    --input: 224 40% 80%;
+    --ring: 227 68% 49%;
+    --primary: 227 68% 49%;
     --primary-foreground: 0 0% 100%;
-    --radius: 0.5rem;
+    --radius: 0.85rem;
+    --cover-cobalt: 225 100% 94%;
+    --cover-orchid: 294 43% 93%;
+    --cover-mint: 151 42% 91%;
+    --cover-amber: 41 100% 91%;
   }
 
   .dark {
-    --background: 222 40% 8%;
-    --foreground: 210 20% 96%;
-    --card: 222 32% 12%;
-    --card-foreground: 210 20% 96%;
-    --muted: 222 28% 18%;
-    --muted-foreground: 215 16% 70%;
-    --border: 222 24% 22%;
-    --input: 222 24% 22%;
-    --ring: 217 91% 60%;
-    --primary: 217 91% 60%;
-    --primary-foreground: 222 40% 8%;
+    color-scheme: dark;
+    --background: 228 38% 13%;
+    --foreground: 223 75% 94%;
+    --card: 225 35% 19%;
+    --card-foreground: 223 75% 94%;
+    --muted: 225 33% 25%;
+    --muted-foreground: 223 33% 77%;
+    --border: 225 29% 33%;
+    --input: 225 29% 39%;
+    --ring: 224 100% 82%;
+    --primary: 224 100% 82%;
+    --primary-foreground: 225 56% 21%;
+    --cover-cobalt: 224 35% 27%;
+    --cover-orchid: 291 22% 27%;
+    --cover-mint: 158 22% 24%;
+    --cover-amber: 40 26% 24%;
   }
 
   body {
@@ -51,6 +61,78 @@
 
   * {
     border-color: hsl(var(--border));
+  }
+}
+
+.pv-sidebar {
+  --background: 227 67% 36%;
+  --foreground: 225 100% 98%;
+  --card: 227 67% 36%;
+  --muted: 226 64% 46%;
+  --muted-foreground: 225 100% 90%;
+  --border: 226 55% 53%;
+  --primary: 225 100% 97%;
+  --primary-foreground: 227 67% 34%;
+  --ring: 225 100% 90%;
+  color: hsl(var(--foreground));
+  background: hsl(var(--background));
+}
+
+.pv-home-hero {
+  background: hsl(var(--cover-cobalt));
+}
+
+.pv-document-card {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid hsl(var(--border));
+  border-radius: var(--radius);
+  background: hsl(var(--card));
+  text-align: left;
+  transition:
+    border-color 150ms ease,
+    box-shadow 150ms ease;
+}
+
+.pv-document-card:hover {
+  border-color: hsl(var(--primary));
+  box-shadow: 0 4px 16px hsl(var(--primary) / 0.08);
+}
+
+.pv-document-cover {
+  display: block;
+  min-height: 152px;
+  padding: 22px;
+  background: hsl(var(--cover-cobalt));
+}
+
+.pv-document-cover[data-palette="orchid"] {
+  background: hsl(var(--cover-orchid));
+}
+.pv-document-cover[data-palette="mint"] {
+  background: hsl(var(--cover-mint));
+}
+.pv-document-cover[data-palette="amber"] {
+  background: hsl(var(--cover-amber));
+}
+
+.pv-document-status {
+  border-radius: 5px;
+  padding: 3px 7px;
+  background: hsl(var(--muted));
+}
+
+.pv-document-status[data-status="failed"] {
+  color: light-dark(#9f1239, #fda4af);
+  background: light-dark(#fff1f2, #4c1726);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pv-document-card,
+  .pv-document-card * {
+    transition: none;
   }
 }
 

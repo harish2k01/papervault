@@ -8,6 +8,8 @@ export function formatReviewReason(reason: string) {
   if (code === "low_confidence") return "Low classification confidence";
   if (code === "unclassified") return "Document type not identified";
   if (code === "analysis_pending") return "Analysis pending";
+  if (code === "analysis_failed")
+    return "Analysis unavailable; extracted text remains searchable";
   if (code === "manual_change") return "Details changed";
   return humanizeLabel(reason);
 }

@@ -12,6 +12,7 @@ from papervault_api.documents.application.processing import (
     DocumentProcessingService,
     mark_document_processing_failed,
 )
+from papervault_api.documents.domain.enums import DocumentReviewStatus, DocumentStatus
 from papervault_api.documents.infrastructure.ai import (
     build_document_ai_provider,
     build_embedding_provider,
@@ -78,23 +79,47 @@ async def _process_document(document_id: UUID) -> None:
             text_extractor=build_default_text_extractor(settings),
         )
         await document_processing_service.process_document(document_id)
+        document = await session.get(Document, document_id)
+        if document is None or document.status != DocumentStatus.READY.value:
+            return
 
     await _refresh_duplicate_fingerprint(document_id)
 
     if settings.ai_enabled:
-        async with AsyncSessionFactory() as session:
-            ai_processing_service = DocumentAIProcessingService(
-                session=session,
-                ai_provider=build_document_ai_provider(settings.ai_provider, settings),
-                embedding_provider=build_embedding_provider(
-                    settings.embedding_provider,
-                    settings.embedding_dimensions,
-                    settings,
-                ),
-                classification_threshold=settings.ai_classification_threshold,
-                metadata_locale=settings.metadata_locale,
+        try:
+            async with AsyncSessionFactory() as session:
+                ai_processing_service = DocumentAIProcessingService(
+                    session=session,
+                    ai_provider=build_document_ai_provider(settings.ai_provider, settings),
+                    embedding_provider=build_embedding_provider(
+                        settings.embedding_provider,
+                        settings.embedding_dimensions,
+                        settings,
+                    ),
+                    classification_threshold=settings.ai_classification_threshold,
+                    metadata_locale=settings.metadata_locale,
+                )
+                await ai_processing_service.process_document(document_id)
+        except Exception:
+            logger.exception(
+                "document_enrichment_failed_text_preserved",
+                document_id=str(document_id),
             )
-            await ai_processing_service.process_document(document_id)
+            async with AsyncSessionFactory() as session:
+                document = await session.get(Document, document_id)
+                if document is not None and document.status == DocumentStatus.READY.value:
+                    document.review_status = DocumentReviewStatus.PENDING.value
+                    document.review_reasons = list(
+                        dict.fromkeys(
+                            [
+                                reason
+                                for reason in document.review_reasons
+                                if reason != "analysis_pending:metadata"
+                            ]
+                            + ["analysis_failed:metadata"]
+                        )
+                    )
+                    await session.commit()
 
     await _sync_smart_tags(document_id)
 
