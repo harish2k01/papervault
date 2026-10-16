@@ -8,8 +8,9 @@ from typing import Protocol
 from uuid import UUID
 
 import structlog
-from sqlalchemy import Select, and_, func, select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.sql.elements import ColumnElement
 
 from papervault_api.core.config import Settings
 from papervault_api.documents.domain.enums import DocumentStatus
@@ -286,8 +287,9 @@ class DocumentSearchService:
     async def _iter_candidate_documents(
         self, request: SearchRequest
     ) -> AsyncIterator[list[Document]]:
-        statement = select(Document).where(Document.owner_id == request.owner_id)
-        statement = apply_filters(statement, request.filters)
+        statement = select(Document).where(
+            Document.owner_id == request.owner_id, *build_filter_clauses(request.filters)
+        )
 
         if request.filters.tag:
             statement = (
@@ -339,10 +341,8 @@ class DocumentSearchService:
         return {embedding.document_id: embedding for embedding in result.scalars()}
 
 
-def apply_filters(
-    statement: Select[tuple[Document]], filters: SearchFilters
-) -> Select[tuple[Document]]:
-    clauses = []
+def build_filter_clauses(filters: SearchFilters) -> list[ColumnElement[bool]]:
+    clauses: list[ColumnElement[bool]] = []
     if not filters.include_archived:
         clauses.append(Document.status != DocumentStatus.ARCHIVED.value)
     if filters.document_type:
@@ -355,9 +355,7 @@ def apply_filters(
         clauses.append(Document.document_date >= filters.date_from)
     if filters.date_to:
         clauses.append(Document.document_date <= filters.date_to)
-    if clauses:
-        return statement.where(and_(*clauses))
-    return statement
+    return clauses
 
 
 def score_keyword(query: str, text: str) -> float:
