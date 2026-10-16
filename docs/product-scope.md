@@ -25,6 +25,17 @@ the intended product direction.
 
 ## Known Limits
 
+- The default local embedding provider uses token hashing. It is a lexical baseline,
+  not a language model with general semantic understanding. Keyword search is the
+  default in the workspace; meaning-based retrieval needs a suitable model provider
+  and evaluation against the intended document collection.
+- Mixed PDFs require OCR for pages without embedded text. Documents exceeding the
+  configured OCR page limit fail explicitly instead of silently omitting later pages.
+  A genuinely blank page also triggers the completeness check.
+- Database fallback search scans all matching owned documents in bounded batches.
+  It avoids a newest-document cutoff but remains a linear scan, so large vaults
+  should use a healthy OpenSearch index.
+
 - Classification and extraction quality depends on document layout, OCR quality,
   language, and selected model. The bundled evaluation fixtures are a contract check,
   not a comprehensive accuracy benchmark.

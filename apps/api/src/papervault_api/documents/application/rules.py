@@ -62,8 +62,7 @@ def matches_document(document: Document, rule: DocumentRule) -> bool:
     ):
         return False
     return not (
-        rule.date_to
-        and (document.document_date is None or document.document_date > rule.date_to)
+        rule.date_to and (document.document_date is None or document.document_date > rule.date_to)
     )
 
 

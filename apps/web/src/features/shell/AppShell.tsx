@@ -24,6 +24,7 @@ import {
   LogOut,
   LayoutDashboard,
   MessageSquareText,
+  Menu,
   Moon,
   RefreshCw,
   RotateCcw,
@@ -113,6 +114,7 @@ import {
 } from "../../lib/api";
 import { cn, humanizeLabel } from "../../lib/utils";
 import { HomeWorkspace } from "./HomeWorkspace";
+import { DocumentCard, type LibraryDocument } from "../documents/DocumentCard";
 import { formatReviewReason } from "./review-utils";
 import {
   compareNotifications,
@@ -192,15 +194,7 @@ const settingsNavItem = {
   icon: Settings2,
 } satisfies { key: WorkspaceView; label: string; icon: LucideIcon };
 
-type DocumentListEntry = Pick<
-  DocumentItem,
-  | "id"
-  | "title"
-  | "original_filename"
-  | "document_type"
-  | "status"
-  | "created_at"
->;
+type DocumentListEntry = LibraryDocument;
 
 const defaultSearchFilters: SearchFilters = {
   document_type: null,
@@ -220,8 +214,9 @@ export function AppShell() {
   const [showAuthScreen, setShowAuthScreen] = useState(false);
   const [oidcError, setOidcError] = useState<string | null>(null);
   const [activeView, setActiveView] = useState<WorkspaceView>("home");
+  const [mobileNavigationOpen, setMobileNavigationOpen] = useState(false);
   const [query, setQuery] = useState("");
-  const [searchMode, setSearchMode] = useState<SearchMode>("hybrid");
+  const [searchMode, setSearchMode] = useState<SearchMode>("keyword");
   const [filters, setFilters] = useState<SearchFilters>(defaultSearchFilters);
   const [submittedSearch, setSubmittedSearch] =
     useState<SearchRequestInput | null>(null);
@@ -232,9 +227,14 @@ export function AppShell() {
   const [selectedCollectionId, setSelectedCollectionId] = useState<
     string | null
   >(null);
-  const [darkMode, setDarkMode] = useState(
-    () => window.localStorage.getItem("papervault.theme") === "dark",
-  );
+  const [darkMode, setDarkMode] = useState(() => {
+    const saved = window.localStorage.getItem("papervault.theme");
+    return (
+      saved === "dark" ||
+      (!saved &&
+        window.matchMedia?.("(prefers-color-scheme: dark)").matches === true)
+    );
+  });
 
   const authConfigQuery = useQuery({
     queryKey: ["auth-config"],
@@ -262,6 +262,16 @@ export function AppShell() {
     getNextPageParam: (lastPage, _pages, lastPageParam) =>
       lastPage.length === 50 ? lastPageParam + 50 : undefined,
     enabled: workspaceEnabled,
+    refetchInterval: (query) =>
+      query.state.data?.pages
+        .flat()
+        .some((document) =>
+          ["uploaded", "pending_processing", "processing"].includes(
+            document.status,
+          ),
+        )
+        ? 3000
+        : false,
   });
   const documentTypesQuery = useQuery({
     queryKey: ["document-types"],
@@ -327,6 +337,12 @@ export function AppShell() {
     queryKey: ["document", selectedDocumentId],
     queryFn: () => getDocument(selectedDocumentId!),
     enabled: workspaceEnabled && selectedDocumentId !== null,
+    refetchInterval: (query) =>
+      ["uploaded", "pending_processing", "processing"].includes(
+        query.state.data?.document.status ?? "",
+      )
+        ? 2000
+        : false,
   });
   const adminSettingsQuery = useQuery({
     queryKey: ["admin", "settings"],
@@ -783,7 +799,7 @@ export function AppShell() {
 
   function clearSearch() {
     setQuery("");
-    setSearchMode("hybrid");
+    setSearchMode("keyword");
     setFilters(defaultSearchFilters);
     setSubmittedSearch(null);
   }
@@ -899,6 +915,7 @@ export function AppShell() {
         document_type: result.document_type,
         status: result.status,
         created_at: result.created_at,
+        highlights: result.highlights,
       }));
     }
     return documentsQuery.data?.pages.flat() ?? [];
@@ -1006,7 +1023,7 @@ export function AppShell() {
   return (
     <main className="min-h-screen bg-background text-foreground xl:h-screen xl:overflow-hidden">
       <div className="grid min-h-screen content-start xl:h-screen xl:grid-cols-[252px_minmax(0,1fr)] xl:content-normal">
-        <aside className="flex flex-col border-b border-border bg-card px-4 py-3 xl:h-screen xl:border-b-0 xl:border-r xl:py-5">
+        <aside className="pv-sidebar flex flex-col border-b border-border bg-card px-4 py-3 xl:h-screen xl:border-b-0 xl:border-r xl:py-5">
           <div className="mb-3 flex items-center justify-between gap-3 px-1 xl:mb-7 xl:justify-start">
             <div className="flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm">
@@ -1015,11 +1032,22 @@ export function AppShell() {
               <div>
                 <p className="text-sm font-semibold">PaperVault</p>
                 <p className="text-xs text-muted-foreground">
-                  Document intelligence
+                  Your personal archive
                 </p>
               </div>
             </div>
             <div className="flex items-center xl:hidden">
+              <Button
+                aria-label="Toggle navigation"
+                aria-expanded={mobileNavigationOpen}
+                aria-controls="workspace-navigation"
+                size="icon"
+                type="button"
+                variant="ghost"
+                onClick={() => setMobileNavigationOpen((open) => !open)}
+              >
+                <Menu className="h-4 w-4" aria-hidden="true" />
+              </Button>
               <ThemeButton
                 darkMode={darkMode}
                 onToggle={() => setDarkMode(!darkMode)}
@@ -1045,8 +1073,12 @@ export function AppShell() {
           </div>
 
           <nav
+            id="workspace-navigation"
             aria-label="Primary navigation"
-            className="grid grid-cols-3 gap-1 xl:block xl:space-y-1"
+            className={cn(
+              "grid-cols-3 gap-1 xl:block xl:space-y-1",
+              mobileNavigationOpen ? "grid" : "hidden",
+            )}
           >
             {visibleNavItems.map((item) => {
               const active = activeView === item.key;
@@ -1061,7 +1093,10 @@ export function AppShell() {
                   key={item.label}
                   type="button"
                   aria-current={active ? "page" : undefined}
-                  onClick={() => setActiveView(item.key)}
+                  onClick={() => {
+                    setActiveView(item.key);
+                    setMobileNavigationOpen(false);
+                  }}
                 >
                   <span className="flex min-w-0 flex-col items-center gap-1 xl:flex-row xl:gap-3">
                     <item.icon className="h-4 w-4" aria-hidden="true" />
@@ -1139,6 +1174,14 @@ export function AppShell() {
               onOpenDocument={openDocument}
               onOpenDocuments={() => setActiveView("documents")}
               onAsk={() => setActiveView("questions")}
+              onSearch={(query) => {
+                setActiveView("documents");
+                submitSearch({
+                  query,
+                  mode: "keyword",
+                  filters: defaultSearchFilters,
+                });
+              }}
             />
           ) : activeView === "questions" ? (
             <QuestionsWorkspace onOpenDocument={openDocument} />
@@ -1932,47 +1975,15 @@ function DocumentLibrary({
           </p>
         </div>
       </div>
-      <div className="overflow-hidden rounded-lg border border-border bg-card">
-        <div className="hidden grid-cols-[minmax(0,1fr)_180px_140px_130px] gap-4 border-b border-border bg-muted/40 px-4 py-2 text-xs font-medium text-muted-foreground md:grid">
-          <span>Document</span>
-          <span>Type</span>
-          <span>Status</span>
-          <span className="text-right">Added</span>
-        </div>
-        <div className="divide-y divide-border">
-          {documents.map((document) => (
-            <button
-              className="grid w-full gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/60 md:grid-cols-[minmax(0,1fr)_180px_140px_130px] md:items-center"
-              key={document.id}
-              type="button"
-              onClick={() => onOpen(document.id)}
-            >
-              <span className="flex min-w-0 items-center gap-3">
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
-                  <FileText className="h-4 w-4" aria-hidden="true" />
-                </span>
-                <span className="min-w-0">
-                  <span className="block truncate text-sm font-medium">
-                    {document.title}
-                  </span>
-                  <span className="block truncate text-xs text-muted-foreground">
-                    {document.original_filename}
-                  </span>
-                </span>
-              </span>
-              <span className="text-xs text-muted-foreground">
-                {typeLabels.get(document.document_type) ??
-                  humanizeLabel(document.document_type)}
-              </span>
-              <span>
-                <StatusBadge status={document.status} />
-              </span>
-              <span className="text-xs text-muted-foreground md:text-right">
-                {formatDateTime(document.created_at)}
-              </span>
-            </button>
-          ))}
-        </div>
+      <div className="grid gap-5 sm:grid-cols-2 2xl:grid-cols-3">
+        {documents.map((document) => (
+          <DocumentCard
+            key={document.id}
+            document={document}
+            typeLabel={typeLabels.get(document.document_type)}
+            onOpen={onOpen}
+          />
+        ))}
       </div>
       {hasMore ? (
         <div className="mt-4 flex justify-center">
@@ -2114,7 +2125,8 @@ function SearchControls({
             />
             <input
               className="h-11 w-full rounded-md border border-input bg-card pl-10 pr-4 text-sm outline-none ring-offset-background placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring"
-              placeholder="Search documents, issuers, tags, or questions"
+              aria-label="Search documents"
+              placeholder="Search document text, titles, or reference numbers"
               type="search"
               value={query}
               onChange={(event) => onQueryChange(event.target.value)}

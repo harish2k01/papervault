@@ -1,6 +1,8 @@
 from collections.abc import Sequence
 from pathlib import Path
 
+from pypdf import PdfWriter
+
 from papervault_api.documents.application.extraction import sanitize_extracted_text
 from papervault_api.documents.domain.enums import TextExtractionSource, TextExtractionStatus
 from papervault_api.documents.infrastructure.text_extractors import (
@@ -76,7 +78,10 @@ def test_tesseract_cli_extractor_reads_image_text(tmp_path: Path) -> None:
 
 def test_tesseract_cli_extractor_renders_pdf_pages_before_ocr(tmp_path: Path) -> None:
     source = tmp_path / "scan.pdf"
-    source.write_bytes(b"%PDF")
+    writer = PdfWriter()
+    writer.add_blank_page(width=612, height=792)
+    writer.add_blank_page(width=612, height=792)
+    writer.write(source)
     runner = FakeOcrCommandRunner()
     extractor = TesseractCliTextExtractor(
         tesseract_command="tesseract",

@@ -9,6 +9,7 @@ PaperVault is a self-hosted document management system for turning PDFs, scans, 
 - Classify common financial, employment, identity, medical, education, property, and purchase documents.
 - Generate summaries, keywords, entities, suggested tags, typed structured metadata, and embeddings.
 - Search by keyword, meaning, document type, date, tag, issuer, organization, or combined filters.
+- Find exact document text from the home screen without requiring a model provider. Search results include matching excerpts.
 - Ask natural-language questions and receive evidence-backed answers with document and page citations.
 - Save searches and revisit recent queries.
 - Read documents in a built-in page-aware viewer with text-layer and OCR-coordinate highlighting.
@@ -36,6 +37,8 @@ PaperVault is a modular monolith with separate runtime processes:
 HTTP routes and Celery tasks are orchestration boundaries. Document, identity, administration, search, question answering, collections, tagging, notification, and lifecycle behavior belongs to feature-owned application services. OCR, AI, embeddings, grounded answers, storage, OIDC, and search engines are accessed through provider interfaces.
 
 See [Architecture](docs/architecture.md) for the system model and data flows.
+
+The Cobalt workspace uses a searchable home screen and document cards with real processing state. Queued documents refresh automatically until processing finishes. Extraction is independent of optional analysis: a failed model request leaves extracted text available for keyword search and adds a review warning.
 
 ## Quick Start
 
@@ -93,6 +96,7 @@ Detailed setup, Windows commands, provider configuration, and validation steps a
 
 - [Product scope and roadmap](docs/product-scope.md)
 - [Architecture](docs/architecture.md)
+- [Document reliability and verification limits](docs/reliability.md)
 - [Database](docs/database.md)
 - [API](docs/api.md)
 - [Deployment](docs/deployment.md)

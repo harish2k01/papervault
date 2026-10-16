@@ -74,9 +74,24 @@ sequenceDiagram
 
 Processing state is committed before expensive work starts. Expected extraction failures and unexpected worker failures end in a visible `failed` state with a user-safe diagnostic. Failed and stale queued documents can be re-enqueued without re-uploading the source file. Archive is terminal and cannot be overwritten by a late worker.
 
+The upload service commits the queued state before publishing the task. A fast worker
+cannot have its completed state overwritten by a late upload response. The web app
+refreshes pending document details until a terminal state is observed.
+
+Optional AI and embedding enrichment runs after text extraction. Enrichment failure
+leaves a successfully extracted document ready for keyword search, adds an explicit
+review reason, and continues to index the extracted text. This warning does not claim
+that summaries, classification, or semantic embeddings were successfully generated.
+
 ## Extraction And Intelligence
 
 The extraction interface supports embedded PDF text and OCR adapters. The default composite implementation tries embedded text first and uses Poppler plus Tesseract when the PDF has no usable text. Extracted text is normalized at the persistence boundary so provider-specific control characters cannot invalidate a PostgreSQL transaction.
+
+For mixed PDFs, pages with embedded text retain that text while pages without it use
+OCR. Incomplete or unavailable OCR reports a failure with the available partial text
+retained for diagnosis. The Tesseract adapter checks the PDF page count before
+rendering and rejects files above its configured limit rather than reporting a
+truncated extraction as complete.
 
 Page text is stored as immutable children of each extraction. Flattened text remains available for summaries, metadata extraction, embeddings, and global search.
 

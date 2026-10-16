@@ -2,7 +2,7 @@ import csv
 import io
 import subprocess
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Protocol
@@ -25,7 +25,46 @@ class CompositeTextExtractor(TextExtractor):
         if content_type == "application/pdf":
             result = self._pdf_extractor.extract(file_path, content_type)
             if result.status is TextExtractionStatus.SUCCEEDED:
-                return result
+                if not result.page_texts or all(text.strip() for text in result.page_texts):
+                    return result
+                ocr_result = self._ocr_extractor.extract(file_path, content_type)
+                if ocr_result.status is not TextExtractionStatus.SUCCEEDED:
+                    return replace(
+                        result,
+                        status=TextExtractionStatus.FAILED,
+                        error_message=(
+                            "Some PDF pages have no embedded text and require OCR. "
+                            + (ocr_result.error_message or "OCR did not produce usable text.")
+                        ),
+                    )
+                if len(ocr_result.page_texts) != len(result.page_texts):
+                    return replace(
+                        result,
+                        status=TextExtractionStatus.FAILED,
+                        error_message=(
+                            "OCR did not cover every PDF page. Retry with a higher page limit."
+                        ),
+                    )
+                pages = tuple(
+                    embedded if embedded.strip() else ocr
+                    for embedded, ocr in zip(result.page_texts, ocr_result.page_texts, strict=True)
+                )
+                blocks = tuple(
+                    ()
+                    if embedded.strip()
+                    else ocr_result.page_blocks[index]
+                    if index < len(ocr_result.page_blocks)
+                    else ()
+                    for index, embedded in enumerate(result.page_texts)
+                )
+                return replace(
+                    ocr_result,
+                    content_text="\n\n".join(pages).strip(),
+                    page_texts=pages,
+                    page_blocks=blocks,
+                    page_count=result.page_count,
+                    extractor="pypdf+tesseract_cli",
+                )
             return self._ocr_extractor.extract(file_path, content_type)
 
         if content_type in {"image/jpeg", "image/png"}:
@@ -159,6 +198,21 @@ class TesseractCliTextExtractor(TextExtractor):
         )
 
     def _extract_pdf(self, file_path: Path) -> TextExtractionResult:
+        if self._max_pdf_pages is not None:
+            from pypdf import PdfReader
+
+            try:
+                total_pages = len(PdfReader(file_path).pages)
+            except Exception:
+                return self._failure(
+                    "Could not read PDF pages. Check whether the file is encrypted or damaged."
+                )
+            if total_pages > self._max_pdf_pages:
+                return self._failure(
+                    f"PDF has {total_pages} pages, exceeding the OCR limit of "
+                    f"{self._max_pdf_pages}. Increase PAPERVAULT_OCR_MAX_PDF_PAGES "
+                    "or split the document; no pages were silently omitted."
+                )
         with TemporaryDirectory(prefix="papervault-ocr-") as temp_dir:
             output_prefix = Path(temp_dir) / "page"
             args = [

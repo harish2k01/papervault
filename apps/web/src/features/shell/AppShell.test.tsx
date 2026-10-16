@@ -3,6 +3,8 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { vi } from "vitest";
 
 import {
+  type DocumentDetail,
+  type DocumentItem,
   attachTag,
   createTag,
   getAdminSettings,
@@ -20,6 +22,7 @@ import {
   listUsers,
   mergeDuplicateDocuments,
   reprocessDocument,
+  searchDocuments,
   searchDocumentText,
   syncDocumentNotifications,
   updateNotificationStatus,
@@ -177,8 +180,90 @@ describe("AppShell", () => {
       ),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("heading", { name: "Your vault" }),
+      screen.getByRole("heading", {
+        name: "Your paperwork, beautifully in order.",
+      }),
     ).toBeInTheDocument();
+  });
+
+  it("refreshes a queued document until extracted text and preview become available", async () => {
+    const document: DocumentItem = {
+      id: "polling-document",
+      owner_id: "dev-user",
+      title: "Processing receipt",
+      original_filename: "receipt.pdf",
+      content_type: "application/pdf",
+      file_size_bytes: 512,
+      sha256_hash: "c".repeat(64),
+      source_kind: "upload",
+      status: "pending_processing",
+      document_type: "generic_pdf",
+      document_date: null,
+      issuer: null,
+      organization: null,
+      review_status: "pending",
+      review_reasons: [],
+      reviewed_at: null,
+      reviewed_by_id: null,
+      review_note: null,
+      archived_at: null,
+      created_at: "2026-10-16T12:00:00Z",
+      updated_at: "2026-10-16T12:00:00Z",
+    };
+    const detail: DocumentDetail = {
+      document,
+      ai_analysis: null,
+      metadata: null,
+      text_extraction: null,
+      tags: [],
+      timeline_events: [],
+      versions: [],
+    };
+    vi.mocked(listDocuments).mockResolvedValue([document]);
+    vi.mocked(getDocument)
+      .mockResolvedValueOnce(detail)
+      .mockResolvedValue({
+        ...detail,
+        document: { ...document, status: "ready" },
+      });
+    renderAppShell();
+    await openDocumentFromLibrary("Processing receipt");
+    expect(getDocumentFile).not.toHaveBeenCalled();
+    await waitFor(
+      () => expect(getDocumentFile).toHaveBeenCalledWith("polling-document"),
+      { timeout: 4000 },
+    );
+  });
+
+  it("searches extracted content without requiring AI and shows the matching passage", async () => {
+    vi.mocked(searchDocuments).mockResolvedValueOnce([
+      {
+        document_id: "receipt-1",
+        title: "Service receipt",
+        original_filename: "receipt.pdf",
+        document_type: "receipt",
+        status: "ready",
+        summary: null,
+        created_at: "2026-10-16T12:00:00Z",
+        score: 1,
+        highlights: ["Replacement compressor reference ZXQ918273"],
+      },
+    ]);
+    renderAppShell();
+    fireEvent.click(await screen.findByRole("button", { name: "Documents" }));
+    fireEvent.change(
+      screen.getByRole("searchbox", { name: "Search documents" }),
+      {
+        target: { value: "ZXQ918273" },
+      },
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Search" }));
+    expect(
+      await screen.findByText("Replacement compressor reference ZXQ918273"),
+    ).toBeInTheDocument();
+    expect(searchDocuments).toHaveBeenCalledWith(
+      expect.objectContaining({ query: "ZXQ918273", mode: "keyword" }),
+    );
   });
 
   it("renders OIDC sign-in when configured", async () => {

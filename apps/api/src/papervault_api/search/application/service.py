@@ -1,6 +1,8 @@
 import asyncio
-from dataclasses import dataclass, field
+from collections.abc import AsyncIterator
+from dataclasses import dataclass, field, replace
 from datetime import date, datetime
+from heapq import nlargest
 from math import sqrt
 from typing import Protocol
 from uuid import UUID
@@ -105,7 +107,17 @@ class DocumentSearchService:
         self._query_fallback_enabled = query_fallback_enabled
 
     async def search(self, request: SearchRequest) -> tuple[SearchResult, ...]:
-        query_embedding = await self._build_query_embedding(request)
+        try:
+            query_embedding = await self._build_query_embedding(request)
+        except Exception:
+            if request.mode is not SearchMode.HYBRID or not self._query_fallback_enabled:
+                raise
+            logger.warning(
+                "search_embedding_unavailable_using_keyword",
+                owner_id=str(request.owner_id),
+            )
+            request = replace(request, mode=SearchMode.KEYWORD)
+            query_embedding = None
         if request.record_recent:
             await self._record_recent_search(request)
 
@@ -177,51 +189,59 @@ class DocumentSearchService:
         request: SearchRequest,
         query_embedding: tuple[float, ...] | None,
     ) -> tuple[SearchResult, ...]:
-        documents = await self._load_candidate_documents(request)
-        text_by_document = await self._load_current_text(documents)
-        embedding_by_document = await self._load_current_embeddings(documents)
-
         scored: list[SearchResult] = []
-        for document in documents:
-            searchable_text = " ".join(
-                value
-                for value in (
-                    document.title,
-                    document.original_filename,
-                    document.issuer,
-                    document.organization,
-                    document.summary,
-                    text_by_document.get(document.id),
+        result_limit = request.offset + request.limit
+        async for documents in self._iter_candidate_documents(request):
+            text_by_document = await self._load_current_text(documents)
+            embedding_by_document = (
+                await self._load_current_embeddings(documents)
+                if query_embedding is not None
+                else {}
+            )
+            for document in documents:
+                searchable_text = " ".join(
+                    value
+                    for value in (
+                        document.title,
+                        document.original_filename,
+                        document.issuer,
+                        document.organization,
+                        document.summary,
+                        text_by_document.get(document.id),
+                    )
+                    if value
                 )
-                if value
+                keyword_score = score_keyword(request.query, searchable_text)
+                semantic_score = 0.0
+                if query_embedding is not None:
+                    embedding = embedding_by_document.get(document.id)
+                    if embedding is not None:
+                        semantic_score = cosine_similarity(query_embedding, tuple(embedding.vector))
+
+                score = combine_scores(request.mode, keyword_score, semantic_score)
+                if request.query and score <= 0:
+                    continue
+
+                scored.append(
+                    SearchResult(
+                        document_id=document.id,
+                        title=document.title,
+                        original_filename=document.original_filename,
+                        document_type=document.document_type,
+                        status=document.status,
+                        summary=document.summary,
+                        created_at=document.created_at,
+                        score=round(score, 6),
+                        highlights=build_highlights(request.query, searchable_text),
+                    ),
+                )
+            scored = nlargest(
+                result_limit,
+                scored,
+                key=lambda result: (result.score, result.created_at, result.document_id),
             )
-            keyword_score = score_keyword(request.query, searchable_text)
-            semantic_score = 0.0
-            if query_embedding is not None:
-                embedding = embedding_by_document.get(document.id)
-                if embedding is not None:
-                    semantic_score = cosine_similarity(query_embedding, tuple(embedding.vector))
 
-            score = combine_scores(request.mode, keyword_score, semantic_score)
-            if request.query and score == 0:
-                continue
-
-            scored.append(
-                SearchResult(
-                    document_id=document.id,
-                    title=document.title,
-                    original_filename=document.original_filename,
-                    document_type=document.document_type,
-                    status=document.status,
-                    summary=document.summary,
-                    created_at=document.created_at,
-                    score=round(score, 6),
-                    highlights=build_highlights(request.query, searchable_text),
-                ),
-            )
-
-        scored.sort(key=lambda result: (result.score, result.created_at), reverse=True)
-        return tuple(scored[request.offset : request.offset + request.limit])
+        return tuple(scored[request.offset : result_limit])
 
     async def save_search(
         self,
@@ -263,7 +283,9 @@ class DocumentSearchService:
         )
         return tuple(result.scalars())
 
-    async def _load_candidate_documents(self, request: SearchRequest) -> list[Document]:
+    async def _iter_candidate_documents(
+        self, request: SearchRequest
+    ) -> AsyncIterator[list[Document]]:
         statement = select(Document).where(Document.owner_id == request.owner_id)
         statement = apply_filters(statement, request.filters)
 
@@ -274,10 +296,17 @@ class DocumentSearchService:
                 .where(Tag.slug == request.filters.tag)
             )
 
-        result = await self._session.execute(
-            statement.order_by(Document.created_at.desc()).limit(500)
-        )
-        return list(result.scalars().unique())
+        cursor: UUID | None = None
+        while True:
+            batch_statement = statement
+            if cursor is not None:
+                batch_statement = batch_statement.where(Document.id > cursor)
+            result = await self._session.execute(batch_statement.order_by(Document.id).limit(200))
+            documents = list(result.scalars().unique())
+            if not documents:
+                return
+            yield documents
+            cursor = documents[-1].id
 
     async def _load_current_text(self, documents: list[Document]) -> dict[UUID, str]:
         document_ids = [document.id for document in documents]
