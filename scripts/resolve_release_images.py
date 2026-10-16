@@ -71,13 +71,17 @@ def main() -> None:
     parser.add_argument("--repository", default="harish2k01/papervault")
     parser.add_argument("--revision", required=True)
     parser.add_argument("--tag")
+    parser.add_argument("--helm-values", action="store_true")
     args = parser.parse_args()
     tag = args.tag or f"sha-{args.revision[:7]}"
     resolved = {
         component: resolve_image(f"{args.repository}/{component}", tag, args.revision)
         for component in ("api", "worker", "web")
     }
-    print(json.dumps(resolved, indent=2))
+    if args.helm_values:
+        print(json.dumps({"image": resolved}, indent=2))
+    else:
+        print(json.dumps(resolved, indent=2))
 
 
 if __name__ == "__main__":

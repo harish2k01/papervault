@@ -48,6 +48,17 @@ the immutable manifest and platform digests. The Helm chart supports
 `image.api.digest`, `image.worker.digest`, and `image.web.digest`. A configured
 digest takes precedence over its tag.
 
+The homelab profile refuses to render without verified image digests. Generate the
+release lock separately and pass both files to Helm:
+
+```sh
+python scripts/resolve_release_images.py --revision <full-git-commit> --helm-values > release-images.json
+helm upgrade --install papervault infra/helm/papervault --namespace papervault \
+  -f infra/helm/papervault/values-homelab.yaml -f release-images.json --wait
+```
+
+Retain the lock with deployment records. It contains image identities, not credentials.
+
 Dependency resources are installed independently:
 
 ```sh
