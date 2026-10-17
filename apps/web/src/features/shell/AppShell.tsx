@@ -2790,7 +2790,12 @@ function DocumentPanel({
                       Check extracted details
                     </p>
                     <p className="mt-0.5 text-xs text-amber-800 dark:text-amber-300">
-                      {detail.document.review_reasons
+                      {[...detail.document.review_reasons]
+                        .sort(
+                          (a, b) =>
+                            Number(b.startsWith("status_change:")) -
+                            Number(a.startsWith("status_change:")),
+                        )
                         .slice(0, 3)
                         .map(formatReviewReason)
                         .join(" · ") ||

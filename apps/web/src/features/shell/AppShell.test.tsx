@@ -232,7 +232,16 @@ describe("AppShell", () => {
       })
       .mockResolvedValue({
         ...detail,
-        document: { ...document, status: "ready" },
+        document: {
+          ...document,
+          status: "ready",
+          review_reasons: [
+            "unsupported_metadata:provider",
+            "unsupported_metadata:policy_number",
+            "unsupported_metadata:coverage",
+            "status_change:reminders",
+          ],
+        },
         ai_analysis: {
           provider: "ollama",
           model: "local",
@@ -263,6 +272,9 @@ describe("AppShell", () => {
       expect(screen.getByTestId("pdf-page")).toHaveTextContent("Page 2"),
     );
     expect(getDocument).toHaveBeenCalledTimes(3);
+    expect(
+      screen.getByText(/Status change found; confirm dates in Details/),
+    ).toBeInTheDocument();
   }, 10000);
 
   it("searches extracted content without requiring AI and shows the matching passage", async () => {
