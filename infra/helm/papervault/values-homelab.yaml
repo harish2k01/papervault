@@ -1,0 +1,57 @@
+# Dependency resources are managed separately under infra/k8s/homelab.
+# Supply a verified release image values file in addition to this profile.
+image:
+  api:
+    repository: ghcr.io/harish2k01/papervault/api
+    requireDigest: true
+  worker:
+    repository: ghcr.io/harish2k01/papervault/worker
+    requireDigest: true
+  web:
+    repository: ghcr.io/harish2k01/papervault/web
+    requireDigest: true
+
+secret:
+  create: false
+  existingSecret: papervault-runtime
+
+config:
+  environment: production
+  authAllowDevHeaders: "false"
+  localRegistrationEnabled: "false"
+  webAppUrl: https://papervault.k8s.harish2k01.xyz
+  corsOrigins: https://papervault.k8s.harish2k01.xyz
+  s3EndpointUrl: http://papervault-object-storage:9000
+  # Exact-content retrieval is the first deployment's primary workflow.
+  # PostgreSQL is authoritative; no optional OpenSearch dependency is required.
+  searchIndexEnabled: "false"
+  searchQueryBackend: database
+
+gateway:
+  httpRoute:
+    enabled: true
+    gatewayName: traefik-gateway
+    gatewayNamespace: traefik
+    sectionName: websecure
+    hostnames: [papervault.k8s.harish2k01.xyz]
+
+resources:
+  api:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      memory: 1Gi
+  worker:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: "2"
+      memory: 2Gi
+  web:
+    requests:
+      cpu: 10m
+      memory: 32Mi
+    limits:
+      memory: 128Mi

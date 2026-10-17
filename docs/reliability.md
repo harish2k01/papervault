@@ -20,6 +20,8 @@ that extraction, indexing, or later retrieval succeeded.
   bounded result retention. Archived documents remain excluded unless requested.
 - Search cards show matching excerpts as plain text. They are document covers, not
   rendered thumbnails of the source file.
+- Keyword search retains numeric references, short names, and non-Latin text. Its
+  tokens are independent of analysis keywords and existing embedding vectors.
 
 ## Regression coverage
 
@@ -33,6 +35,7 @@ that extraction, indexing, or later retrieval succeeded.
 | A scanned PDF exceeds its OCR page limit | Generated PDF and adapter preflight test |
 | The UI follows a queued document to readiness | Component test verifying that preview fetching begins after polling |
 | Search results explain a match | Component test for keyword requests and matching excerpts |
+| Numeric references, short names, and non-Latin queries | Keyword scoring, excerpt, and database retrieval regressions |
 
 Backend checks run from `apps/api`:
 

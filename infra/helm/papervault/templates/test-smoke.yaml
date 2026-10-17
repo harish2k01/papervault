@@ -20,7 +20,7 @@ spec:
     {{- toYaml .Values.podSecurityContext.api | nindent 4 }}
   containers:
     - name: smoke
-      image: "{{ .Values.image.api.repository }}:{{ .Values.image.api.tag }}"
+      image: {{ include "papervault.image" .Values.image.api | quote }}
       imagePullPolicy: {{ .Values.image.api.pullPolicy }}
       securityContext:
         {{- toYaml .Values.containerSecurityContext.api | nindent 8 }}

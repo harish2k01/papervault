@@ -47,3 +47,14 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- define "papervault.configMapName" -}}
 {{- printf "%s-config" (include "papervault.fullname" .) -}}
 {{- end -}}
+
+{{- define "papervault.image" -}}
+{{- if and .requireDigest (not .digest) -}}
+{{- fail "This deployment requires verified image digests. Supply release image values from resolve_release_images.py --helm-values." -}}
+{{- end -}}
+{{- if .digest -}}
+{{- printf "%s@%s" .repository .digest -}}
+{{- else -}}
+{{- printf "%s:%s" .repository .tag -}}
+{{- end -}}
+{{- end -}}

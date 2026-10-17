@@ -30,8 +30,16 @@ spec:
         {{- toYaml .Values.podSecurityContext.worker | nindent 8 }}
       containers:
         - name: worker
-          image: "{{ .Values.image.worker.repository }}:{{ .Values.image.worker.tag }}"
+          image: {{ include "papervault.image" .Values.image.worker | quote }}
           imagePullPolicy: {{ .Values.image.worker.pullPolicy }}
+          command:
+            - celery
+            - -A
+            - papervault_api.worker.celery_app:celery_app
+            - worker
+            - --loglevel=INFO
+            - {{ printf "--concurrency=%v" (.Values.worker.concurrency | default 2) | quote }}
+            - --prefetch-multiplier=1
           securityContext:
             {{- toYaml .Values.containerSecurityContext.worker | nindent 12 }}
           envFrom:
@@ -39,6 +47,19 @@ spec:
                 name: {{ include "papervault.configMapName" . }}
             - secretRef:
                 name: {{ include "papervault.secretName" . }}
+          readinessProbe:
+            exec:
+              command:
+                - python
+                - -c
+                - |
+                  import socket
+                  from papervault_api.worker.celery_app import celery_app
+                  replies = celery_app.control.ping(destination=["celery@" + socket.gethostname()], timeout=3)
+                  assert replies, "Worker did not answer through its configured broker"
+            initialDelaySeconds: 20
+            periodSeconds: 30
+            timeoutSeconds: 15
           volumeMounts:
             - name: tmp
               mountPath: /tmp

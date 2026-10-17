@@ -30,7 +30,7 @@ spec:
         {{- toYaml .Values.podSecurityContext.api | nindent 8 }}
       containers:
         - name: api
-          image: "{{ .Values.image.api.repository }}:{{ .Values.image.api.tag }}"
+          image: {{ include "papervault.image" .Values.image.api | quote }}
           imagePullPolicy: {{ .Values.image.api.pullPolicy }}
           securityContext:
             {{- toYaml .Values.containerSecurityContext.api | nindent 12 }}
@@ -42,6 +42,12 @@ spec:
                 name: {{ include "papervault.configMapName" . }}
             - secretRef:
                 name: {{ include "papervault.secretName" . }}
+          startupProbe:
+            httpGet:
+              path: /health/live
+              port: http
+            periodSeconds: 5
+            failureThreshold: 30
           readinessProbe:
             httpGet:
               path: /health/ready

@@ -9,18 +9,24 @@ replicaCount:
 image:
   api:
     repository: ghcr.io/example/papervault-api
+    digest: ""
     tag: "0.1.0"
     pullPolicy: IfNotPresent
   worker:
     repository: ghcr.io/example/papervault-worker
+    digest: ""
     tag: "0.1.0"
     pullPolicy: IfNotPresent
   web:
     repository: ghcr.io/example/papervault-web
+    digest: ""
     tag: "0.1.0"
     pullPolicy: IfNotPresent
 
 imagePullSecrets: []
+
+worker:
+  concurrency: 2
 
 serviceAccount:
   create: true

@@ -31,7 +31,7 @@ spec:
         {{- toYaml .Values.podSecurityContext.api | nindent 8 }}
       containers:
         - name: migrate
-          image: "{{ .Values.image.api.repository }}:{{ .Values.image.api.tag }}"
+          image: {{ include "papervault.image" .Values.image.api | quote }}
           imagePullPolicy: {{ .Values.image.api.pullPolicy }}
           {{- if .Values.migrations.waitForDatabase }}
           command:
