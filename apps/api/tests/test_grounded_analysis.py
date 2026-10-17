@@ -393,3 +393,60 @@ def test_explicit_appointment_recovers_an_omitted_title_but_not_a_conditional_of
         )
         result = ModelDocumentAIProvider(client).analyze(clause, "employment_contract")
         assert result.extracted_metadata.get("position") == expected
+
+
+def test_wrapped_date_recovers_the_complete_source_span_without_borrowing_other_dates() -> None:
+    client = SourceModel(
+        [
+            {
+                "category": "employment_contract",
+                "confidence_score": 0.9,
+                "fields": {},
+                "summary": [],
+                "critical": [],
+                "tags": {},
+            }
+        ]
+    )
+    text = "Employment will commence on 14\nAugust 2026. This contract ends on 13 August 2028."
+    result = ModelDocumentAIProvider(client).analyze(text, "employment_contract")
+    assert result.extracted_metadata["start_date"] == "2026-08-14"
+    evidence = next(item for item in result.field_evidence if item.field == "start_date")
+    assert evidence.quote == "commence on 14 August 2026"
+    fields = {
+        field.key: field for field in get_document_type("employment_contract").metadata_fields
+    }
+    assert not supports_value(
+        "2028-08-13", "Start Date: not specified\nEnd Date: 13/08/2028", fields["start_date"]
+    )
+    assert supports_value(
+        "2026-12-31", "Employment will commence on 12/31/2026", fields["start_date"], "en-US"
+    )
+
+
+def test_prose_wraps_keep_source_spans_without_merging_labels_tables_or_lists() -> None:
+    from papervault_api.documents.infrastructure.source_grounding import (
+        numbered_lines,
+        referenced_quote,
+    )
+
+    paragraph = (
+        "The employee must give thirty days notice before resignation. If the contract is\n"
+        "terminated, access must be returned. No termination has occurred."
+    )
+    text = (
+        paragraph
+        + "\nEmployer: Example Company\nEmployee Name: Example Person"
+        + "\nAmount  Tax\n100  20\n- First item\n- Second item"
+    )
+    lines = numbered_lines(text)
+    assert lines[0].text == paragraph.replace("\n", " ")
+    assert referenced_quote([1], lines, text) == paragraph
+    assert [line.text for line in lines[1:]] == [
+        "Employer: Example Company",
+        "Employee Name: Example Person",
+        "Amount  Tax",
+        "100  20",
+        "- First item",
+        "- Second item",
+    ]

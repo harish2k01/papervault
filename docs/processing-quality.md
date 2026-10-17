@@ -30,12 +30,12 @@ omitting critical information; both checks must pass.
 
 The selected private Qwen3 1.7B hybrid pipeline passes **8/8 cases**, including
 **30/30 fields**, **18/18 summary concepts**, **8/8 tag facets**, and **22/22 noise-tag
-checks**. Its [full report](evaluations/qwen3-17b-lines-v2.json) records actual
+checks**. Its [full report](evaluations/qwen3-17b-lines-v3.json) records actual
 source evidence and remaining warnings. It also passes the three separate
-[multi-page and conditional cases](evaluations/qwen3-17b-holdout-v2.json).
+[multi-page and conditional cases](evaluations/qwen3-17b-holdout-v3.json).
 
 Measured on three CPU cores of an AMD Ryzen 5 2500U, single-page cases took
-35.3–45.0 seconds; the two-page policy holdout took 67.2 seconds. These are observed
+37.0–43.1 seconds; the two-page policy holdout took 61.8 seconds. These are observed
 development measurements, not
 latency guarantees or a production accuracy estimate. Rejected quote-copying pilots
 are retained under [evaluations/pilots](evaluations/pilots); their failures motivated
@@ -105,12 +105,22 @@ on available hardware.
 
 ## Grounded local analysis
 
-The `grounded-lines-v2` contract sends numbered source lines to a private Ollama
+The `grounded-lines-v3` contract sends numbered source passages to a private Ollama
 endpoint. Structured output restricts categories and field names. The server builds
 quotes from selected lines, normalizes dates using the configured locale, verifies
 values against the source, and rejects invalid references. Explicit colon, tab, and
 line-separated labels are also parsed directly. Conflicting values are withheld.
 These checks establish source support, not that every field has the right meaning.
+
+Version three groups conservative prose continuations created by PDF visual line
+wraps. Source offsets still cover the original contiguous text. Headings, explicit
+labels, tab/space-separated table rows and new list items stay separate. Explicit
+date phrases can recover a complete source span across lines even when model line
+selection omits it; only simple connecting words are allowed between the date label
+and its value. An unspecified start date cannot borrow a later end date. This is a
+bounded heuristic, not general PDF layout reconstruction. The additional
+`processing_wrapped_pdf.json` case reproduces text extracted from a real synthetic
+PDF whose joining date and conditional termination sentences span physical lines.
 
 Version two requires both a typed value and line references for each selected fact.
 It recognizes narrative joining/end dates, ordinal and month-first dates, explicit
@@ -128,14 +138,22 @@ fresh generic uploads, including classification; this comparison measures the wh
 pipeline, rather than isolating one parser change. It does not establish accuracy
 on a representative production corpus.
 
-The [version-two narrative report](evaluations/narrative-v2.json) passes all three
+The [current narrative report](evaluations/narrative-v3.json) passes all three
 cases, all 16 annotated fields, five required summary concepts and the two checks
-that absent annual pay/end dates remain withheld. Cases took 39.4–79.1 seconds on
-the same private CPU service. Combined with the original and multi-page sets, this
-is 14 passing synthetic cases and 54/54 annotated metadata checks. All three reports
+that absent annual pay/end dates remain withheld. Cases took 46.6–86.8 seconds on
+the private CPU service. The additional [wrapped-PDF case](evaluations/qwen3-17b-wrapped-v3.json)
+passes all six fields and required summary concepts; its first run after a model
+restart took 131.5 seconds. Combined with the original and multi-page sets, this
+is 15 passing synthetic cases and 60/60 annotated metadata checks. All four reports
 record the same analysis source hash, model manifest and runtime version. Remaining
 unsupported model attempts remain visible even when direct source parsing recovers
 a field. The limited corpus does not measure arbitrary document accuracy.
+
+The current reports use `grounded-lines-v3` with an 8,192-token context. Earlier
+version-two reports remain as historical results with their original 16,384-token
+context identities. During the repeated current run the model used approximately
+2.5 GiB, after the larger allocation had reached its 6 GiB limit. Context sizing is
+an operational control; source windows still cover all pages.
 
 ```sh
 python scripts/evaluate_processing.py --provider ollama \

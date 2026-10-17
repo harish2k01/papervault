@@ -9,7 +9,11 @@ from papervault_api.documents.domain.document_types import (
     MetadataFieldDefinition,
     MetadataFieldType,
 )
-from papervault_api.documents.infrastructure.field_context import contextual_amount, field_aliases
+from papervault_api.documents.infrastructure.field_context import (
+    contextual_amount,
+    date_source_candidates,
+    field_aliases,
+)
 
 
 @dataclass(frozen=True)
@@ -22,8 +26,31 @@ class SourceLine:
 
 def numbered_lines(text: str) -> tuple[SourceLine, ...]:
     lines: list[SourceLine] = []
+    spans: list[tuple[int, int]] = []
     cursor = 0
+    previous = ""
     for raw in text.splitlines(keepends=True):
+        value = raw.rstrip("\r\n")
+        if value.strip():
+            record = r"^[\w /%-]{1,60}:|\t| {2,}"
+            continuation = (
+                spans
+                and len(previous.strip()) >= 50
+                and not re.search(r"[.!?:;]$", previous.rstrip())
+                and not previous.strip().isupper()
+                and not value.strip().isupper()
+                and not re.search(record, previous)
+                and not re.search(record, value)
+                and not re.match(r"\s*(?:[-*\u2022]|\d+[.)])\s", value)
+            )
+            if continuation:
+                spans[-1] = (spans[-1][0], cursor + len(value))
+            else:
+                spans.append((cursor, cursor + len(value)))
+        previous = value
+        cursor += len(raw)
+    for start, stop in spans:
+        raw = text[start:stop]
         offset = 0
         while offset < len(raw):
             end = min(len(raw), offset + 700)
@@ -31,13 +58,10 @@ def numbered_lines(text: str) -> tuple[SourceLine, ...]:
                 boundary = raw.rfind(" ", offset, end)
                 if boundary > offset + 350:
                     end = boundary + 1
-            value = raw[offset:end].rstrip("\r\n")
+            value = re.sub(r"[\r\n]+[ \t]*", " ", raw[offset:end])
             if value.strip():
-                lines.append(
-                    SourceLine(len(lines) + 1, value, cursor + offset, cursor + offset + len(value))
-                )
+                lines.append(SourceLine(len(lines) + 1, value, start + offset, start + end))
             offset = end
-        cursor += len(raw)
     return tuple(lines)
 
 
@@ -148,13 +172,18 @@ def action_topics(text: str) -> tuple[str, ...]:
 
 
 def labelled_candidates(
-    fields: dict[str, MetadataFieldDefinition], source: str
+    fields: dict[str, MetadataFieldDefinition], source: str, locale: str = "en-IN"
 ) -> list[tuple[str, object, str]]:
     """Read explicit labels without depending on a model selecting the correct line."""
     candidates: list[tuple[str, object, str]] = []
     for name, field in fields.items():
         if field.field_type is MetadataFieldType.OBJECT_LIST:
             continue
+        if field.field_type is MetadataFieldType.DATE:
+            candidates.extend(
+                (name, value, quote)
+                for value, quote in date_source_candidates(source, field, locale)
+            )
         alternatives = "|".join(re.escape(alias) for alias in field_aliases(field))
         pattern = (
             r"(?=((?<!\w)(?:" + alternatives + r")[ ]*[:#][ \t]*[^\r\n]+|"

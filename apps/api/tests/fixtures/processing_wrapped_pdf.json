@@ -1,0 +1,44 @@
+[
+  {
+    "name": "PDF visual wraps preserve joining dates and complete summary clauses",
+    "pages": [
+      "EMPLOYMENT AGREEMENT\nThis agreement is made on 03 July 2026 between Northbridge Labs Private Limited\n(hereinafter referred to as the Employer) and Leela Rao (hereinafter referred to as\nthe Employee).\nThe Employee is appointed as Senior Platform Engineer. Employment will commence on 14\nAugust 2026. This fixed-term contract ends on 13 August 2028.\nThe employee must give 30 days notice before resignation. If the contract is\nterminated, access must be returned. This clause does not record an actual\ntermination.",
+      "ANNEXURE A - COMPENSATION\nEmployee Name: LEELA RAO\nEmployer: NORTHBRIDGE LABS PRIVATE LIMITED\nAnnual CTC: INR 24 lakh per annum\nMonthly Gross: INR 180000\nOne-time Joining Bonus: INR 50000\nReimbursement Limit: INR 15000\nThe annual CTC includes variable compensation; reimbursements and the one-time\njoining bonus must not be added to the stated annual CTC."
+    ],
+    "expected_category": "employment_contract",
+    "expected_metadata": {
+      "employer": "Northbridge Labs Private Limited",
+      "employee_name": "Leela Rao",
+      "position": "Senior Platform Engineer",
+      "start_date": "2026-08-14",
+      "end_date": "2028-08-13",
+      "annual_compensation": 2400000
+    },
+    "summary_concepts": [
+      [
+        "14 August 2026"
+      ],
+      [
+        "24 lakh"
+      ],
+      [
+        "30 days notice"
+      ]
+    ],
+    "forbidden_warnings": [
+      "status_change:reminders",
+      "conflicting_metadata:employer",
+      "conflicting_metadata:employee_name"
+    ],
+    "expected_pages": [
+      1,
+      2
+    ],
+    "unhelpful_tags": [
+      "annexure",
+      "employee",
+      "inr",
+      "agreement"
+    ]
+  }
+]

@@ -47,7 +47,7 @@ from papervault_api.documents.infrastructure.source_grounding import (
 )
 
 MAX_SOURCE_BYTES = 6000
-PROMPT_VERSION = "grounded-lines-v2"
+PROMPT_VERSION = "grounded-lines-v3"
 NOISE_TAGS = STOPWORDS | {
     "status",
     "update",
@@ -371,7 +371,7 @@ def parse_window(
         else:
             warnings.append(f"unsupported_metadata:{name}")
     conflicts: set[str] = set()
-    for name, raw_value, candidate in labelled_candidates(fields, window):
+    for name, raw_value, candidate in labelled_candidates(fields, window, locale):
         definition = fields[name]
         quote = normalized(candidate)
         try:

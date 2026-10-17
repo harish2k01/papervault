@@ -100,9 +100,12 @@ downloads require internet access. Retain runtime and model identities with depl
 records independently of application releases.
 
 The model pod requests 4 GiB, limits memory to 6 GiB and CPU to three cores, and uses
-a 16,384-token context. Each source window has a conservative input budget plus
+an 8,192-token context. Each source window has a conservative input budget plus
 2,048 output tokens. Windows cover source pages instead of truncating a document at
 a fixed character count. A 300-second request timeout surfaces failures for review.
+The smaller context allocation avoids memory pressure observed at the 6 GiB limit
+with a 16,384-token context. The existing 6,000-byte source window still fits within
+the conservative input budget; every source page remains scheduled for analysis.
 Text becomes ready and searchable before enrichment is queued. Slow model analysis
 therefore does not occupy the ingestion consumer or block OCR of later uploads.
 `analysis_pending:metadata` remains visible until enrichment completes. Broker

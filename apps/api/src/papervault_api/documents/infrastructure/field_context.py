@@ -36,8 +36,8 @@ CONTEXT_ALIASES: dict[str, tuple[str, ...]] = {
 }
 DATE_TOKEN = re.compile(
     r"\b(?:\d{4}[-/]\d{1,2}[-/]\d{1,2}|\d{1,2}[-/.]\d{1,2}[-/.]\d{4}|"
-    r"\d{1,2}(?:st|nd|rd|th)?[ -][A-Za-z]+[ -]\d{4}|"
-    r"[A-Za-z]+ \d{1,2}(?:st|nd|rd|th)?,? \d{4})\b",
+    r"\d{1,2}(?:st|nd|rd|th)?(?:\s+|-)[A-Za-z]+(?:\s+|-)\d{4}|"
+    r"[A-Za-z]+\s+\d{1,2}(?:st|nd|rd|th)?,?\s+\d{4})\b",
     re.I,
 )
 ENTITY_FIELDS = {
@@ -62,17 +62,33 @@ def field_aliases(field: MetadataFieldDefinition) -> tuple[str, ...]:
 
 
 def contextual_date(quote: str, field: MetadataFieldDefinition, locale: str) -> str | None:
+    candidates = date_source_candidates(quote, field, locale)
+    return candidates[0][0] if candidates else None
+
+
+def date_source_candidates(
+    source: str, field: MetadataFieldDefinition, locale: str
+) -> list[tuple[str, str]]:
+    candidates: list[tuple[str, str]] = []
     for alias in field_aliases(field):
-        match = re.search(r"\b" + re.escape(alias) + r"\b", quote, flags=re.I)
-        if not match:
-            continue
-        date = DATE_TOKEN.search(quote[match.end() : match.end() + 220])
-        if date:
+        for match in re.finditer(r"\b" + re.escape(alias) + r"\b", source, flags=re.I):
+            tail = source[match.end() : match.end() + 220]
+            date = DATE_TOKEN.search(tail)
+            if date is None:
+                continue
+            # Bind only an explicit date with simple connecting words. A missing
+            # start date must not borrow the date from the next end-date field.
+            gap = tail[: date.start()]
+            if not re.fullmatch(
+                r"[\s:#=\u2013\u2014-]*(?:(?:is|shall be|will be|on|from|the)\s+)*", gap, re.I
+            ):
+                continue
             try:
-                return parse_date(date.group(), locale=locale)
+                value = parse_date(date.group(), locale=locale)
             except ValueError:
                 continue
-    return None
+            candidates.append((value, source[match.start() : match.end() + date.end()]))
+    return candidates
 
 
 def contextual_amount(quote: str, field: MetadataFieldDefinition) -> int | float | None:

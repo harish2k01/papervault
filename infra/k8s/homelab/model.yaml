@@ -58,7 +58,7 @@ spec:
             - name: OLLAMA_MAX_QUEUE
               value: "4"
             - name: OLLAMA_CONTEXT_LENGTH
-              value: "16384"
+              value: "8192"
             - name: OLLAMA_KEEP_ALIVE
               value: 30m
           ports:
