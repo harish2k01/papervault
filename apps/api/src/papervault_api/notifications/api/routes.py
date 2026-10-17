@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from papervault_api.db.session import get_session
+from papervault_api.documents.infrastructure.models import Document
 from papervault_api.identity.api.dependencies import get_current_user
 from papervault_api.identity.application.current_user import CurrentUser
 from papervault_api.notifications.api.schemas import (
@@ -38,6 +39,9 @@ async def sync_document_notifications(
     current_user: Annotated[CurrentUser, Depends(get_current_user)],
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> list[NotificationResponse]:
+    document = await session.get(Document, document_id)
+    if document is None or document.owner_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
     service = NotificationService(session)
     notifications = await service.generate_for_document(document_id)
     owned_notifications = [
