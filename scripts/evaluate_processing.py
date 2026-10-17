@@ -33,6 +33,11 @@ def main() -> int:
     )
     parser.add_argument("--output", type=Path)
     parser.add_argument(
+        "--resume",
+        action="store_true",
+        help="Resume a matching partial report without rerunning completed cases.",
+    )
+    parser.add_argument(
         "--report-only",
         action="store_true",
         help="Return success after writing a report even when quality checks fail.",
@@ -62,7 +67,40 @@ def main() -> int:
             "context_tokens": settings.ollama_context_tokens,
             "max_output_tokens": settings.ollama_max_output_tokens,
         }
+    import papervault_api
+
+    package = Path(papervault_api.__file__).parent
+    sources = [
+        "documents/infrastructure/ai.py",
+        "documents/infrastructure/grounded_ai.py",
+        "documents/infrastructure/source_grounding.py",
+        "documents/infrastructure/field_context.py",
+        "documents/domain/metadata.py",
+        "core/model_clients.py",
+    ]
+    identity["analysis_source_sha256"] = hashlib.sha256(
+        b"".join((package / name).read_bytes() for name in sources)
+    ).hexdigest()
     results = []
+    if args.resume:
+        if args.output is None or not args.output.exists():
+            parser.error("--resume requires an existing --output report")
+        previous = json.loads(args.output.read_text(encoding="utf-8"))
+        if (
+            previous.get("inference_identity") != identity
+            or previous.get("requested_provider") != args.provider
+            or previous.get("corpus_sha256")
+            != hashlib.sha256(args.corpus.read_bytes()).hexdigest()
+        ):
+            parser.error(
+                "Cannot resume a report from different sources, corpus, model, or settings"
+            )
+        for index, item in enumerate(previous["cases"]):
+            if index >= len(cases) or item["name"] != cases[index]["name"]:
+                parser.error("Report cases do not match corpus order")
+            if "error_type" in item:
+                break
+            results.append(item)
 
     def build_report():
         report = quality_report(results)
@@ -74,7 +112,7 @@ def main() -> int:
         report["inference_identity"] = identity
         return report
 
-    for case in cases:
+    for case in cases[len(results) :]:
         started = time.monotonic()
         try:
             if "pages" in case and isinstance(provider, PageAwareDocumentAIProvider):

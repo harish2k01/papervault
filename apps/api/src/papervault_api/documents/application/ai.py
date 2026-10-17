@@ -107,14 +107,34 @@ class DocumentAIProcessingService:
         self._classification_threshold = classification_threshold
         self._metadata_locale = metadata_locale
 
-    async def process_document(self, document_id: UUID) -> None:
+    async def process_document(
+        self, document_id: UUID, *, expected_extraction_id: UUID | None = None
+    ) -> bool:
         document = await self._session.get(Document, document_id)
-        if document is None:
-            return
+        if (
+            document is None
+            or document.status != DocumentStatus.READY.value
+            or document.archived_at is not None
+        ):
+            return False
 
         text_extraction = await self._get_current_successful_text_extraction(document_id)
         if text_extraction is None or not text_extraction.content_text:
-            return
+            return False
+
+        if expected_extraction_id is not None:
+            if text_extraction.id != expected_extraction_id:
+                return False
+            completed = await self._session.scalar(
+                select(DocumentAIAnalysis.id).where(
+                    DocumentAIAnalysis.document_id == document_id,
+                    DocumentAIAnalysis.text_extraction_id == expected_extraction_id,
+                    DocumentAIAnalysis.is_current.is_(True),
+                    DocumentAIAnalysis.status == AIAnalysisStatus.SUCCEEDED.value,
+                )
+            )
+            if completed is not None:
+                return False
 
         if isinstance(self._ai_provider, PageAwareDocumentAIProvider):
             page_rows = (
@@ -147,7 +167,7 @@ class DocumentAIProcessingService:
             or current_extraction is None
             or current_extraction.id != text_extraction.id
         ):
-            return
+            return False
         text_hash = hashlib.sha256(text_extraction.content_text.encode("utf-8")).hexdigest()
 
         await self._mark_existing_ai_outputs_not_current(document_id)
@@ -238,6 +258,7 @@ class DocumentAIProcessingService:
         )
 
         await self._session.commit()
+        return True
 
     async def _replace_text_chunks(
         self,

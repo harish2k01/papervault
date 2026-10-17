@@ -24,6 +24,9 @@ class Settings(BaseSettings):
         alias="PAPERVAULT_MAX_UPLOAD_SIZE_BYTES",
     )
     ai_enabled: bool = Field(default=True, alias="PAPERVAULT_AI_ENABLED")
+    enrichment_queue_enabled: bool = Field(
+        default=False, alias="PAPERVAULT_ENRICHMENT_QUEUE_ENABLED"
+    )
     ai_provider: str = Field(default="local", alias="PAPERVAULT_AI_PROVIDER")
     answer_provider: str = Field(default="local", alias="PAPERVAULT_ANSWER_PROVIDER")
     embedding_provider: str = Field(default="local", alias="PAPERVAULT_EMBEDDING_PROVIDER")

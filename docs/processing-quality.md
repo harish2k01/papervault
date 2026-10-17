@@ -105,12 +105,37 @@ on available hardware.
 
 ## Grounded local analysis
 
-The `grounded-lines-v1` contract sends numbered source lines to a private Ollama
+The `grounded-lines-v2` contract sends numbered source lines to a private Ollama
 endpoint. Structured output restricts categories and field names. The server builds
 quotes from selected lines, normalizes dates using the configured locale, verifies
 values against the source, and rejects invalid references. Explicit colon, tab, and
 line-separated labels are also parsed directly. Conflicting values are withheld.
 These checks establish source support, not that every field has the right meaning.
+
+Version two requires both a typed value and line references for each selected fact.
+It recognizes narrative joining/end dates, ordinal and month-first dates, explicit
+annual compensation with lakh/crore units, and appointment clauses. Monthly pay is
+not annualized. Explicit employer/employee definitions reject reversed parties;
+entity names differing only in case do not create artificial conflicts. Strong
+document headings can supply the initial category hint for fresh uploads. Supported
+values still require literal source text or a defined date/amount normalization.
+
+The separate `processing_narrative.json` set contains three synthetic employment
+cases with 16 annotated fields, including legal party definitions, annexures,
+signing versus joining dates, conditional termination and monthly-only pay. The
+[deployed-v1 baseline](evaluations/narrative-v1-baseline.json) failed all three as
+fresh generic uploads, including classification; this comparison measures the whole
+pipeline, rather than isolating one parser change. It does not establish accuracy
+on a representative production corpus.
+
+```sh
+python scripts/evaluate_processing.py --provider ollama \
+  --corpus apps/api/tests/fixtures/processing_narrative.json --output narrative-quality.json
+```
+
+Reports include a source-code hash. `--resume` continues a matching partial report
+only when provider, model identity, settings, source hash, corpus and completed case
+order match. Completed quality failures remain in resumed results.
 
 Summaries are extractive: selected passages, supported key fields, and conservative
 critical-statement rules preserve source wording. They are not free-form generated

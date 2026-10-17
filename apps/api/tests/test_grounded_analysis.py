@@ -242,3 +242,154 @@ def test_explicit_label_fallback_withholds_conflicting_values_on_the_same_page()
     )
     assert "total_amount" not in result.extracted_metadata
     assert "conflicting_metadata:total_amount" in result.quality_warnings
+
+
+def test_narrative_parties_dates_and_compensation_have_typed_source_support() -> None:
+    text = (
+        "EMPLOYMENT AGREEMENT\n"
+        "Northbridge Labs (hereinafter called the Employer) and Leela Rao (the Employee).\n"
+        "You are appointed as Platform Engineer.\n"
+        "Employment will commence on 14th August 2026 and expires on September 13, 2028.\n"
+        "Your annual CTC is INR 24 lakh per annum."
+    )
+    values = {
+        "employer": (2, "Northbridge Labs"),
+        "employee_name": (2, "Leela Rao"),
+        "position": (3, "Platform Engineer"),
+        "start_date": (4, "2026-08-14"),
+        "end_date": (4, "2028-09-13"),
+        "annual_compensation": (5, 2400000),
+    }
+    client = SourceModel(
+        [
+            {
+                "category": "employment_contract",
+                "confidence_score": 0.9,
+                "fields": {
+                    key: {"lines": [line], "value": value} for key, (line, value) in values.items()
+                },
+                "summary": [2, 3, 4, 5],
+                "critical": [],
+                "tags": {},
+            }
+        ]
+    )
+    result = ModelDocumentAIProvider(client).analyze(text, "generic_pdf")
+    assert result.extracted_metadata == {key: value for key, (_, value) in values.items()}
+    assert client.calls[0]["current_category"] == "employment_contract"
+    fields = {
+        field.key: field for field in get_document_type("employment_contract").metadata_fields
+    }
+    assert not supports_value("Leela Rao", text.splitlines()[1], fields["employer"])
+    assert not supports_value(1200000, "Monthly Gross: INR 100000", fields["annual_compensation"])
+
+
+def test_entity_case_variants_are_not_conflicts_but_different_entities_are() -> None:
+    client = SourceModel(
+        [
+            {
+                "category": "employment_contract",
+                "confidence_score": 0.9,
+                "fields": {},
+                "summary": [],
+                "critical": [],
+                "tags": {},
+            }
+        ]
+    )
+    result = ModelDocumentAIProvider(client).analyze_pages(
+        (
+            AnalysisPage(1, "Employer: Northbridge Labs"),
+            AnalysisPage(2, "Employer: NORTHBRIDGE LABS"),
+        ),
+        "employment_contract",
+    )
+    assert result.extracted_metadata["employer"] == "Northbridge Labs"
+    assert "conflicting_metadata:employer" not in result.quality_warnings
+
+
+def test_shared_line_fields_are_split_and_generic_tags_do_not_match_word_fragments() -> None:
+    client = SourceModel(
+        [
+            {
+                "category": "employment_contract",
+                "confidence_score": 0.9,
+                "fields": {},
+                "summary": [1],
+                "critical": [],
+                "tags": {"art": [1], "status": [1], "northbridge": [1]},
+            }
+        ]
+    )
+    result = ModelDocumentAIProvider(client).analyze(
+        "Employer: Northbridge Labs Employee Name: Leela Rao\nParty status update",
+        "employment_contract",
+    )
+    assert result.extracted_metadata == {
+        "employer": "Northbridge Labs",
+        "employee_name": "Leela Rao",
+    }
+    assert "art" not in result.suggested_tags and "status" not in result.suggested_tags
+    schema = analysis_schema()["oneOf"][0]["properties"]["fields"]
+    assert schema["additionalProperties"] is False
+
+
+def test_currency_parentheses_and_percentage_clauses_are_not_misread() -> None:
+    from papervault_api.documents.infrastructure.field_context import contextual_amount
+
+    fields = {field.key: field for field in get_document_type("bank_statement").metadata_fields}
+    assert (
+        contextual_amount("Closing Balance: (INR 1,234.50)", fields["closing_balance"]) == -1234.5
+    )
+    assert contextual_amount("Closing Balance: INR -1,234.50", fields["closing_balance"]) == -1234.5
+    contract = {
+        field.key: field for field in get_document_type("employment_contract").metadata_fields
+    }
+    assert contextual_amount("Annual salary increase: 10%", contract["annual_compensation"]) is None
+    assert (
+        contextual_amount(
+            "Annual remuneration is not specified. Monthly gross: INR 100000",
+            contract["annual_compensation"],
+        )
+        is None
+    )
+    assert (
+        contextual_amount(
+            "Annual Compensation:\nMonthly Gross: INR 100000",
+            contract["annual_compensation"],
+        )
+        is None
+    )
+    assert (
+        contextual_amount(
+            "Annual Compensation:\nINR 1200000 per annum",
+            contract["annual_compensation"],
+        )
+        == 1200000
+    )
+
+
+def test_explicit_appointment_recovers_an_omitted_title_but_not_a_conditional_offer() -> None:
+    for clause, expected in [
+        (
+            "The Employee is appointed as Senior Platform Engineer. Employment commences later.",
+            "Senior Platform Engineer",
+        ),
+        ("You have been appointed as Data Engineer.", "Data Engineer"),
+        ("If you are appointed as Support Engineer, details will follow.", None),
+        ("You are not appointed as Support Engineer.", None),
+    ]:
+        client = SourceModel(
+            [
+                {
+                    "category": "employment_contract",
+                    "confidence_score": 0.9,
+                    "fields": {},
+                    "summary": [],
+                    "critical": [],
+                    "tags": {},
+                }
+            ]
+        )
+        result = ModelDocumentAIProvider(client).analyze(clause, "employment_contract")
+        assert result.extracted_metadata.get("position") == expected

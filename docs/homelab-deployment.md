@@ -74,8 +74,10 @@ must exist before migrations can run. The HTTPRoute remains disabled until migra
 the private documents bucket, and the owner account are ready. Later upgrades use
 the chart's migration hook with the existing runtime resources.
 
-Workers have concurrency of one and a prefetch multiplier of one to bound CPU model
-queueing. Image
+The profile runs separate ingestion and enrichment consumers, each with concurrency
+one and a prefetch multiplier of one. The ingestion consumer reads `celery`; the
+enrichment consumer reads `papervault-enrichment`. Both use the verified worker image.
+Image
 builders use the runner network to avoid a nested Docker MTU mismatch.
 
 ## Local analysis model
@@ -101,8 +103,23 @@ The model pod requests 4 GiB, limits memory to 6 GiB and CPU to three cores, and
 a 16,384-token context. Each source window has a conservative input budget plus
 2,048 output tokens. Windows cover source pages instead of truncating a document at
 a fixed character count. A 300-second request timeout surfaces failures for review.
-Text search remains usable when enrichment fails. CPU processing can take minutes
-for long documents; the single worker provides limited throughput.
+Text becomes ready and searchable before enrichment is queued. Slow model analysis
+therefore does not occupy the ingestion consumer or block OCR of later uploads.
+`analysis_pending:metadata` remains visible until enrichment completes. Broker
+publication or model failures become reviewable `analysis_failed:metadata` states
+without removing extracted text. Each queued analysis is bound to an extraction ID;
+obsolete and already completed deliveries skip model inference. Enrichment uses late
+acknowledgement and requeues on worker loss through the existing persistent Redis.
+Unexpected infrastructure exceptions use up to three retries with exponential
+backoff; rejected model output remains a visible review failure rather than looping.
+
+CPU analysis can still take minutes per page and remains serial on this hardware.
+Queue separation improves ingestion availability, not model inference throughput.
+The default chart keeps a single consumer for local installations; enable
+`worker.separateEnrichment` to provision the second deployment. When disabling it,
+the current worker image consumes both queues so outstanding enrichment can drain.
+Before rolling back to an older image that lacks the enrichment task, drain the
+enrichment queue or retain a compatible enrichment consumer until it is empty.
 
 ## Verification
 

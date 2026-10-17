@@ -27,6 +27,8 @@ imagePullSecrets: []
 
 worker:
   concurrency: 2
+  separateEnrichment: false
+  enrichmentConcurrency: 1
 
 serviceAccount:
   create: true

@@ -122,6 +122,14 @@ The database is the chunk source of truth. Retrieval is currently bounded to 5,0
 
 ## Search
 
+In deployments with separate enrichment enabled, ingestion commits OCR/native text,
+refreshes duplicate fingerprints and the search projection, then publishes a model
+job to a dedicated queue. The model consumer uses the same worker image and receives
+the document ID plus its extraction ID. Replaced sources and completed deliveries
+are skipped; a second source check after inference prevents stale writes. Model
+failure leaves the ready document searchable with a review warning. Single-consumer
+installations retain inline enrichment by default.
+
 The worker projects owned document fields, current text, AI output, metadata, tags, and embeddings into OpenSearch. Keyword, semantic, and hybrid queries use OpenSearch when enabled. A PostgreSQL scorer remains available as a controlled fallback.
 
 Lifecycle and tag changes commit to PostgreSQL first and then refresh the search projection on a best-effort basis. Indexing failure is observable but does not roll back a successful metadata edit.

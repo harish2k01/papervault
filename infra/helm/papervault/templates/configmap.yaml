@@ -10,6 +10,7 @@ data:
   PAPERVAULT_API_CORS_ORIGINS: {{ .Values.config.corsOrigins | quote }}
   PAPERVAULT_MAX_UPLOAD_SIZE_BYTES: {{ .Values.config.maxUploadSizeBytes | quote }}
   PAPERVAULT_AI_ENABLED: {{ .Values.config.aiEnabled | quote }}
+  PAPERVAULT_ENRICHMENT_QUEUE_ENABLED: {{ .Values.worker.separateEnrichment | default false | quote }}
   PAPERVAULT_AI_PROVIDER: {{ .Values.config.aiProvider | quote }}
   PAPERVAULT_ANSWER_PROVIDER: {{ .Values.config.answerProvider | quote }}
   PAPERVAULT_EMBEDDING_PROVIDER: {{ .Values.config.embeddingProvider | quote }}
