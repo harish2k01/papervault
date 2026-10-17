@@ -35,7 +35,8 @@ source evidence and remaining warnings. It also passes the three separate
 [multi-page and conditional cases](evaluations/qwen3-17b-holdout-v2.json).
 
 Measured on three CPU cores of an AMD Ryzen 5 2500U, single-page cases took
-35.3–45.0 seconds; the two-page policy holdout took 67.2 seconds. These are observed development measurements, not
+35.3–45.0 seconds; the two-page policy holdout took 67.2 seconds. These are observed
+development measurements, not
 latency guarantees or a production accuracy estimate. Rejected quote-copying pilots
 are retained under [evaluations/pilots](evaluations/pilots); their failures motivated
 line selection and direct parsing of explicit labels. An 8/8 pipeline result does
@@ -126,6 +127,15 @@ signing versus joining dates, conditional termination and monthly-only pay. The
 fresh generic uploads, including classification; this comparison measures the whole
 pipeline, rather than isolating one parser change. It does not establish accuracy
 on a representative production corpus.
+
+The [version-two narrative report](evaluations/narrative-v2.json) passes all three
+cases, all 16 annotated fields, five required summary concepts and the two checks
+that absent annual pay/end dates remain withheld. Cases took 39.4–79.1 seconds on
+the same private CPU service. Combined with the original and multi-page sets, this
+is 14 passing synthetic cases and 54/54 annotated metadata checks. All three reports
+record the same analysis source hash, model manifest and runtime version. Remaining
+unsupported model attempts remain visible even when direct source parsing recovers
+a field. The limited corpus does not measure arbitrary document accuracy.
 
 ```sh
 python scripts/evaluate_processing.py --provider ollama \
