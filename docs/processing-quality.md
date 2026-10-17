@@ -58,7 +58,8 @@ requires OCR when it has no embedded text, substantial raster content (20% of pa
 area), sparse embedded text with raster content (at least 2% and fewer than 40
 alphanumeric characters), or excessive replacement characters. Image-bearing Form
 XObjects are included conservatively. Small logos on otherwise digital pages do not
-automatically force OCR.
+automatically force OCR. Pages without text or painted content are identified as
+blank rather than treated as failed scanned attachments.
 
 For pages requiring OCR, native text remains intact and additional OCR lines are
 appended, with duplicate lines removed. Other digital pages retain their original

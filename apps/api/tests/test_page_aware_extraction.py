@@ -1,7 +1,7 @@
 from pathlib import Path
 
 import pytest
-from pypdf import PdfWriter
+from pypdf import PdfReader, PdfWriter
 from pypdf.generic import (
     ArrayObject,
     DecodedStreamObject,
@@ -153,3 +153,23 @@ def test_required_ocr_failure_preserves_embedded_text_for_inspection(tmp_path: P
     )
     assert result.status is TextExtractionStatus.FAILED
     assert result.content_text == "Scanned by office scanner"
+
+
+def test_genuinely_blank_attachment_page_does_not_fail_a_digital_document(tmp_path: Path) -> None:
+    source = tmp_path / "digital.pdf"
+    create_pdf(
+        source, image_size=20, text="Invoice INV-204. Total INR 124999.50 from Acme Electronics."
+    )
+    writer = PdfWriter()
+    writer.append(PdfReader(source))
+    writer.add_blank_page(width=600, height=800)
+    combined = tmp_path / "digital-with-blank.pdf"
+    writer.write(combined)
+    ocr = RecordingOcr("")
+    result = CompositeTextExtractor(pdf_extractor=PypdfTextExtractor(), ocr_extractor=ocr).extract(
+        combined, "application/pdf"
+    )
+    assert not ocr.called
+    assert result.status is TextExtractionStatus.SUCCEEDED
+    assert result.page_texts[1] == ""
+    assert result.page_assessments[1].reasons == ("blank_page",)

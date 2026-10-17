@@ -26,9 +26,14 @@ class CompositeTextExtractor(TextExtractor):
         if content_type == "application/pdf":
             result = self._pdf_extractor.extract(file_path, content_type)
             if result.status is TextExtractionStatus.SUCCEEDED:
+                assessed_pages = {page.page_number - 1 for page in result.page_assessments}
                 required_pages = {
                     page.page_number - 1 for page in result.page_assessments if page.requires_ocr
-                } | {index for index, text in enumerate(result.page_texts) if not text.strip()}
+                } | {
+                    index
+                    for index, text in enumerate(result.page_texts)
+                    if not text.strip() and index not in assessed_pages
+                }
                 if not required_pages:
                     return result
                 ocr_result = self._ocr_extractor.extract(file_path, content_type)
@@ -170,6 +175,7 @@ class PypdfTextExtractor(TextExtractor):
 
 def inspect_pdf_page(page: Any, page_number: int) -> tuple[str, PdfPageAssessment]:
     image_areas: list[float] = []
+    painted_content = False
     reference = page.get("/Resources")
     resources = reference.get_object() if reference is not None else {}
     objects = resources.get("/XObject", {})
@@ -183,6 +189,22 @@ def inspect_pdf_page(page: Any, page_number: int) -> tuple[str, PdfPageAssessmen
         matrix: list[float],
         text_matrix: list[float],
     ) -> None:
+        nonlocal painted_content
+        if operator in {
+            b"Do",
+            b"S",
+            b"s",
+            b"f",
+            b"F",
+            b"f*",
+            b"B",
+            b"B*",
+            b"b",
+            b"b*",
+            b"sh",
+            b"INLINE IMAGE",
+        }:
+            painted_content = True
         if operator != b"Do" or not operands or page_area <= 0:
             return
         reference = objects.get(operands[0])
@@ -210,6 +232,8 @@ def inspect_pdf_page(page: Any, page_number: int) -> tuple[str, PdfPageAssessmen
 
     text = page.extract_text(visitor_operand_before=inspect_image) or ""
     coverage = round(min(1.0, sum(image_areas)), 4)
+    if not text.strip() and not painted_content:
+        return text, PdfPageAssessment(page_number, False, coverage, ("blank_page",))
     reasons: list[str] = []
     if not text.strip():
         reasons.append("no_embedded_text")
