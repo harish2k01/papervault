@@ -93,8 +93,7 @@ async def _process_document(document_id: UUID) -> None:
         )
 
     await _refresh_duplicate_fingerprint(document_id)
-    async with AsyncSessionFactory() as session:
-        await NotificationService(session).generate_for_document(document_id)
+    await _refresh_notifications(document_id)
     await _index_document(document_id)
     if extraction_id is None:
         await _mark_enrichment_failed(document_id)
@@ -203,11 +202,16 @@ async def _enrich_document(document_id: UUID, extraction_id: UUID | None = None)
 
     await _sync_smart_tags(document_id)
 
-    async with AsyncSessionFactory() as session:
-        notification_service = NotificationService(session)
-        await notification_service.generate_for_document(document_id)
-
+    await _refresh_notifications(document_id)
     await _index_document(document_id)
+
+
+async def _refresh_notifications(document_id: UUID) -> None:
+    try:
+        async with AsyncSessionFactory() as session:
+            await NotificationService(session).generate_for_document(document_id)
+    except Exception:
+        logger.exception("document_notification_refresh_failed", document_id=str(document_id))
 
 
 async def _index_document(document_id: UUID) -> None:

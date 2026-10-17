@@ -30,13 +30,12 @@ omitting critical information; both checks must pass.
 
 The selected private Qwen3 1.7B hybrid pipeline passes **8/8 cases**, including
 **30/30 fields**, **18/18 summary concepts**, **8/8 tag facets**, and **22/22 noise-tag
-checks**. Its [full report](evaluations/qwen3-17b-grounded-lines.json) records actual
+checks**. Its [full report](evaluations/qwen3-17b-lines-v2.json) records actual
 source evidence and remaining warnings. It also passes the three separate
-[multi-page and conditional cases](evaluations/qwen3-17b-holdout.json).
+[multi-page and conditional cases](evaluations/qwen3-17b-holdout-v2.json).
 
 Measured on three CPU cores of an AMD Ryzen 5 2500U, single-page cases took
-28.5–42.3 seconds; the two-page policy took 57.8 seconds. The model container used
-about 3.9 GiB during this run. These are observed development measurements, not
+35.3–45.0 seconds; the two-page policy holdout took 67.2 seconds. These are observed development measurements, not
 latency guarantees or a production accuracy estimate. Rejected quote-copying pilots
 are retained under [evaluations/pilots](evaluations/pilots); their failures motivated
 line selection and direct parsing of explicit labels. An 8/8 pipeline result does

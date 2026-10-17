@@ -150,7 +150,9 @@ async def test_fast_worker_completion_is_not_overwritten_by_upload_response(
     assert uploaded.document.status == "ready"
 
 
-@pytest.mark.parametrize("delivery", ["inline", "queued", "publication_failed"])
+@pytest.mark.parametrize(
+    "delivery", ["inline", "queued", "queued_notification_failed", "publication_failed"]
+)
 async def test_real_pdf_text_is_searchable_and_indexed_even_when_analysis_fails(
     session: AsyncSession, monkeypatch: pytest.MonkeyPatch, delivery: str
 ) -> None:
@@ -206,6 +208,14 @@ async def test_real_pdf_text_is_searchable_and_indexed_even_when_analysis_fails(
         published.append((name, args, queue))
 
     monkeypatch.setattr(worker.celery_app, "send_task", publish)
+    if delivery == "queued_notification_failed":
+
+        async def unavailable_notifications(self: object, document_id: UUID) -> None:
+            raise ConnectionError("Notification refresh unavailable")
+
+        monkeypatch.setattr(
+            worker.NotificationService, "generate_for_document", unavailable_notifications
+        )
 
     await worker._process_document(document_id)
     await session.refresh(document)
@@ -219,7 +229,7 @@ async def test_real_pdf_text_is_searchable_and_indexed_even_when_analysis_fails(
     assert document.processing_error is None
     assert document.review_status == "pending"
     assert document.review_reasons == [
-        "analysis_pending:metadata" if delivery == "queued" else "analysis_failed:metadata"
+        "analysis_pending:metadata" if delivery.startswith("queued") else "analysis_failed:metadata"
     ]
     assert extraction is not None and "ZXQ918273" in (extraction.content_text or "")
     assert index.documents
@@ -229,7 +239,7 @@ async def test_real_pdf_text_is_searchable_and_indexed_even_when_analysis_fails(
         session=session, embedding_provider_name="local", embedding_dimensions=64
     ).search(SearchRequest(owner_id=owner_id, query="ZXQ918273", mode=SearchMode.KEYWORD))
     assert [result.document_id for result in results] == [document_id]
-    if delivery == "queued":
+    if delivery.startswith("queued"):
         assert published == [
             (
                 "papervault.documents.enrich_document",

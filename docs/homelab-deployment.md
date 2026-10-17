@@ -108,6 +108,7 @@ therefore does not occupy the ingestion consumer or block OCR of later uploads.
 `analysis_pending:metadata` remains visible until enrichment completes. Broker
 publication or model failures become reviewable `analysis_failed:metadata` states
 without removing extracted text. Each queued analysis is bound to an extraction ID;
+Notification refresh failures are logged and do not stop enrichment publication.
 obsolete and already completed deliveries skip model inference. Enrichment uses late
 acknowledgement and requeues on worker loss through the existing persistent Redis.
 Unexpected infrastructure exceptions use up to three retries with exponential

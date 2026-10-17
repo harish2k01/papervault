@@ -1,0 +1,2230 @@
+{
+  "schema_version": 1,
+  "passed": true,
+  "cases_passed": 8,
+  "cases_total": 8,
+  "metrics": {
+    "classification": {
+      "passed": 8,
+      "total": 8,
+      "rate": 1.0
+    },
+    "metadata": {
+      "passed": 30,
+      "total": 30,
+      "rate": 1.0
+    },
+    "summary_coverage": {
+      "passed": 18,
+      "total": 18,
+      "rate": 1.0
+    },
+    "tag_coverage": {
+      "passed": 8,
+      "total": 8,
+      "rate": 1.0
+    },
+    "tag_noise": {
+      "passed": 22,
+      "total": 22,
+      "rate": 1.0
+    },
+    "summary_contradiction": {
+      "passed": 7,
+      "total": 7,
+      "rate": 1.0
+    }
+  },
+  "cases": [
+    {
+      "name": "Invoice with colon-delimited labels",
+      "passed": true,
+      "provider": "ollama",
+      "model": "qwen3:1.7b",
+      "classification_confidence": 1.0,
+      "checks": [
+        {
+          "metric": "classification",
+          "field": "category",
+          "passed": true,
+          "expected": "invoice",
+          "actual": "invoice"
+        },
+        {
+          "metric": "metadata",
+          "field": "vendor",
+          "passed": true,
+          "expected": "Acme Electronics",
+          "actual": "Acme Electronics"
+        },
+        {
+          "metric": "metadata",
+          "field": "invoice_number",
+          "passed": true,
+          "expected": "INV-204",
+          "actual": "INV-204"
+        },
+        {
+          "metric": "metadata",
+          "field": "purchase_date",
+          "passed": true,
+          "expected": "2026-07-11",
+          "actual": "2026-07-11"
+        },
+        {
+          "metric": "metadata",
+          "field": "total_amount",
+          "passed": true,
+          "expected": 124999.5,
+          "actual": 124999.5
+        },
+        {
+          "metric": "summary_coverage",
+          "field": "0",
+          "passed": true,
+          "expected": [
+            "Acme Electronics"
+          ],
+          "actual": "Purchase Date: 11/07/2026 Total Amount: INR 124,999.50 Vendor: Acme Electronics Invoice Number: INV-204"
+        },
+        {
+          "metric": "summary_coverage",
+          "field": "1",
+          "passed": true,
+          "expected": [
+            "INV-204"
+          ],
+          "actual": "Purchase Date: 11/07/2026 Total Amount: INR 124,999.50 Vendor: Acme Electronics Invoice Number: INV-204"
+        },
+        {
+          "metric": "summary_coverage",
+          "field": "2",
+          "passed": true,
+          "expected": [
+            "124999.5",
+            "124,999.50"
+          ],
+          "actual": "Purchase Date: 11/07/2026 Total Amount: INR 124,999.50 Vendor: Acme Electronics Invoice Number: INV-204"
+        },
+        {
+          "metric": "tag_coverage",
+          "field": "0",
+          "passed": true,
+          "expected": [
+            "invoice",
+            "purchase"
+          ],
+          "actual": [
+            "invoice"
+          ]
+        },
+        {
+          "metric": "tag_noise",
+          "field": "vendor",
+          "passed": true,
+          "expected": "absent",
+          "actual": [
+            "invoice"
+          ]
+        },
+        {
+          "metric": "tag_noise",
+          "field": "inr",
+          "passed": true,
+          "expected": "absent",
+          "actual": [
+            "invoice"
+          ]
+        },
+        {
+          "metric": "tag_noise",
+          "field": "bill",
+          "passed": true,
+          "expected": "absent",
+          "actual": [
+            "invoice"
+          ]
+        }
+      ],
+      "latency_seconds": 35.326,
+      "field_evidence": [
+        {
+          "page_number": 1,
+          "quote": "Vendor: Acme Electronics",
+          "field": "vendor"
+        },
+        {
+          "page_number": 1,
+          "quote": "Invoice Number: INV-204",
+          "field": "invoice_number"
+        },
+        {
+          "page_number": 1,
+          "quote": "Purchase Date: 11/07/2026",
+          "field": "purchase_date"
+        },
+        {
+          "page_number": 1,
+          "quote": "Total Amount: INR 124,999.50",
+          "field": "total_amount"
+        }
+      ],
+      "summary_evidence": [
+        {
+          "page_number": 1,
+          "quote": "Purchase Date: 11/07/2026",
+          "field": null
+        },
+        {
+          "page_number": 1,
+          "quote": "Total Amount: INR 124,999.50",
+          "field": null
+        },
+        {
+          "page_number": 1,
+          "quote": "Vendor: Acme Electronics",
+          "field": null
+        },
+        {
+          "page_number": 1,
+          "quote": "Invoice Number: INV-204",
+          "field": null
+        }
+      ],
+      "quality_warnings": [
+        "unsupported_metadata:line_items"
+      ],
+      "covered_pages": [
+        1
+      ],
+      "analysis": {
+        "provider": "ollama",
+        "model": "qwen3:1.7b",
+        "summary": "Purchase Date: 11/07/2026 Total Amount: INR 124,999.50 Vendor: Acme Electronics Invoice Number: INV-204",
+        "keywords": [
+          "tax",
+          "acme",
+          "electronics",
+          "inv-204",
+          "purchase",
+          "example",
+          "customer"
+        ],
+        "entities": [
+          {
+            "kind": "amount",
+            "value": "INR 124,999.50",
+            "confidence_score": 0.7
+          },
+          {
+            "kind": "date",
+            "value": "11/07/2026",
+            "confidence_score": 0.7
+          }
+        ],
+        "suggested_tags": [
+          "invoice"
+        ],
+        "category": "invoice",
+        "confidence_score": 1.0,
+        "extracted_metadata": {
+          "vendor": "Acme Electronics",
+          "invoice_number": "INV-204",
+          "purchase_date": "2026-07-11",
+          "total_amount": 124999.5
+        },
+        "field_evidence": [
+          {
+            "page_number": 1,
+            "quote": "Vendor: Acme Electronics",
+            "field": "vendor"
+          },
+          {
+            "page_number": 1,
+            "quote": "Invoice Number: INV-204",
+            "field": "invoice_number"
+          },
+          {
+            "page_number": 1,
+            "quote": "Purchase Date: 11/07/2026",
+            "field": "purchase_date"
+          },
+          {
+            "page_number": 1,
+            "quote": "Total Amount: INR 124,999.50",
+            "field": "total_amount"
+          }
+        ],
+        "summary_evidence": [
+          {
+            "page_number": 1,
+            "quote": "Purchase Date: 11/07/2026",
+            "field": null
+          },
+          {
+            "page_number": 1,
+            "quote": "Total Amount: INR 124,999.50",
+            "field": null
+          },
+          {
+            "page_number": 1,
+            "quote": "Vendor: Acme Electronics",
+            "field": null
+          },
+          {
+            "page_number": 1,
+            "quote": "Invoice Number: INV-204",
+            "field": null
+          }
+        ],
+        "quality_warnings": [
+          "unsupported_metadata:line_items"
+        ],
+        "covered_pages": [
+          1
+        ]
+      }
+    },
+    {
+      "name": "Invoice fields arranged in columns",
+      "passed": true,
+      "provider": "ollama",
+      "model": "qwen3:1.7b",
+      "classification_confidence": 1.0,
+      "checks": [
+        {
+          "metric": "classification",
+          "field": "category",
+          "passed": true,
+          "expected": "invoice",
+          "actual": "invoice"
+        },
+        {
+          "metric": "metadata",
+          "field": "vendor",
+          "passed": true,
+          "expected": "Acme Electronics",
+          "actual": "Acme Electronics"
+        },
+        {
+          "metric": "metadata",
+          "field": "invoice_number",
+          "passed": true,
+          "expected": "INV-204",
+          "actual": "INV-204"
+        },
+        {
+          "metric": "metadata",
+          "field": "purchase_date",
+          "passed": true,
+          "expected": "2026-07-11",
+          "actual": "2026-07-11"
+        },
+        {
+          "metric": "metadata",
+          "field": "total_amount",
+          "passed": true,
+          "expected": 124999.5,
+          "actual": 124999.5
+        },
+        {
+          "metric": "summary_coverage",
+          "field": "0",
+          "passed": true,
+          "expected": [
+            "Acme Electronics"
+          ],
+          "actual": "Purchase Date 11/07/2026 Vendor Acme Electronics Invoice Number INV-204 Total Amount INR 124,999.50"
+        },
+        {
+          "metric": "summary_coverage",
+          "field": "1",
+          "passed": true,
+          "expected": [
+            "INV-204"
+          ],
+          "actual": "Purchase Date 11/07/2026 Vendor Acme Electronics Invoice Number INV-204 Total Amount INR 124,999.50"
+        },
+        {
+          "metric": "tag_coverage",
+          "field": "0",
+          "passed": true,
+          "expected": [
+            "invoice",
+            "purchase"
+          ],
+          "actual": [
+            "invoice"
+          ]
+        },
+        {
+          "metric": "tag_noise",
+          "field": "vendor",
+          "passed": true,
+          "expected": "absent",
+          "actual": [
+            "invoice"
+          ]
+        },
+        {
+          "metric": "tag_noise",
+          "field": "inr",
+          "passed": true,
+          "expected": "absent",
+          "actual": [
+            "invoice"
+          ]
+        },
+        {
+          "metric": "tag_noise",
+          "field": "bill",
+          "passed": true,
+          "expected": "absent",
+          "actual": [
+            "invoice"
+          ]
+        }
+      ],
+      "latency_seconds": 39.259,
+      "field_evidence": [
+        {
+          "page_number": 1,
+          "quote": "Vendor Acme Electronics",
+          "field": "vendor"
+        },
+        {
+          "page_number": 1,
+          "quote": "Invoice Number INV-204",
+          "field": "invoice_number"
+        },
+        {
+          "page_number": 1,
+          "quote": "Purchase Date 11/07/2026",
+          "field": "purchase_date"
+        },
+        {
+          "page_number": 1,
+          "quote": "Total Amount INR 124,999.50",
+          "field": "total_amount"
+        }
+      ],
+      "summary_evidence": [
+        {
+          "page_number": 1,
+          "quote": "Purchase Date 11/07/2026",
+          "field": null
+        },
+        {
+          "page_number": 1,
+          "quote": "Vendor Acme Electronics",
+          "field": null
+        },
+        {
+          "page_number": 1,
+          "quote": "Invoice Number INV-204",
+          "field": null
+        },
+        {
+          "page_number": 1,
+          "quote": "Total Amount INR 124,999.50",
+          "field": null
+        }
+      ],
+      "quality_warnings": [
+        "unsupported_metadata:line_items"
+      ],
+      "covered_pages": [
+        1
+      ],
+      "analysis": {
+        "provider": "ollama",
+        "model": "qwen3:1.7b",
+        "summary": "Purchase Date 11/07/2026 Vendor Acme Electronics Invoice Number INV-204 Total Amount INR 124,999.50",
+        "keywords": [
+          "tax",
+          "acme",
+          "electronics",
+          "inv-204",
+          "purchase",
+          "example",
+          "customer"
+        ],
+        "entities": [
+          {
+            "kind": "amount",
+            "value": "INR 124,999.50",
+            "confidence_score": 0.7
+          },
+          {
+            "kind": "date",
+            "value": "11/07/2026",
+            "confidence_score": 0.7
+          }
+        ],
+        "suggested_tags": [
+          "invoice"
+        ],
+        "category": "invoice",
+        "confidence_score": 1.0,
+        "extracted_metadata": {
+          "vendor": "Acme Electronics",
+          "invoice_number": "INV-204",
+          "purchase_date": "2026-07-11",
+          "total_amount": 124999.5
+        },
+        "field_evidence": [
+          {
+            "page_number": 1,
+            "quote": "Vendor Acme Electronics",
+            "field": "vendor"
+          },
+          {
+            "page_number": 1,
+            "quote": "Invoice Number INV-204",
+            "field": "invoice_number"
+          },
+          {
+            "page_number": 1,
+            "quote": "Purchase Date 11/07/2026",
+            "field": "purchase_date"
+          },
+          {
+            "page_number": 1,
+            "quote": "Total Amount INR 124,999.50",
+            "field": "total_amount"
+          }
+        ],
+        "summary_evidence": [
+          {
+            "page_number": 1,
+            "quote": "Purchase Date 11/07/2026",
+            "field": null
+          },
+          {
+            "page_number": 1,
+            "quote": "Vendor Acme Electronics",
+            "field": null
+          },
+          {
+            "page_number": 1,
+            "quote": "Invoice Number INV-204",
+            "field": null
+          },
+          {
+            "page_number": 1,
+            "quote": "Total Amount INR 124,999.50",
+            "field": null
+          }
+        ],
+        "quality_warnings": [
+          "unsupported_metadata:line_items"
+        ],
+        "covered_pages": [
+          1
+        ]
+      }
+    },
+    {
+      "name": "Cancelled policy must describe ended coverage",
+      "passed": true,
+      "provider": "ollama",
+      "model": "qwen3:1.7b",
+      "classification_confidence": 1.0,
+      "checks": [
+        {
+          "metric": "classification",
+          "field": "category",
+          "passed": true,
+          "expected": "insurance_policy",
+          "actual": "insurance_policy"
+        },
+        {
+          "metric": "metadata",
+          "field": "provider",
+          "passed": true,
+          "expected": "Example Insurance",
+          "actual": "Example Insurance"
+        },
+        {
+          "metric": "metadata",
+          "field": "policy_number",
+          "passed": true,
+          "expected": "POL-204",
+          "actual": "POL-204"
+        },
+        {
+          "metric": "metadata",
+          "field": "premium",
+          "passed": true,
+          "expected": 12000,
+          "actual": 12000
+        },
+        {
+          "metric": "summary_coverage",
+          "field": "0",
+          "passed": true,
+          "expected": [
+            "cancelled",
+            "canceled",
+            "cancellation"
+          ],
+          "actual": "This policy was cancelled effective 01/06/2026. No coverage remains. Refund INR 9000 issued. INSURANCE POLICY CANCELLATION NOTICE Expiry Date: 31/12/2026 Provider: Example Insurance Policy Number: POL-204 Premium: INR 12000"
+        },
+        {
+          "metric": "summary_coverage",
+          "field": "1",
+          "passed": true,
+          "expected": [
+            "no coverage",
+            "coverage ended",
+            "coverage has ended"
+          ],
+          "actual": "This policy was cancelled effective 01/06/2026. No coverage remains. Refund INR 9000 issued. INSURANCE POLICY CANCELLATION NOTICE Expiry Date: 31/12/2026 Provider: Example Insurance Policy Number: POL-204 Premium: INR 12000"
+        },
+        {
+          "metric": "summary_coverage",
+          "field": "2",
+          "passed": true,
+          "expected": [
+            "refund"
+          ],
+          "actual": "This policy was cancelled effective 01/06/2026. No coverage remains. Refund INR 9000 issued. INSURANCE POLICY CANCELLATION NOTICE Expiry Date: 31/12/2026 Provider: Example Insurance Policy Number: POL-204 Premium: INR 12000"
+        },
+        {
+          "metric": "summary_contradiction",
+          "field": "policy is active",
+          "passed": true,
+          "expected": "absent",
+          "actual": "This policy was cancelled effective 01/06/2026. No coverage remains. Refund INR 9000 issued. INSURANCE POLICY CANCELLATION NOTICE Expiry Date: 31/12/2026 Provider: Example Insurance Policy Number: POL-204 Premium: INR 12000"
+        },
+        {
+          "metric": "summary_contradiction",
+          "field": "coverage remains active",
+          "passed": true,
+          "expected": "absent",
+          "actual": "This policy was cancelled effective 01/06/2026. No coverage remains. Refund INR 9000 issued. INSURANCE POLICY CANCELLATION NOTICE Expiry Date: 31/12/2026 Provider: Example Insurance Policy Number: POL-204 Premium: INR 12000"
+        },
+        {
+          "metric": "tag_coverage",
+          "field": "0",
+          "passed": true,
+          "expected": [
+            "cancelled",
+            "cancellation",
+            "cancelled-policy"
+          ],
+          "actual": [
+            "insurance-policy",
+            "cancellation"
+          ]
+        },
+        {
+          "metric": "tag_noise",
+          "field": "inr",
+          "passed": true,
+          "expected": "absent",
+          "actual": [
+            "insurance-policy",
+            "cancellation"
+          ]
+        },
+        {
+          "metric": "tag_noise",
+          "field": "notice",
+          "passed": true,
+          "expected": "absent",
+          "actual": [
+            "insurance-policy",
+            "cancellation"
+          ]
+        }
+      ],
+      "latency_seconds": 35.524,
+      "field_evidence": [
+        {
+          "page_number": 1,
+          "quote": "Premium: INR 12000",
+          "field": "premium"
+        },
+        {
+          "page_number": 1,
+          "quote": "Expiry Date: 31/12/2026",
+          "field": "expiry_date"
+        },
+        {
+          "page_number": 1,
+          "quote": "Provider: Example Insurance",
+          "field": "provider"
+        },
+        {
+          "page_number": 1,
+          "quote": "Policy Number: POL-204",
+          "field": "policy_number"
+        }
+      ],
+      "summary_evidence": [
+        {
+          "page_number": 1,
+          "quote": "This policy was cancelled effective 01/06/2026. No coverage remains. Refund INR 9000 issued.",
+          "field": null
+        },
+        {
+          "page_number": 1,
+          "quote": "INSURANCE POLICY CANCELLATION NOTICE",
+          "field": null
+        },
+        {
+          "page_number": 1,
+          "quote": "Expiry Date: 31/12/2026",
+          "field": null
+        },
+        {
+          "page_number": 1,
+          "quote": "Provider: Example Insurance",
+          "field": null
+        },
+        {
+          "page_number": 1,
+          "quote": "Policy Number: POL-204",
+          "field": null
+        },
+        {
+          "page_number": 1,
+          "quote": "Premium: INR 12000",
+          "field": null
+        }
+      ],
+      "quality_warnings": [
+        "unsupported_metadata:provider",
+        "unsupported_metadata:policy_number",
+        "status_change:reminders"
+      ],
+      "covered_pages": [
+        1
+      ],
+      "analysis": {
+        "provider": "ollama",
+        "model": "qwen3:1.7b",
+        "summary": "This policy was cancelled effective 01/06/2026. No coverage remains. Refund INR 9000 issued. INSURANCE POLICY CANCELLATION NOTICE Expiry Date: 31/12/2026 Provider: Example Insurance Policy Number: POL-204 Premium: INR 12000",
+        "keywords": [
+          "insurance",
+          "cancellation",
+          "provider",
+          "example",
+          "pol-204",
+          "premium",
+          "expiry",
+          "was",
+          "cancelled",
+          "effective",
+          "coverage",
+          "remains"
+        ],
+        "entities": [
+          {
+            "kind": "amount",
+            "value": "INR 12000",
+            "confidence_score": 0.7
+          },
+          {
+            "kind": "amount",
+            "value": "INR 9000",
+            "confidence_score": 0.7
+          },
+          {
+            "kind": "date",
+            "value": "31/12/2026",
+            "confidence_score": 0.7
+          },
+          {
+            "kind": "date",
+            "value": "01/06/2026",
+            "confidence_score": 0.7
+          }
+        ],
+        "suggested_tags": [
+          "insurance-policy",
+          "cancellation"
+        ],
+        "category": "insurance_policy",
+        "confidence_score": 1.0,
+        "extracted_metadata": {
+          "premium": 12000,
+          "expiry_date": "2026-12-31",
+          "provider": "Example Insurance",
+          "policy_number": "POL-204"
+        },
+        "field_evidence": [
+          {
+            "page_number": 1,
+            "quote": "Premium: INR 12000",
+            "field": "premium"
+          },
+          {
+            "page_number": 1,
+            "quote": "Expiry Date: 31/12/2026",
+            "field": "expiry_date"
+          },
+          {
+            "page_number": 1,
+            "quote": "Provider: Example Insurance",
+            "field": "provider"
+          },
+          {
+            "page_number": 1,
+            "quote": "Policy Number: POL-204",
+            "field": "policy_number"
+          }
+        ],
+        "summary_evidence": [
+          {
+            "page_number": 1,
+            "quote": "This policy was cancelled effective 01/06/2026. No coverage remains. Refund INR 9000 issued.",
+            "field": null
+          },
+          {
+            "page_number": 1,
+            "quote": "INSURANCE POLICY CANCELLATION NOTICE",
+            "field": null
+          },
+          {
+            "page_number": 1,
+            "quote": "Expiry Date: 31/12/2026",
+            "field": null
+          },
+          {
+            "page_number": 1,
+            "quote": "Provider: Example Insurance",
+            "field": null
+          },
+          {
+            "page_number": 1,
+            "quote": "Policy Number: POL-204",
+            "field": null
+          },
+          {
+            "page_number": 1,
+            "quote": "Premium: INR 12000",
+            "field": null
+          }
+        ],
+        "quality_warnings": [
+          "unsupported_metadata:provider",
+          "unsupported_metadata:policy_number",
+          "status_change:reminders"
+        ],
+        "covered_pages": [
+          1
+        ]
+      }
+    },
+    {
+      "name": "Salary with zero net pay",
+      "passed": true,
+      "provider": "ollama",
+      "model": "qwen3:1.7b",
+      "classification_confidence": 1.0,
+      "checks": [
+        {
+          "metric": "classification",
+          "field": "category",
+          "passed": true,
+          "expected": "salary_slip",
+          "actual": "salary_slip"
+        },
+        {
+          "metric": "metadata",
+          "field": "employer",
+          "passed": true,
+          "expected": "Example Company",
+          "actual": "Example Company"
+        },
+        {
+          "metric": "metadata",
+          "field": "month",
+          "passed": true,
+          "expected": 3,
+          "actual": 3
+        },
+        {
+          "metric": "metadata",
+          "field": "year",
+          "passed": true,
+          "expected": 2026,
+          "actual": 2026
+        },
+        {
+          "metric": "metadata",
+          "field": "net_salary",
+          "passed": true,
+          "expected": 0,
+          "actual": 0
+        },
+        {
+          "metric": "metadata",
+          "field": "gross_salary",
+          "passed": true,
+          "expected": 10000,
+          "actual": 10000
+        },
+        {
+          "metric": "summary_coverage",
+          "field": "0",
+          "passed": true,
+          "expected": [
+            "net salary: INR 0",
+            "net pay: INR 0",
+            "net pay is zero",
+            "net pay: 0",
+            "net salary: 0"
+          ],
+          "actual": "SALARY SLIP Employer: Example Company Month: March Year: 2026 Gross Salary: INR 10000 Net Pay: INR 0"
+        },
+        {
+          "metric": "tag_coverage",
+          "field": "0",
+          "passed": true,
+          "expected": [
+            "salary-slip",
+            "payroll"
+          ],
+          "actual": [
+            "salary-slip"
+          ]
+        },
+        {
+          "metric": "tag_noise",
+          "field": "inr",
+          "passed": true,
+          "expected": "absent",
+          "actual": [
+            "salary-slip"
+          ]
+        },
+        {
+          "metric": "tag_noise",
+          "field": "slip",
+          "passed": true,
+          "expected": "absent",
+          "actual": [
+            "salary-slip"
+          ]
+        },
+        {
+          "metric": "tag_noise",
+          "field": "employer",
+          "passed": true,
+          "expected": "absent",
+          "actual": [
+            "salary-slip"
+          ]
+        }
+      ],
+      "latency_seconds": 35.396,
+      "field_evidence": [
+        {
+          "page_number": 1,
+          "quote": "Employer: Example Company",
+          "field": "employer"
+        },
+        {
+          "page_number": 1,
+          "quote": "Month: March",
+          "field": "month"
+        },
+        {
+          "page_number": 1,
+          "quote": "Year: 2026",
+          "field": "year"
+        },
+        {
+          "page_number": 1,
+          "quote": "Gross Salary: INR 10000",
+          "field": "gross_salary"
+        },
+        {
+          "page_number": 1,
+          "quote": "Net Pay: INR 0",
+          "field": "net_salary"
+        }
+      ],
+      "summary_evidence": [
+        {
+          "page_number": 1,
+          "quote": "SALARY SLIP",
+          "field": null
+        },
+        {
+          "page_number": 1,
+          "quote": "Employer: Example Company",
+          "field": null
+        },
+        {
+          "page_number": 1,
+          "quote": "Month: March",
+          "field": null
+        },
+        {
+          "page_number": 1,
+          "quote": "Year: 2026",
+          "field": null
+        },
+        {
+          "page_number": 1,
+          "quote": "Gross Salary: INR 10000",
+          "field": null
+        },
+        {
+          "page_number": 1,
+          "quote": "Net Pay: INR 0",
+          "field": null
+        }
+      ],
+      "quality_warnings": [],
+      "covered_pages": [
+        1
+      ],
+      "analysis": {
+        "provider": "ollama",
+        "model": "qwen3:1.7b",
+        "summary": "SALARY SLIP Employer: Example Company Month: March Year: 2026 Gross Salary: INR 10000 Net Pay: INR 0",
+        "keywords": [
+          "example",
+          "company",
+          "month",
+          "march",
+          "year",
+          "gross",
+          "deductions",
+          "net",
+          "pay"
+        ],
+        "entities": [
+          {
+            "kind": "amount",
+            "value": "INR 10000",
+            "confidence_score": 0.7
+          },
+          {
+            "kind": "amount",
+            "value": "INR 10000",
+            "confidence_score": 0.7
+          },
+          {
+            "kind": "amount",
+            "value": "INR 0",
+            "confidence_score": 0.7
+          }
+        ],
+        "suggested_tags": [
+          "salary-slip"
+        ],
+        "category": "salary_slip",
+        "confidence_score": 1.0,
+        "extracted_metadata": {
+          "employer": "Example Company",
+          "month": 3,
+          "year": 2026,
+          "gross_salary": 10000,
+          "net_salary": 0
+        },
+        "field_evidence": [
+          {
+            "page_number": 1,
+            "quote": "Employer: Example Company",
+            "field": "employer"
+          },
+          {
+            "page_number": 1,
+            "quote": "Month: March",
+            "field": "month"
+          },
+          {
+            "page_number": 1,
+            "quote": "Year: 2026",
+            "field": "year"
+          },
+          {
+            "page_number": 1,
+            "quote": "Gross Salary: INR 10000",
+            "field": "gross_salary"
+          },
+          {
+            "page_number": 1,
+            "quote": "Net Pay: INR 0",
+            "field": "net_salary"
+          }
+        ],
+        "summary_evidence": [
+          {
+            "page_number": 1,
+            "quote": "SALARY SLIP",
+            "field": null
+          },
+          {
+            "page_number": 1,
+            "quote": "Employer: Example Company",
+            "field": null
+          },
+          {
+            "page_number": 1,
+            "quote": "Month: March",
+            "field": null
+          },
+          {
+            "page_number": 1,
+            "quote": "Year: 2026",
+            "field": null
+          },
+          {
+            "page_number": 1,
+            "quote": "Gross Salary: INR 10000",
+            "field": null
+          },
+          {
+            "page_number": 1,
+            "quote": "Net Pay: INR 0",
+            "field": null
+          }
+        ],
+        "quality_warnings": [],
+        "covered_pages": [
+          1
+        ]
+      }
+    },
+    {
+      "name": "Card statement distinguishes minimum from total due",
+      "passed": true,
+      "provider": "ollama",
+      "model": "qwen3:1.7b",
+      "classification_confidence": 1.0,
+      "checks": [
+        {
+          "metric": "classification",
+          "field": "category",
+          "passed": true,
+          "expected": "credit_card_statement",
+          "actual": "credit_card_statement"
+        },
+        {
+          "metric": "metadata",
+          "field": "bank",
+          "passed": true,
+          "expected": "Example Bank",
+          "actual": "Example Bank"
+        },
+        {
+          "metric": "metadata",
+          "field": "due_date",
+          "passed": true,
+          "expected": "2026-10-20",
+          "actual": "2026-10-20"
+        },
+        {
+          "metric": "metadata",
+          "field": "total_due",
+          "passed": true,
+          "expected": 42000,
+          "actual": 42000
+        },
+        {
+          "metric": "metadata",
+          "field": "minimum_due",
+          "passed": true,
+          "expected": 2100,
+          "actual": 2100
+        },
+        {
+          "metric": "summary_coverage",
+          "field": "0",
+          "passed": true,
+          "expected": [
+            "42000",
+            "42,000"
+          ],
+          "actual": "Statement Period: September 2026 Total Due: INR 42000 Minimum Due: INR 2100 Bank: Example Bank Due Date: 20/10/2026"
+        },
+        {
+          "metric": "summary_coverage",
+          "field": "1",
+          "passed": true,
+          "expected": [
+            "2100",
+            "2,100"
+          ],
+          "actual": "Statement Period: September 2026 Total Due: INR 42000 Minimum Due: INR 2100 Bank: Example Bank Due Date: 20/10/2026"
+        },
+        {
+          "metric": "summary_coverage",
+          "field": "2",
+          "passed": true,
+          "expected": [
+            "20/10/2026",
+            "2026-10-20",
+            "20 October 2026"
+          ],
+          "actual": "Statement Period: September 2026 Total Due: INR 42000 Minimum Due: INR 2100 Bank: Example Bank Due Date: 20/10/2026"
+        },
+        {
+          "metric": "summary_contradiction",
+          "field": "minimum payment settles the full balance",
+          "passed": true,
+          "expected": "absent",
+          "actual": "Statement Period: September 2026 Total Due: INR 42000 Minimum Due: INR 2100 Bank: Example Bank Due Date: 20/10/2026"
+        },
+        {
+          "metric": "tag_coverage",
+          "field": "0",
+          "passed": true,
+          "expected": [
+            "credit-card-statement",
+            "credit-card"
+          ],
+          "actual": [
+            "credit-card-statement"
+          ]
+        },
+        {
+          "metric": "tag_noise",
+          "field": "inr",
+          "passed": true,
+          "expected": "absent",
+          "actual": [
+            "credit-card-statement"
+          ]
+        },
+        {
+          "metric": "tag_noise",
+          "field": "minimum",
+          "passed": true,
+          "expected": "absent",
+          "actual": [
+            "credit-card-statement"
+          ]
+        },
+        {
+          "metric": "tag_noise",
+          "field": "due",
+          "passed": true,
+          "expected": "absent",
+          "actual": [
+            "credit-card-statement"
+          ]
+        }
+      ],
+      "latency_seconds": 40.891,
+      "field_evidence": [
+        {
+          "page_number": 1,
+          "quote": "Bank: Example Bank",
+          "field": "bank"
+        },
+        {
+          "page_number": 1,
+          "quote": "Statement Period: September 2026",
+          "field": "statement_period"
+        },
+        {
+          "page_number": 1,
+          "quote": "Due Date: 20/10/2026",
+          "field": "due_date"
+        },
+        {
+          "page_number": 1,
+          "quote": "Total Due: INR 42000",
+          "field": "total_due"
+        },
+        {
+          "page_number": 1,
+          "quote": "Minimum Due: INR 2100",
+          "field": "minimum_due"
+        }
+      ],
+      "summary_evidence": [
+        {
+          "page_number": 1,
+          "quote": "Statement Period: September 2026",
+          "field": null
+        },
+        {
+          "page_number": 1,
+          "quote": "Total Due: INR 42000",
+          "field": null
+        },
+        {
+          "page_number": 1,
+          "quote": "Minimum Due: INR 2100",
+          "field": null
+        },
+        {
+          "page_number": 1,
+          "quote": "Bank: Example Bank",
+          "field": null
+        },
+        {
+          "page_number": 1,
+          "quote": "Due Date: 20/10/2026",
+          "field": null
+        }
+      ],
+      "quality_warnings": [],
+      "covered_pages": [
+        1
+      ],
+      "analysis": {
+        "provider": "ollama",
+        "model": "qwen3:1.7b",
+        "summary": "Statement Period: September 2026 Total Due: INR 42000 Minimum Due: INR 2100 Bank: Example Bank Due Date: 20/10/2026",
+        "keywords": [
+          "example",
+          "period",
+          "september",
+          "paying",
+          "does",
+          "settle",
+          "full",
+          "balance"
+        ],
+        "entities": [
+          {
+            "kind": "amount",
+            "value": "INR 42000",
+            "confidence_score": 0.7
+          },
+          {
+            "kind": "amount",
+            "value": "INR 2100",
+            "confidence_score": 0.7
+          },
+          {
+            "kind": "date",
+            "value": "20/10/2026",
+            "confidence_score": 0.7
+          }
+        ],
+        "suggested_tags": [
+          "credit-card-statement"
+        ],
+        "category": "credit_card_statement",
+        "confidence_score": 1.0,
+        "extracted_metadata": {
+          "bank": "Example Bank",
+          "statement_period": "September 2026",
+          "due_date": "2026-10-20",
+          "total_due": 42000,
+          "minimum_due": 2100
+        },
+        "field_evidence": [
+          {
+            "page_number": 1,
+            "quote": "Bank: Example Bank",
+            "field": "bank"
+          },
+          {
+            "page_number": 1,
+            "quote": "Statement Period: September 2026",
+            "field": "statement_period"
+          },
+          {
+            "page_number": 1,
+            "quote": "Due Date: 20/10/2026",
+            "field": "due_date"
+          },
+          {
+            "page_number": 1,
+            "quote": "Total Due: INR 42000",
+            "field": "total_due"
+          },
+          {
+            "page_number": 1,
+            "quote": "Minimum Due: INR 2100",
+            "field": "minimum_due"
+          }
+        ],
+        "summary_evidence": [
+          {
+            "page_number": 1,
+            "quote": "Statement Period: September 2026",
+            "field": null
+          },
+          {
+            "page_number": 1,
+            "quote": "Total Due: INR 42000",
+            "field": null
+          },
+          {
+            "page_number": 1,
+            "quote": "Minimum Due: INR 2100",
+            "field": null
+          },
+          {
+            "page_number": 1,
+            "quote": "Bank: Example Bank",
+            "field": null
+          },
+          {
+            "page_number": 1,
+            "quote": "Due Date: 20/10/2026",
+            "field": null
+          }
+        ],
+        "quality_warnings": [],
+        "covered_pages": [
+          1
+        ]
+      }
+    },
+    {
+      "name": "Clinical finding preserves negation",
+      "passed": true,
+      "provider": "ollama",
+      "model": "qwen3:1.7b",
+      "classification_confidence": 1.0,
+      "checks": [
+        {
+          "metric": "classification",
+          "field": "category",
+          "passed": true,
+          "expected": "medical_report",
+          "actual": "medical_report"
+        },
+        {
+          "metric": "metadata",
+          "field": "provider",
+          "passed": true,
+          "expected": "Example Diagnostics",
+          "actual": "Example Diagnostics"
+        },
+        {
+          "metric": "metadata",
+          "field": "patient_name",
+          "passed": true,
+          "expected": "Example Person",
+          "actual": "Example Person"
+        },
+        {
+          "metric": "metadata",
+          "field": "report_date",
+          "passed": true,
+          "expected": "2026-07-11",
+          "actual": "2026-07-11"
+        },
+        {
+          "metric": "summary_coverage",
+          "field": "0",
+          "passed": true,
+          "expected": [
+            "no evidence of fracture",
+            "no fracture",
+            "fracture excluded"
+          ],
+          "actual": "Findings: No evidence of fracture. Mild soft tissue swelling. Follow-up advised if symptoms persist. Report Date: 11/07/2026 Patient Name: Example Person Provider: Example Diagnostics"
+        },
+        {
+          "metric": "summary_coverage",
+          "field": "1",
+          "passed": true,
+          "expected": [
+            "swelling"
+          ],
+          "actual": "Findings: No evidence of fracture. Mild soft tissue swelling. Follow-up advised if symptoms persist. Report Date: 11/07/2026 Patient Name: Example Person Provider: Example Diagnostics"
+        },
+        {
+          "metric": "summary_contradiction",
+          "field": "fracture confirmed",
+          "passed": true,
+          "expected": "absent",
+          "actual": "Findings: No evidence of fracture. Mild soft tissue swelling. Follow-up advised if symptoms persist. Report Date: 11/07/2026 Patient Name: Example Person Provider: Example Diagnostics"
+        },
+        {
+          "metric": "summary_contradiction",
+          "field": "fracture detected",
+          "passed": true,
+          "expected": "absent",
+          "actual": "Findings: No evidence of fracture. Mild soft tissue swelling. Follow-up advised if symptoms persist. Report Date: 11/07/2026 Patient Name: Example Person Provider: Example Diagnostics"
+        },
+        {
+          "metric": "tag_coverage",
+          "field": "0",
+          "passed": true,
+          "expected": [
+            "medical-report",
+            "medical"
+          ],
+          "actual": [
+            "medical-report"
+          ]
+        },
+        {
+          "metric": "tag_noise",
+          "field": "provider",
+          "passed": true,
+          "expected": "absent",
+          "actual": [
+            "medical-report"
+          ]
+        },
+        {
+          "metric": "tag_noise",
+          "field": "name",
+          "passed": true,
+          "expected": "absent",
+          "actual": [
+            "medical-report"
+          ]
+        }
+      ],
+      "latency_seconds": 42.75,
+      "field_evidence": [
+        {
+          "page_number": 1,
+          "quote": "Patient Name: Example Person",
+          "field": "patient_name"
+        },
+        {
+          "page_number": 1,
+          "quote": "Report Date: 11/07/2026",
+          "field": "report_date"
+        },
+        {
+          "page_number": 1,
+          "quote": "Findings: No evidence of fracture. Mild soft tissue swelling. Follow-up advised if symptoms persist.",
+          "field": "findings"
+        },
+        {
+          "page_number": 1,
+          "quote": "Provider: Example Diagnostics",
+          "field": "provider"
+        }
+      ],
+      "summary_evidence": [
+        {
+          "page_number": 1,
+          "quote": "Findings: No evidence of fracture. Mild soft tissue swelling. Follow-up advised if symptoms persist.",
+          "field": null
+        },
+        {
+          "page_number": 1,
+          "quote": "Report Date: 11/07/2026",
+          "field": null
+        },
+        {
+          "page_number": 1,
+          "quote": "Patient Name: Example Person",
+          "field": null
+        },
+        {
+          "page_number": 1,
+          "quote": "Provider: Example Diagnostics",
+          "field": null
+        }
+      ],
+      "quality_warnings": [
+        "unsupported_metadata:provider"
+      ],
+      "covered_pages": [
+        1
+      ],
+      "analysis": {
+        "provider": "ollama",
+        "model": "qwen3:1.7b",
+        "summary": "Findings: No evidence of fracture. Mild soft tissue swelling. Follow-up advised if symptoms persist. Report Date: 11/07/2026 Patient Name: Example Person Provider: Example Diagnostics",
+        "keywords": [
+          "report",
+          "example",
+          "clinical",
+          "medical",
+          "provider",
+          "diagnostics",
+          "patient",
+          "person",
+          "findings",
+          "evidence",
+          "fracture",
+          "mild"
+        ],
+        "entities": [
+          {
+            "kind": "date",
+            "value": "11/07/2026",
+            "confidence_score": 0.7
+          }
+        ],
+        "suggested_tags": [
+          "medical-report"
+        ],
+        "category": "medical_report",
+        "confidence_score": 1.0,
+        "extracted_metadata": {
+          "patient_name": "Example Person",
+          "report_date": "2026-07-11",
+          "findings": [
+            {
+              "text": "No evidence of fracture."
+            },
+            {
+              "text": "Mild soft tissue swelling."
+            },
+            {
+              "text": "Follow-up advised if symptoms persist."
+            }
+          ],
+          "provider": "Example Diagnostics"
+        },
+        "field_evidence": [
+          {
+            "page_number": 1,
+            "quote": "Patient Name: Example Person",
+            "field": "patient_name"
+          },
+          {
+            "page_number": 1,
+            "quote": "Report Date: 11/07/2026",
+            "field": "report_date"
+          },
+          {
+            "page_number": 1,
+            "quote": "Findings: No evidence of fracture. Mild soft tissue swelling. Follow-up advised if symptoms persist.",
+            "field": "findings"
+          },
+          {
+            "page_number": 1,
+            "quote": "Provider: Example Diagnostics",
+            "field": "provider"
+          }
+        ],
+        "summary_evidence": [
+          {
+            "page_number": 1,
+            "quote": "Findings: No evidence of fracture. Mild soft tissue swelling. Follow-up advised if symptoms persist.",
+            "field": null
+          },
+          {
+            "page_number": 1,
+            "quote": "Report Date: 11/07/2026",
+            "field": null
+          },
+          {
+            "page_number": 1,
+            "quote": "Patient Name: Example Person",
+            "field": null
+          },
+          {
+            "page_number": 1,
+            "quote": "Provider: Example Diagnostics",
+            "field": null
+          }
+        ],
+        "quality_warnings": [
+          "unsupported_metadata:provider"
+        ],
+        "covered_pages": [
+          1
+        ]
+      }
+    },
+    {
+      "name": "Withdrawn offer must preserve withdrawal",
+      "passed": true,
+      "provider": "ollama",
+      "model": "qwen3:1.7b",
+      "classification_confidence": 1.0,
+      "checks": [
+        {
+          "metric": "classification",
+          "field": "category",
+          "passed": true,
+          "expected": "offer_letter",
+          "actual": "offer_letter"
+        },
+        {
+          "metric": "metadata",
+          "field": "employer",
+          "passed": true,
+          "expected": "Example Software",
+          "actual": "Example Software"
+        },
+        {
+          "metric": "metadata",
+          "field": "position",
+          "passed": true,
+          "expected": "Engineer",
+          "actual": "Engineer"
+        },
+        {
+          "metric": "metadata",
+          "field": "offer_date",
+          "passed": true,
+          "expected": "2026-07-01",
+          "actual": "2026-07-01"
+        },
+        {
+          "metric": "summary_coverage",
+          "field": "0",
+          "passed": true,
+          "expected": [
+            "withdrawn",
+            "withdrawal",
+            "rescinded"
+          ],
+          "actual": "The employment offer has been withdrawn. The candidate must not report for joining. WITHDRAWAL OF OFFER LETTER Employer: Example Software Position: Engineer Offer Date: 01/07/2026 Joining Date: 01/08/2026"
+        },
+        {
+          "metric": "summary_coverage",
+          "field": "1",
+          "passed": true,
+          "expected": [
+            "must not report",
+            "do not join",
+            "should not report"
+          ],
+          "actual": "The employment offer has been withdrawn. The candidate must not report for joining. WITHDRAWAL OF OFFER LETTER Employer: Example Software Position: Engineer Offer Date: 01/07/2026 Joining Date: 01/08/2026"
+        },
+        {
+          "metric": "summary_contradiction",
+          "field": "offer is active",
+          "passed": true,
+          "expected": "absent",
+          "actual": "The employment offer has been withdrawn. The candidate must not report for joining. WITHDRAWAL OF OFFER LETTER Employer: Example Software Position: Engineer Offer Date: 01/07/2026 Joining Date: 01/08/2026"
+        },
+        {
+          "metric": "summary_contradiction",
+          "field": "report for joining on",
+          "passed": true,
+          "expected": "absent",
+          "actual": "The employment offer has been withdrawn. The candidate must not report for joining. WITHDRAWAL OF OFFER LETTER Employer: Example Software Position: Engineer Offer Date: 01/07/2026 Joining Date: 01/08/2026"
+        },
+        {
+          "metric": "tag_coverage",
+          "field": "0",
+          "passed": true,
+          "expected": [
+            "withdrawn",
+            "withdrawal",
+            "offer-withdrawal"
+          ],
+          "actual": [
+            "offer-letter",
+            "withdrawal"
+          ]
+        },
+        {
+          "metric": "tag_noise",
+          "field": "employer",
+          "passed": true,
+          "expected": "absent",
+          "actual": [
+            "offer-letter",
+            "withdrawal"
+          ]
+        },
+        {
+          "metric": "tag_noise",
+          "field": "position",
+          "passed": true,
+          "expected": "absent",
+          "actual": [
+            "offer-letter",
+            "withdrawal"
+          ]
+        }
+      ],
+      "latency_seconds": 44.957,
+      "field_evidence": [
+        {
+          "page_number": 1,
+          "quote": "Employer: Example Software",
+          "field": "employer"
+        },
+        {
+          "page_number": 1,
+          "quote": "Position: Engineer",
+          "field": "position"
+        },
+        {
+          "page_number": 1,
+          "quote": "Offer Date: 01/07/2026",
+          "field": "offer_date"
+        },
+        {
+          "page_number": 1,
+          "quote": "Joining Date: 01/08/2026",
+          "field": "joining_date"
+        }
+      ],
+      "summary_evidence": [
+        {
+          "page_number": 1,
+          "quote": "The employment offer has been withdrawn. The candidate must not report for joining.",
+          "field": null
+        },
+        {
+          "page_number": 1,
+          "quote": "WITHDRAWAL OF OFFER LETTER",
+          "field": null
+        },
+        {
+          "page_number": 1,
+          "quote": "Employer: Example Software",
+          "field": null
+        },
+        {
+          "page_number": 1,
+          "quote": "Position: Engineer",
+          "field": null
+        },
+        {
+          "page_number": 1,
+          "quote": "Offer Date: 01/07/2026",
+          "field": null
+        },
+        {
+          "page_number": 1,
+          "quote": "Joining Date: 01/08/2026",
+          "field": null
+        }
+      ],
+      "quality_warnings": [
+        "unsupported_metadata:employer",
+        "unsupported_metadata:position",
+        "unsupported_metadata:offer_date",
+        "unsupported_metadata:joining_date",
+        "unsupported_metadata:annual_compensation",
+        "status_change:reminders"
+      ],
+      "covered_pages": [
+        1
+      ],
+      "analysis": {
+        "provider": "ollama",
+        "model": "qwen3:1.7b",
+        "summary": "The employment offer has been withdrawn. The candidate must not report for joining. WITHDRAWAL OF OFFER LETTER Employer: Example Software Position: Engineer Offer Date: 01/07/2026 Joining Date: 01/08/2026",
+        "keywords": [
+          "offer",
+          "joining",
+          "withdrawal",
+          "letter",
+          "example",
+          "software",
+          "engineer",
+          "employment",
+          "withdrawn",
+          "candidate",
+          "must",
+          "report"
+        ],
+        "entities": [
+          {
+            "kind": "date",
+            "value": "01/07/2026",
+            "confidence_score": 0.7
+          },
+          {
+            "kind": "date",
+            "value": "01/08/2026",
+            "confidence_score": 0.7
+          }
+        ],
+        "suggested_tags": [
+          "offer-letter",
+          "withdrawal"
+        ],
+        "category": "offer_letter",
+        "confidence_score": 1.0,
+        "extracted_metadata": {
+          "employer": "Example Software",
+          "position": "Engineer",
+          "offer_date": "2026-07-01",
+          "joining_date": "2026-08-01"
+        },
+        "field_evidence": [
+          {
+            "page_number": 1,
+            "quote": "Employer: Example Software",
+            "field": "employer"
+          },
+          {
+            "page_number": 1,
+            "quote": "Position: Engineer",
+            "field": "position"
+          },
+          {
+            "page_number": 1,
+            "quote": "Offer Date: 01/07/2026",
+            "field": "offer_date"
+          },
+          {
+            "page_number": 1,
+            "quote": "Joining Date: 01/08/2026",
+            "field": "joining_date"
+          }
+        ],
+        "summary_evidence": [
+          {
+            "page_number": 1,
+            "quote": "The employment offer has been withdrawn. The candidate must not report for joining.",
+            "field": null
+          },
+          {
+            "page_number": 1,
+            "quote": "WITHDRAWAL OF OFFER LETTER",
+            "field": null
+          },
+          {
+            "page_number": 1,
+            "quote": "Employer: Example Software",
+            "field": null
+          },
+          {
+            "page_number": 1,
+            "quote": "Position: Engineer",
+            "field": null
+          },
+          {
+            "page_number": 1,
+            "quote": "Offer Date: 01/07/2026",
+            "field": null
+          },
+          {
+            "page_number": 1,
+            "quote": "Joining Date: 01/08/2026",
+            "field": null
+          }
+        ],
+        "quality_warnings": [
+          "unsupported_metadata:employer",
+          "unsupported_metadata:position",
+          "unsupported_metadata:offer_date",
+          "unsupported_metadata:joining_date",
+          "unsupported_metadata:annual_compensation",
+          "status_change:reminders"
+        ],
+        "covered_pages": [
+          1
+        ]
+      }
+    },
+    {
+      "name": "Statement table preserves closing balance",
+      "passed": true,
+      "provider": "ollama",
+      "model": "qwen3:1.7b",
+      "classification_confidence": 1.0,
+      "checks": [
+        {
+          "metric": "classification",
+          "field": "category",
+          "passed": true,
+          "expected": "bank_statement",
+          "actual": "bank_statement"
+        },
+        {
+          "metric": "metadata",
+          "field": "bank",
+          "passed": true,
+          "expected": "Example Bank",
+          "actual": "Example Bank"
+        },
+        {
+          "metric": "metadata",
+          "field": "account_last_four",
+          "passed": true,
+          "expected": "4321",
+          "actual": "4321"
+        },
+        {
+          "metric": "metadata",
+          "field": "opening_balance",
+          "passed": true,
+          "expected": 45000,
+          "actual": 45000
+        },
+        {
+          "metric": "metadata",
+          "field": "closing_balance",
+          "passed": true,
+          "expected": 51200,
+          "actual": 51200
+        },
+        {
+          "metric": "summary_coverage",
+          "field": "0",
+          "passed": true,
+          "expected": [
+            "51200",
+            "51,200"
+          ],
+          "actual": "Opening Balance INR 45000 Closing Balance INR 51200 Bank Example Bank Account Last Four 4321 Statement Start 01/09/2026 Statement End 30/09/2026"
+        },
+        {
+          "metric": "summary_coverage",
+          "field": "1",
+          "passed": true,
+          "expected": [
+            "4321"
+          ],
+          "actual": "Opening Balance INR 45000 Closing Balance INR 51200 Bank Example Bank Account Last Four 4321 Statement Start 01/09/2026 Statement End 30/09/2026"
+        },
+        {
+          "metric": "tag_coverage",
+          "field": "0",
+          "passed": true,
+          "expected": [
+            "bank-statement",
+            "banking"
+          ],
+          "actual": [
+            "bank-statement"
+          ]
+        },
+        {
+          "metric": "tag_noise",
+          "field": "debit",
+          "passed": true,
+          "expected": "absent",
+          "actual": [
+            "bank-statement"
+          ]
+        },
+        {
+          "metric": "tag_noise",
+          "field": "credit",
+          "passed": true,
+          "expected": "absent",
+          "actual": [
+            "bank-statement"
+          ]
+        },
+        {
+          "metric": "tag_noise",
+          "field": "inr",
+          "passed": true,
+          "expected": "absent",
+          "actual": [
+            "bank-statement"
+          ]
+        },
+        {
+          "metric": "tag_noise",
+          "field": "last",
+          "passed": true,
+          "expected": "absent",
+          "actual": [
+            "bank-statement"
+          ]
+        }
+      ],
+      "latency_seconds": 44.095,
+      "field_evidence": [
+        {
+          "page_number": 1,
+          "quote": "Bank Example Bank",
+          "field": "bank"
+        },
+        {
+          "page_number": 1,
+          "quote": "Account Last Four 4321",
+          "field": "account_last_four"
+        },
+        {
+          "page_number": 1,
+          "quote": "Statement Start 01/09/2026",
+          "field": "statement_start"
+        },
+        {
+          "page_number": 1,
+          "quote": "Statement End 30/09/2026",
+          "field": "statement_end"
+        },
+        {
+          "page_number": 1,
+          "quote": "Opening Balance INR 45000",
+          "field": "opening_balance"
+        },
+        {
+          "page_number": 1,
+          "quote": "Closing Balance INR 51200",
+          "field": "closing_balance"
+        }
+      ],
+      "summary_evidence": [
+        {
+          "page_number": 1,
+          "quote": "Opening Balance INR 45000",
+          "field": null
+        },
+        {
+          "page_number": 1,
+          "quote": "Closing Balance INR 51200",
+          "field": null
+        },
+        {
+          "page_number": 1,
+          "quote": "Bank Example Bank",
+          "field": null
+        },
+        {
+          "page_number": 1,
+          "quote": "Account Last Four 4321",
+          "field": null
+        },
+        {
+          "page_number": 1,
+          "quote": "Statement Start 01/09/2026",
+          "field": null
+        },
+        {
+          "page_number": 1,
+          "quote": "Statement End 30/09/2026",
+          "field": null
+        }
+      ],
+      "quality_warnings": [],
+      "covered_pages": [
+        1
+      ],
+      "analysis": {
+        "provider": "ollama",
+        "model": "qwen3:1.7b",
+        "summary": "Opening Balance INR 45000 Closing Balance INR 51200 Bank Example Bank Account Last Four 4321 Statement Start 01/09/2026 Statement End 30/09/2026",
+        "keywords": [
+          "balance",
+          "example",
+          "account",
+          "four",
+          "start",
+          "end",
+          "opening",
+          "closing",
+          "description"
+        ],
+        "entities": [
+          {
+            "kind": "amount",
+            "value": "INR 45000",
+            "confidence_score": 0.7
+          },
+          {
+            "kind": "amount",
+            "value": "INR 51200",
+            "confidence_score": 0.7
+          },
+          {
+            "kind": "date",
+            "value": "01/09/2026",
+            "confidence_score": 0.7
+          },
+          {
+            "kind": "date",
+            "value": "30/09/2026",
+            "confidence_score": 0.7
+          },
+          {
+            "kind": "date",
+            "value": "30/09/2026",
+            "confidence_score": 0.7
+          }
+        ],
+        "suggested_tags": [
+          "bank-statement"
+        ],
+        "category": "bank_statement",
+        "confidence_score": 1.0,
+        "extracted_metadata": {
+          "bank": "Example Bank",
+          "account_last_four": "4321",
+          "statement_start": "2026-09-01",
+          "statement_end": "2026-09-30",
+          "opening_balance": 45000,
+          "closing_balance": 51200
+        },
+        "field_evidence": [
+          {
+            "page_number": 1,
+            "quote": "Bank Example Bank",
+            "field": "bank"
+          },
+          {
+            "page_number": 1,
+            "quote": "Account Last Four 4321",
+            "field": "account_last_four"
+          },
+          {
+            "page_number": 1,
+            "quote": "Statement Start 01/09/2026",
+            "field": "statement_start"
+          },
+          {
+            "page_number": 1,
+            "quote": "Statement End 30/09/2026",
+            "field": "statement_end"
+          },
+          {
+            "page_number": 1,
+            "quote": "Opening Balance INR 45000",
+            "field": "opening_balance"
+          },
+          {
+            "page_number": 1,
+            "quote": "Closing Balance INR 51200",
+            "field": "closing_balance"
+          }
+        ],
+        "summary_evidence": [
+          {
+            "page_number": 1,
+            "quote": "Opening Balance INR 45000",
+            "field": null
+          },
+          {
+            "page_number": 1,
+            "quote": "Closing Balance INR 51200",
+            "field": null
+          },
+          {
+            "page_number": 1,
+            "quote": "Bank Example Bank",
+            "field": null
+          },
+          {
+            "page_number": 1,
+            "quote": "Account Last Four 4321",
+            "field": null
+          },
+          {
+            "page_number": 1,
+            "quote": "Statement Start 01/09/2026",
+            "field": null
+          },
+          {
+            "page_number": 1,
+            "quote": "Statement End 30/09/2026",
+            "field": null
+          }
+        ],
+        "quality_warnings": [],
+        "covered_pages": [
+          1
+        ]
+      }
+    }
+  ],
+  "limitations": [
+    "Summary checks measure annotated phrase coverage and contradictions, not all factuality.",
+    "Only annotated metadata fields and tag facets are scored; unannotated claims need review.",
+    "Synthetic text cases do not measure photographed-document OCR or semantic retrieval."
+  ],
+  "corpus_complete": true,
+  "corpus_cases_total": 8,
+  "corpus_sha256": "55a519a36c045ea2c3634b758cd21436a3ba71ae74fa956af23645b86d857399",
+  "requested_provider": "ollama",
+  "inference_identity": {
+    "model_manifest_digest": "8f68893c685c3ddff2aa3fffce2aa60a30bb2da65ca488b61fff134a4d1730e7",
+    "server_version": "0.40.5",
+    "analysis_contract": "grounded-lines-v2",
+    "context_tokens": 16384,
+    "max_output_tokens": 2048,
+    "analysis_source_sha256": "9bb00b9499144d3971813f40e97aeec587324fb050c9a786c383d9a81a13c47d"
+  }
+}
