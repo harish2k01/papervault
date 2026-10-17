@@ -104,8 +104,9 @@ an 8,192-token context. Each source window has a conservative input budget plus
 2,048 output tokens. Windows cover source pages instead of truncating a document at
 a fixed character count. A 300-second request timeout surfaces failures for review.
 The smaller context allocation avoids memory pressure observed at the 6 GiB limit
-with a 16,384-token context. The existing 6,000-byte source window still fits within
-the conservative input budget; every source page remains scheduled for analysis.
+with a 16,384-token context. Source windows of up to 6,000 bytes are subdivided
+further when needed to fit the conservative input budget. Every source page remains
+scheduled for analysis; larger pages can require more requests and take longer.
 Text becomes ready and searchable before enrichment is queued. Slow model analysis
 therefore does not occupy the ingestion consumer or block OCR of later uploads.
 `analysis_pending:metadata` remains visible until enrichment completes. Broker
