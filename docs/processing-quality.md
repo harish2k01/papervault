@@ -105,12 +105,22 @@ on available hardware.
 
 ## Grounded local analysis
 
-The `grounded-lines-v2` contract sends numbered source lines to a private Ollama
+The `grounded-lines-v3` contract sends numbered source passages to a private Ollama
 endpoint. Structured output restricts categories and field names. The server builds
 quotes from selected lines, normalizes dates using the configured locale, verifies
 values against the source, and rejects invalid references. Explicit colon, tab, and
 line-separated labels are also parsed directly. Conflicting values are withheld.
 These checks establish source support, not that every field has the right meaning.
+
+Version three groups conservative prose continuations created by PDF visual line
+wraps. Source offsets still cover the original contiguous text. Headings, explicit
+labels, tab/space-separated table rows and new list items stay separate. Explicit
+date phrases can recover a complete source span across lines even when model line
+selection omits it; only simple connecting words are allowed between the date label
+and its value. An unspecified start date cannot borrow a later end date. This is a
+bounded heuristic, not general PDF layout reconstruction. The additional
+`processing_wrapped_pdf.json` case reproduces text extracted from a real synthetic
+PDF whose joining date and conditional termination sentences span physical lines.
 
 Version two requires both a typed value and line references for each selected fact.
 It recognizes narrative joining/end dates, ordinal and month-first dates, explicit
