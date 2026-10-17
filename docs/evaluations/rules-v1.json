@@ -1,0 +1,1031 @@
+{
+  "schema_version": 1,
+  "passed": false,
+  "cases_passed": 1,
+  "cases_total": 8,
+  "metrics": {
+    "classification": {
+      "passed": 8,
+      "total": 8,
+      "rate": 1.0
+    },
+    "metadata": {
+      "passed": 22,
+      "total": 30,
+      "rate": 0.7333
+    },
+    "summary_coverage": {
+      "passed": 10,
+      "total": 18,
+      "rate": 0.5556
+    },
+    "tag_coverage": {
+      "passed": 8,
+      "total": 8,
+      "rate": 1.0
+    },
+    "tag_noise": {
+      "passed": 11,
+      "total": 22,
+      "rate": 0.5
+    },
+    "summary_contradiction": {
+      "passed": 7,
+      "total": 7,
+      "rate": 1.0
+    }
+  },
+  "cases": [
+    {
+      "name": "Invoice with colon-delimited labels",
+      "passed": false,
+      "provider": "local",
+      "model": "rules-v1",
+      "classification_confidence": 0.95,
+      "checks": [
+        {
+          "metric": "classification",
+          "field": "category",
+          "passed": true,
+          "expected": "invoice",
+          "actual": "invoice"
+        },
+        {
+          "metric": "metadata",
+          "field": "vendor",
+          "passed": true,
+          "expected": "Acme Electronics",
+          "actual": "Acme Electronics"
+        },
+        {
+          "metric": "metadata",
+          "field": "invoice_number",
+          "passed": true,
+          "expected": "INV-204",
+          "actual": "INV-204"
+        },
+        {
+          "metric": "metadata",
+          "field": "purchase_date",
+          "passed": true,
+          "expected": "2026-07-11",
+          "actual": "2026-07-11"
+        },
+        {
+          "metric": "metadata",
+          "field": "total_amount",
+          "passed": true,
+          "expected": 124999.5,
+          "actual": 124999.5
+        },
+        {
+          "metric": "summary_coverage",
+          "field": "0",
+          "passed": true,
+          "expected": [
+            "Acme Electronics"
+          ],
+          "actual": "This document is classified as Invoice. Extracted details include vendor: Acme Electronics; invoice number: INV-204; purchase date: 11/07/2026; total amount: 124999.5. Detected amounts: INR 124,999.50. Detected dates: 11/07/2026. This is a purchase record that may contain payment and warranty details."
+        },
+        {
+          "metric": "summary_coverage",
+          "field": "1",
+          "passed": true,
+          "expected": [
+            "INV-204"
+          ],
+          "actual": "This document is classified as Invoice. Extracted details include vendor: Acme Electronics; invoice number: INV-204; purchase date: 11/07/2026; total amount: 124999.5. Detected amounts: INR 124,999.50. Detected dates: 11/07/2026. This is a purchase record that may contain payment and warranty details."
+        },
+        {
+          "metric": "summary_coverage",
+          "field": "2",
+          "passed": true,
+          "expected": [
+            "124999.5",
+            "124,999.50"
+          ],
+          "actual": "This document is classified as Invoice. Extracted details include vendor: Acme Electronics; invoice number: INV-204; purchase date: 11/07/2026; total amount: 124999.5. Detected amounts: INR 124,999.50. Detected dates: 11/07/2026. This is a purchase record that may contain payment and warranty details."
+        },
+        {
+          "metric": "tag_coverage",
+          "field": "0",
+          "passed": true,
+          "expected": [
+            "invoice",
+            "purchase"
+          ],
+          "actual": [
+            "invoice",
+            "tax",
+            "vendor",
+            "acme",
+            "electronics"
+          ]
+        },
+        {
+          "metric": "tag_noise",
+          "field": "vendor",
+          "passed": false,
+          "expected": "absent",
+          "actual": [
+            "invoice",
+            "tax",
+            "vendor",
+            "acme",
+            "electronics"
+          ]
+        },
+        {
+          "metric": "tag_noise",
+          "field": "inr",
+          "passed": true,
+          "expected": "absent",
+          "actual": [
+            "invoice",
+            "tax",
+            "vendor",
+            "acme",
+            "electronics"
+          ]
+        },
+        {
+          "metric": "tag_noise",
+          "field": "bill",
+          "passed": true,
+          "expected": "absent",
+          "actual": [
+            "invoice",
+            "tax",
+            "vendor",
+            "acme",
+            "electronics"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Invoice fields arranged in columns",
+      "passed": false,
+      "provider": "local",
+      "model": "rules-v1",
+      "classification_confidence": 0.95,
+      "checks": [
+        {
+          "metric": "classification",
+          "field": "category",
+          "passed": true,
+          "expected": "invoice",
+          "actual": "invoice"
+        },
+        {
+          "metric": "metadata",
+          "field": "vendor",
+          "passed": false,
+          "expected": "Acme Electronics",
+          "actual": null
+        },
+        {
+          "metric": "metadata",
+          "field": "invoice_number",
+          "passed": false,
+          "expected": "INV-204",
+          "actual": null
+        },
+        {
+          "metric": "metadata",
+          "field": "purchase_date",
+          "passed": false,
+          "expected": "2026-07-11",
+          "actual": null
+        },
+        {
+          "metric": "metadata",
+          "field": "total_amount",
+          "passed": false,
+          "expected": 124999.5,
+          "actual": null
+        },
+        {
+          "metric": "summary_coverage",
+          "field": "0",
+          "passed": false,
+          "expected": [
+            "Acme Electronics"
+          ],
+          "actual": "This document is classified as Invoice. Detected amounts: INR 124,999.50. Detected dates: 11/07/2026. This is a purchase record that may contain payment and warranty details."
+        },
+        {
+          "metric": "summary_coverage",
+          "field": "1",
+          "passed": false,
+          "expected": [
+            "INV-204"
+          ],
+          "actual": "This document is classified as Invoice. Detected amounts: INR 124,999.50. Detected dates: 11/07/2026. This is a purchase record that may contain payment and warranty details."
+        },
+        {
+          "metric": "tag_coverage",
+          "field": "0",
+          "passed": true,
+          "expected": [
+            "invoice",
+            "purchase"
+          ],
+          "actual": [
+            "invoice",
+            "tax",
+            "vendor",
+            "acme",
+            "electronics"
+          ]
+        },
+        {
+          "metric": "tag_noise",
+          "field": "vendor",
+          "passed": false,
+          "expected": "absent",
+          "actual": [
+            "invoice",
+            "tax",
+            "vendor",
+            "acme",
+            "electronics"
+          ]
+        },
+        {
+          "metric": "tag_noise",
+          "field": "inr",
+          "passed": true,
+          "expected": "absent",
+          "actual": [
+            "invoice",
+            "tax",
+            "vendor",
+            "acme",
+            "electronics"
+          ]
+        },
+        {
+          "metric": "tag_noise",
+          "field": "bill",
+          "passed": true,
+          "expected": "absent",
+          "actual": [
+            "invoice",
+            "tax",
+            "vendor",
+            "acme",
+            "electronics"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Cancelled policy must describe ended coverage",
+      "passed": false,
+      "provider": "local",
+      "model": "rules-v1",
+      "classification_confidence": 0.95,
+      "checks": [
+        {
+          "metric": "classification",
+          "field": "category",
+          "passed": true,
+          "expected": "insurance_policy",
+          "actual": "insurance_policy"
+        },
+        {
+          "metric": "metadata",
+          "field": "provider",
+          "passed": true,
+          "expected": "Example Insurance",
+          "actual": "Example Insurance"
+        },
+        {
+          "metric": "metadata",
+          "field": "policy_number",
+          "passed": true,
+          "expected": "POL-204",
+          "actual": "POL-204"
+        },
+        {
+          "metric": "metadata",
+          "field": "premium",
+          "passed": true,
+          "expected": 12000,
+          "actual": 12000
+        },
+        {
+          "metric": "summary_coverage",
+          "field": "0",
+          "passed": false,
+          "expected": [
+            "cancelled",
+            "canceled",
+            "cancellation"
+          ],
+          "actual": "This document is classified as Insurance Policy. Extracted details include provider: Example Insurance; policy number: POL-204; premium: 12000.0; expiry date: 31/12/2026. Detected amounts: INR 12000, INR 9000. Detected dates: 31/12/2026, 01/06/2026. Review the policy coverage, premium, and expiry details."
+        },
+        {
+          "metric": "summary_coverage",
+          "field": "1",
+          "passed": false,
+          "expected": [
+            "no coverage",
+            "coverage ended",
+            "coverage has ended"
+          ],
+          "actual": "This document is classified as Insurance Policy. Extracted details include provider: Example Insurance; policy number: POL-204; premium: 12000.0; expiry date: 31/12/2026. Detected amounts: INR 12000, INR 9000. Detected dates: 31/12/2026, 01/06/2026. Review the policy coverage, premium, and expiry details."
+        },
+        {
+          "metric": "summary_coverage",
+          "field": "2",
+          "passed": false,
+          "expected": [
+            "refund"
+          ],
+          "actual": "This document is classified as Insurance Policy. Extracted details include provider: Example Insurance; policy number: POL-204; premium: 12000.0; expiry date: 31/12/2026. Detected amounts: INR 12000, INR 9000. Detected dates: 31/12/2026, 01/06/2026. Review the policy coverage, premium, and expiry details."
+        },
+        {
+          "metric": "summary_contradiction",
+          "field": "policy is active",
+          "passed": true,
+          "expected": "absent",
+          "actual": "This document is classified as Insurance Policy. Extracted details include provider: Example Insurance; policy number: POL-204; premium: 12000.0; expiry date: 31/12/2026. Detected amounts: INR 12000, INR 9000. Detected dates: 31/12/2026, 01/06/2026. Review the policy coverage, premium, and expiry details."
+        },
+        {
+          "metric": "summary_contradiction",
+          "field": "coverage remains active",
+          "passed": true,
+          "expected": "absent",
+          "actual": "This document is classified as Insurance Policy. Extracted details include provider: Example Insurance; policy number: POL-204; premium: 12000.0; expiry date: 31/12/2026. Detected amounts: INR 12000, INR 9000. Detected dates: 31/12/2026, 01/06/2026. Review the policy coverage, premium, and expiry details."
+        },
+        {
+          "metric": "tag_coverage",
+          "field": "0",
+          "passed": true,
+          "expected": [
+            "cancelled",
+            "cancellation",
+            "cancelled-policy"
+          ],
+          "actual": [
+            "insurance-policy",
+            "insurance",
+            "inr",
+            "cancellation",
+            "notice"
+          ]
+        },
+        {
+          "metric": "tag_noise",
+          "field": "inr",
+          "passed": false,
+          "expected": "absent",
+          "actual": [
+            "insurance-policy",
+            "insurance",
+            "inr",
+            "cancellation",
+            "notice"
+          ]
+        },
+        {
+          "metric": "tag_noise",
+          "field": "notice",
+          "passed": false,
+          "expected": "absent",
+          "actual": [
+            "insurance-policy",
+            "insurance",
+            "inr",
+            "cancellation",
+            "notice"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Salary with zero net pay",
+      "passed": false,
+      "provider": "local",
+      "model": "rules-v1",
+      "classification_confidence": 0.95,
+      "checks": [
+        {
+          "metric": "classification",
+          "field": "category",
+          "passed": true,
+          "expected": "salary_slip",
+          "actual": "salary_slip"
+        },
+        {
+          "metric": "metadata",
+          "field": "employer",
+          "passed": true,
+          "expected": "Example Company",
+          "actual": "Example Company"
+        },
+        {
+          "metric": "metadata",
+          "field": "month",
+          "passed": true,
+          "expected": 3,
+          "actual": 3
+        },
+        {
+          "metric": "metadata",
+          "field": "year",
+          "passed": true,
+          "expected": 2026,
+          "actual": 2026
+        },
+        {
+          "metric": "metadata",
+          "field": "net_salary",
+          "passed": true,
+          "expected": 0,
+          "actual": 0
+        },
+        {
+          "metric": "metadata",
+          "field": "gross_salary",
+          "passed": true,
+          "expected": 10000,
+          "actual": 10000
+        },
+        {
+          "metric": "summary_coverage",
+          "field": "0",
+          "passed": true,
+          "expected": [
+            "net salary: INR 0",
+            "net pay is zero",
+            "net pay: 0",
+            "net salary: 0"
+          ],
+          "actual": "This document is classified as Salary Slip. Extracted details include employer: Example Company; month: March; year: 2026; net salary: INR 0; gross salary: 10000.0. Detected amounts: INR 10000, INR 10000, INR 0. Review gross earnings, deductions, and net salary for the pay period."
+        },
+        {
+          "metric": "tag_coverage",
+          "field": "0",
+          "passed": true,
+          "expected": [
+            "salary-slip",
+            "payroll"
+          ],
+          "actual": [
+            "salary-slip",
+            "inr",
+            "slip",
+            "employer",
+            "example"
+          ]
+        },
+        {
+          "metric": "tag_noise",
+          "field": "inr",
+          "passed": false,
+          "expected": "absent",
+          "actual": [
+            "salary-slip",
+            "inr",
+            "slip",
+            "employer",
+            "example"
+          ]
+        },
+        {
+          "metric": "tag_noise",
+          "field": "slip",
+          "passed": false,
+          "expected": "absent",
+          "actual": [
+            "salary-slip",
+            "inr",
+            "slip",
+            "employer",
+            "example"
+          ]
+        },
+        {
+          "metric": "tag_noise",
+          "field": "employer",
+          "passed": false,
+          "expected": "absent",
+          "actual": [
+            "salary-slip",
+            "inr",
+            "slip",
+            "employer",
+            "example"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Card statement distinguishes minimum from total due",
+      "passed": false,
+      "provider": "local",
+      "model": "rules-v1",
+      "classification_confidence": 0.81,
+      "checks": [
+        {
+          "metric": "classification",
+          "field": "category",
+          "passed": true,
+          "expected": "credit_card_statement",
+          "actual": "credit_card_statement"
+        },
+        {
+          "metric": "metadata",
+          "field": "bank",
+          "passed": true,
+          "expected": "Example Bank",
+          "actual": "Example Bank"
+        },
+        {
+          "metric": "metadata",
+          "field": "due_date",
+          "passed": true,
+          "expected": "2026-10-20",
+          "actual": "2026-10-20"
+        },
+        {
+          "metric": "metadata",
+          "field": "total_due",
+          "passed": true,
+          "expected": 42000,
+          "actual": 42000
+        },
+        {
+          "metric": "metadata",
+          "field": "minimum_due",
+          "passed": true,
+          "expected": 2100,
+          "actual": 2100
+        },
+        {
+          "metric": "summary_coverage",
+          "field": "0",
+          "passed": true,
+          "expected": [
+            "42000",
+            "42,000"
+          ],
+          "actual": "This document is classified as Credit Card Statement. Extracted details include bank: Example Bank; statement period: September 2026; due date: 20/10/2026; total due: 42000.0; minimum due: 2100.0. Detected amounts: INR 42000, INR 2100. Detected dates: 20/10/2026."
+        },
+        {
+          "metric": "summary_coverage",
+          "field": "1",
+          "passed": true,
+          "expected": [
+            "2100",
+            "2,100"
+          ],
+          "actual": "This document is classified as Credit Card Statement. Extracted details include bank: Example Bank; statement period: September 2026; due date: 20/10/2026; total due: 42000.0; minimum due: 2100.0. Detected amounts: INR 42000, INR 2100. Detected dates: 20/10/2026."
+        },
+        {
+          "metric": "summary_coverage",
+          "field": "2",
+          "passed": true,
+          "expected": [
+            "20/10/2026",
+            "2026-10-20",
+            "20 October 2026"
+          ],
+          "actual": "This document is classified as Credit Card Statement. Extracted details include bank: Example Bank; statement period: September 2026; due date: 20/10/2026; total due: 42000.0; minimum due: 2100.0. Detected amounts: INR 42000, INR 2100. Detected dates: 20/10/2026."
+        },
+        {
+          "metric": "summary_contradiction",
+          "field": "minimum payment settles the full balance",
+          "passed": true,
+          "expected": "absent",
+          "actual": "This document is classified as Credit Card Statement. Extracted details include bank: Example Bank; statement period: September 2026; due date: 20/10/2026; total due: 42000.0; minimum due: 2100.0. Detected amounts: INR 42000, INR 2100. Detected dates: 20/10/2026."
+        },
+        {
+          "metric": "tag_coverage",
+          "field": "0",
+          "passed": true,
+          "expected": [
+            "credit-card-statement",
+            "credit-card"
+          ],
+          "actual": [
+            "credit-card-statement",
+            "due",
+            "inr",
+            "minimum",
+            "credit"
+          ]
+        },
+        {
+          "metric": "tag_noise",
+          "field": "inr",
+          "passed": false,
+          "expected": "absent",
+          "actual": [
+            "credit-card-statement",
+            "due",
+            "inr",
+            "minimum",
+            "credit"
+          ]
+        },
+        {
+          "metric": "tag_noise",
+          "field": "minimum",
+          "passed": false,
+          "expected": "absent",
+          "actual": [
+            "credit-card-statement",
+            "due",
+            "inr",
+            "minimum",
+            "credit"
+          ]
+        },
+        {
+          "metric": "tag_noise",
+          "field": "due",
+          "passed": false,
+          "expected": "absent",
+          "actual": [
+            "credit-card-statement",
+            "due",
+            "inr",
+            "minimum",
+            "credit"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Clinical finding preserves negation",
+      "passed": true,
+      "provider": "local",
+      "model": "rules-v1",
+      "classification_confidence": 0.9,
+      "checks": [
+        {
+          "metric": "classification",
+          "field": "category",
+          "passed": true,
+          "expected": "medical_report",
+          "actual": "medical_report"
+        },
+        {
+          "metric": "metadata",
+          "field": "provider",
+          "passed": true,
+          "expected": "Example Diagnostics",
+          "actual": "Example Diagnostics"
+        },
+        {
+          "metric": "metadata",
+          "field": "patient_name",
+          "passed": true,
+          "expected": "Example Person",
+          "actual": "Example Person"
+        },
+        {
+          "metric": "metadata",
+          "field": "report_date",
+          "passed": true,
+          "expected": "2026-07-11",
+          "actual": "2026-07-11"
+        },
+        {
+          "metric": "summary_coverage",
+          "field": "0",
+          "passed": true,
+          "expected": [
+            "no evidence of fracture",
+            "no fracture",
+            "fracture excluded"
+          ],
+          "actual": "This document is classified as Medical Report. Extracted details include provider: Example Diagnostics; patient name: Example Person; report date: 11/07/2026; findings: No evidence of fracture. Mild soft tissue swelling. Follow-up advised if symptoms persist.. Detected dates: 11/07/2026."
+        },
+        {
+          "metric": "summary_coverage",
+          "field": "1",
+          "passed": true,
+          "expected": [
+            "swelling"
+          ],
+          "actual": "This document is classified as Medical Report. Extracted details include provider: Example Diagnostics; patient name: Example Person; report date: 11/07/2026; findings: No evidence of fracture. Mild soft tissue swelling. Follow-up advised if symptoms persist.. Detected dates: 11/07/2026."
+        },
+        {
+          "metric": "summary_contradiction",
+          "field": "fracture confirmed",
+          "passed": true,
+          "expected": "absent",
+          "actual": "This document is classified as Medical Report. Extracted details include provider: Example Diagnostics; patient name: Example Person; report date: 11/07/2026; findings: No evidence of fracture. Mild soft tissue swelling. Follow-up advised if symptoms persist.. Detected dates: 11/07/2026."
+        },
+        {
+          "metric": "summary_contradiction",
+          "field": "fracture detected",
+          "passed": true,
+          "expected": "absent",
+          "actual": "This document is classified as Medical Report. Extracted details include provider: Example Diagnostics; patient name: Example Person; report date: 11/07/2026; findings: No evidence of fracture. Mild soft tissue swelling. Follow-up advised if symptoms persist.. Detected dates: 11/07/2026."
+        },
+        {
+          "metric": "tag_coverage",
+          "field": "0",
+          "passed": true,
+          "expected": [
+            "medical-report",
+            "medical"
+          ],
+          "actual": [
+            "medical-report",
+            "report",
+            "example",
+            "clinical",
+            "medical"
+          ]
+        },
+        {
+          "metric": "tag_noise",
+          "field": "provider",
+          "passed": true,
+          "expected": "absent",
+          "actual": [
+            "medical-report",
+            "report",
+            "example",
+            "clinical",
+            "medical"
+          ]
+        },
+        {
+          "metric": "tag_noise",
+          "field": "name",
+          "passed": true,
+          "expected": "absent",
+          "actual": [
+            "medical-report",
+            "report",
+            "example",
+            "clinical",
+            "medical"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Withdrawn offer must preserve withdrawal",
+      "passed": false,
+      "provider": "local",
+      "model": "rules-v1",
+      "classification_confidence": 0.835,
+      "checks": [
+        {
+          "metric": "classification",
+          "field": "category",
+          "passed": true,
+          "expected": "offer_letter",
+          "actual": "offer_letter"
+        },
+        {
+          "metric": "metadata",
+          "field": "employer",
+          "passed": true,
+          "expected": "Example Software",
+          "actual": "Example Software"
+        },
+        {
+          "metric": "metadata",
+          "field": "position",
+          "passed": true,
+          "expected": "Engineer",
+          "actual": "Engineer"
+        },
+        {
+          "metric": "metadata",
+          "field": "offer_date",
+          "passed": true,
+          "expected": "2026-07-01",
+          "actual": "2026-07-01"
+        },
+        {
+          "metric": "summary_coverage",
+          "field": "0",
+          "passed": false,
+          "expected": [
+            "withdrawn",
+            "withdrawal",
+            "rescinded"
+          ],
+          "actual": "This document is classified as Offer Letter. Extracted details include employer: Example Software; position: Engineer; offer date: 01/07/2026; joining date: 01/08/2026. Detected dates: 01/07/2026, 01/08/2026."
+        },
+        {
+          "metric": "summary_coverage",
+          "field": "1",
+          "passed": false,
+          "expected": [
+            "must not report",
+            "do not join",
+            "should not report"
+          ],
+          "actual": "This document is classified as Offer Letter. Extracted details include employer: Example Software; position: Engineer; offer date: 01/07/2026; joining date: 01/08/2026. Detected dates: 01/07/2026, 01/08/2026."
+        },
+        {
+          "metric": "summary_contradiction",
+          "field": "offer is active",
+          "passed": true,
+          "expected": "absent",
+          "actual": "This document is classified as Offer Letter. Extracted details include employer: Example Software; position: Engineer; offer date: 01/07/2026; joining date: 01/08/2026. Detected dates: 01/07/2026, 01/08/2026."
+        },
+        {
+          "metric": "summary_contradiction",
+          "field": "report for joining on",
+          "passed": true,
+          "expected": "absent",
+          "actual": "This document is classified as Offer Letter. Extracted details include employer: Example Software; position: Engineer; offer date: 01/07/2026; joining date: 01/08/2026. Detected dates: 01/07/2026, 01/08/2026."
+        },
+        {
+          "metric": "tag_coverage",
+          "field": "0",
+          "passed": true,
+          "expected": [
+            "withdrawn",
+            "withdrawal",
+            "offer-withdrawal"
+          ],
+          "actual": [
+            "offer-letter",
+            "offer",
+            "joining",
+            "withdrawal",
+            "letter"
+          ]
+        },
+        {
+          "metric": "tag_noise",
+          "field": "employer",
+          "passed": true,
+          "expected": "absent",
+          "actual": [
+            "offer-letter",
+            "offer",
+            "joining",
+            "withdrawal",
+            "letter"
+          ]
+        },
+        {
+          "metric": "tag_noise",
+          "field": "position",
+          "passed": true,
+          "expected": "absent",
+          "actual": [
+            "offer-letter",
+            "offer",
+            "joining",
+            "withdrawal",
+            "letter"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Statement table preserves closing balance",
+      "passed": false,
+      "provider": "local",
+      "model": "rules-v1",
+      "classification_confidence": 0.95,
+      "checks": [
+        {
+          "metric": "classification",
+          "field": "category",
+          "passed": true,
+          "expected": "bank_statement",
+          "actual": "bank_statement"
+        },
+        {
+          "metric": "metadata",
+          "field": "bank",
+          "passed": false,
+          "expected": "Example Bank",
+          "actual": null
+        },
+        {
+          "metric": "metadata",
+          "field": "account_last_four",
+          "passed": false,
+          "expected": "4321",
+          "actual": null
+        },
+        {
+          "metric": "metadata",
+          "field": "opening_balance",
+          "passed": false,
+          "expected": 45000,
+          "actual": null
+        },
+        {
+          "metric": "metadata",
+          "field": "closing_balance",
+          "passed": false,
+          "expected": 51200,
+          "actual": null
+        },
+        {
+          "metric": "summary_coverage",
+          "field": "0",
+          "passed": true,
+          "expected": [
+            "51200",
+            "51,200"
+          ],
+          "actual": "This document is classified as Bank Statement. Detected amounts: INR 45000, INR 51200. Detected dates: 01/09/2026, 30/09/2026, 30/09/2026. Review the account period, transaction activity, and opening and closing balances."
+        },
+        {
+          "metric": "summary_coverage",
+          "field": "1",
+          "passed": false,
+          "expected": [
+            "4321"
+          ],
+          "actual": "This document is classified as Bank Statement. Detected amounts: INR 45000, INR 51200. Detected dates: 01/09/2026, 30/09/2026, 30/09/2026. Review the account period, transaction activity, and opening and closing balances."
+        },
+        {
+          "metric": "tag_coverage",
+          "field": "0",
+          "passed": true,
+          "expected": [
+            "bank-statement",
+            "banking"
+          ],
+          "actual": [
+            "bank-statement",
+            "balance",
+            "inr",
+            "example",
+            "account"
+          ]
+        },
+        {
+          "metric": "tag_noise",
+          "field": "debit",
+          "passed": true,
+          "expected": "absent",
+          "actual": [
+            "bank-statement",
+            "balance",
+            "inr",
+            "example",
+            "account"
+          ]
+        },
+        {
+          "metric": "tag_noise",
+          "field": "credit",
+          "passed": true,
+          "expected": "absent",
+          "actual": [
+            "bank-statement",
+            "balance",
+            "inr",
+            "example",
+            "account"
+          ]
+        },
+        {
+          "metric": "tag_noise",
+          "field": "inr",
+          "passed": false,
+          "expected": "absent",
+          "actual": [
+            "bank-statement",
+            "balance",
+            "inr",
+            "example",
+            "account"
+          ]
+        },
+        {
+          "metric": "tag_noise",
+          "field": "last",
+          "passed": true,
+          "expected": "absent",
+          "actual": [
+            "bank-statement",
+            "balance",
+            "inr",
+            "example",
+            "account"
+          ]
+        }
+      ]
+    }
+  ],
+  "limitations": [
+    "Summary checks measure annotated phrase coverage and contradictions, not all factuality.",
+    "Only annotated metadata fields and tag facets are scored; unannotated claims need review.",
+    "Synthetic text cases do not measure photographed-document OCR or semantic retrieval."
+  ],
+  "corpus_sha256": "4ce5644ca255835b428cf9c8dabc59bc4d559b71c26795e71aa32ea711c566fa",
+  "requested_provider": "local"
+}

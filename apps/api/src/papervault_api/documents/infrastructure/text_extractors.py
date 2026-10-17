@@ -5,11 +5,12 @@ from collections.abc import Sequence
 from dataclasses import dataclass, replace
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import Protocol
+from typing import Any, Protocol
 
 from papervault_api.core.config import Settings, get_settings
 from papervault_api.documents.application.extraction import (
     OcrTextBlock,
+    PdfPageAssessment,
     TextExtractionResult,
     TextExtractor,
 )
@@ -25,7 +26,15 @@ class CompositeTextExtractor(TextExtractor):
         if content_type == "application/pdf":
             result = self._pdf_extractor.extract(file_path, content_type)
             if result.status is TextExtractionStatus.SUCCEEDED:
-                if not result.page_texts or all(text.strip() for text in result.page_texts):
+                assessed_pages = {page.page_number - 1 for page in result.page_assessments}
+                required_pages = {
+                    page.page_number - 1 for page in result.page_assessments if page.requires_ocr
+                } | {
+                    index
+                    for index, text in enumerate(result.page_texts)
+                    if not text.strip() and index not in assessed_pages
+                }
+                if not required_pages:
                     return result
                 ocr_result = self._ocr_extractor.extract(file_path, content_type)
                 if ocr_result.status is not TextExtractionStatus.SUCCEEDED:
@@ -33,7 +42,7 @@ class CompositeTextExtractor(TextExtractor):
                         result,
                         status=TextExtractionStatus.FAILED,
                         error_message=(
-                            "Some PDF pages have no embedded text and require OCR. "
+                            "PDF pages require OCR to cover missing or image-based content. "
                             + (ocr_result.error_message or "OCR did not produce usable text.")
                         ),
                     )
@@ -45,13 +54,46 @@ class CompositeTextExtractor(TextExtractor):
                             "OCR did not cover every PDF page. Retry with a higher page limit."
                         ),
                     )
+                empty_pages = [
+                    index + 1
+                    for index in sorted(required_pages)
+                    if not ocr_result.page_texts[index].strip()
+                ]
+                if empty_pages:
+                    return replace(
+                        result,
+                        status=TextExtractionStatus.FAILED,
+                        error_message=(
+                            f"OCR produced no text for required pages {empty_pages}. "
+                            "Extraction coverage could not be established."
+                        ),
+                    )
+                footer_only_pages = [
+                    index + 1
+                    for index in sorted(required_pages)
+                    if result.page_texts[index].strip()
+                    and sum(char.isalnum() for char in result.page_texts[index]) < 40
+                    and merge_page_text(result.page_texts[index], ocr_result.page_texts[index])
+                    == result.page_texts[index].strip()
+                ]
+                if footer_only_pages:
+                    return replace(
+                        result,
+                        status=TextExtractionStatus.FAILED,
+                        error_message=(
+                            f"OCR only repeated sparse embedded text on pages {footer_only_pages}. "
+                            "Image content could not be verified; review the source."
+                        ),
+                    )
                 pages = tuple(
-                    embedded if embedded.strip() else ocr
-                    for embedded, ocr in zip(result.page_texts, ocr_result.page_texts, strict=True)
+                    merge_page_text(embedded, ocr) if index in required_pages else embedded
+                    for index, (embedded, ocr) in enumerate(
+                        zip(result.page_texts, ocr_result.page_texts, strict=True)
+                    )
                 )
                 blocks = tuple(
                     ()
-                    if embedded.strip()
+                    if index not in required_pages
                     else ocr_result.page_blocks[index]
                     if index < len(ocr_result.page_blocks)
                     else ()
@@ -64,6 +106,7 @@ class CompositeTextExtractor(TextExtractor):
                     page_blocks=blocks,
                     page_count=result.page_count,
                     extractor="pypdf+tesseract_cli",
+                    page_assessments=result.page_assessments,
                 )
             return self._ocr_extractor.extract(file_path, content_type)
 
@@ -92,7 +135,12 @@ class PypdfTextExtractor(TextExtractor):
             from pypdf import PdfReader
 
             reader = PdfReader(file_path)
-            pages = [page.extract_text() or "" for page in reader.pages]
+            pages: list[str] = []
+            assessments: list[PdfPageAssessment] = []
+            for page_number, page in enumerate(reader.pages, start=1):
+                text, assessment = inspect_pdf_page(page, page_number)
+                pages.append(text)
+                assessments.append(assessment)
         except Exception as exc:
             return TextExtractionResult(
                 source=TextExtractionSource.EMBEDDED_TEXT,
@@ -110,6 +158,8 @@ class PypdfTextExtractor(TextExtractor):
                 page_count=len(pages),
                 extractor="pypdf",
                 error_message="No embedded text found; OCR is required",
+                page_texts=page_texts,
+                page_assessments=tuple(assessments),
             )
 
         return TextExtractionResult(
@@ -119,7 +169,112 @@ class PypdfTextExtractor(TextExtractor):
             page_texts=page_texts,
             page_count=len(pages),
             extractor="pypdf",
+            page_assessments=tuple(assessments),
         )
+
+
+def inspect_pdf_page(page: Any, page_number: int) -> tuple[str, PdfPageAssessment]:
+    image_areas: list[float] = []
+    painted_content = False
+    reference = page.get("/Resources")
+    resources = reference.get_object() if reference is not None else {}
+    objects = resources.get("/XObject", {})
+    if hasattr(objects, "get_object"):
+        objects = objects.get_object()
+    page_area = float(page.mediabox.width * page.mediabox.height)
+
+    def inspect_image(
+        operator: bytes,
+        operands: list[Any],
+        matrix: list[float],
+        text_matrix: list[float],
+    ) -> None:
+        nonlocal painted_content
+        if operator in {
+            b"Do",
+            b"S",
+            b"s",
+            b"f",
+            b"F",
+            b"f*",
+            b"B",
+            b"B*",
+            b"b",
+            b"b*",
+            b"sh",
+            b"INLINE IMAGE",
+        }:
+            painted_content = True
+        if operator != b"Do" or not operands or page_area <= 0:
+            return
+        reference = objects.get(operands[0])
+        if reference is None:
+            return
+        image = reference.get_object()
+        area = abs(matrix[0] * matrix[3] - matrix[1] * matrix[2])
+        if image.get("/Subtype") == "/Image":
+            image_areas.append(area / page_area)
+        elif image.get("/Subtype") == "/Form" and form_contains_images(image):
+            # Form XObjects can wrap an entire scanned page. Their unit
+            # square is their BBox, unlike raster Image XObjects.
+            bounds = image.get("/BBox", [0, 0, 0, 0])
+            form_matrix = image.get("/Matrix", [1, 0, 0, 1, 0, 0])
+            form_scale = abs(
+                float(form_matrix[0] * form_matrix[3] - form_matrix[1] * form_matrix[2])
+            )
+            image_areas.append(
+                area
+                * form_scale
+                * abs(float(bounds[2] - bounds[0]))
+                * abs(float(bounds[3] - bounds[1]))
+                / page_area
+            )
+
+    text = page.extract_text(visitor_operand_before=inspect_image) or ""
+    coverage = round(min(1.0, sum(image_areas)), 4)
+    if not text.strip() and not painted_content:
+        return text, PdfPageAssessment(page_number, False, coverage, ("blank_page",))
+    reasons: list[str] = []
+    if not text.strip():
+        reasons.append("no_embedded_text")
+    if coverage >= 0.2:
+        reasons.append("substantial_raster_content")
+    elif coverage >= 0.02 and sum(char.isalnum() for char in text) < 40:
+        reasons.append("sparse_text_with_raster_content")
+    if text and text.count("\ufffd") / len(text) > 0.02:
+        reasons.append("damaged_text_encoding")
+    return text, PdfPageAssessment(page_number, bool(reasons), coverage, tuple(reasons))
+
+
+def form_contains_images(form: Any, *, depth: int = 0) -> bool:
+    if depth >= 8:
+        # Treat excessively nested resources conservatively rather than skipping OCR.
+        return True
+    resources = form.get("/Resources")
+    if resources is None:
+        return False
+    objects = resources.get_object().get("/XObject", {})
+    if hasattr(objects, "get_object"):
+        objects = objects.get_object()
+    for reference in objects.values():
+        child = reference.get_object()
+        if child.get("/Subtype") == "/Image" or (
+            child.get("/Subtype") == "/Form" and form_contains_images(child, depth=depth + 1)
+        ):
+            return True
+    return False
+
+
+def merge_page_text(embedded: str, ocr: str) -> str:
+    """Preserve native text and append distinct OCR lines."""
+    lines = embedded.strip().splitlines()
+    known = {" ".join(line.casefold().split()) for line in lines}
+    for line in ocr.strip().splitlines():
+        normalized = " ".join(line.casefold().split())
+        if normalized and normalized not in known:
+            lines.append(line)
+            known.add(normalized)
+    return "\n".join(lines).strip()
 
 
 @dataclass(frozen=True, slots=True)

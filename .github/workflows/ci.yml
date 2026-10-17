@@ -30,6 +30,13 @@ jobs:
         run: mypy src
       - name: Test
         run: pytest
+      - name: Record processing quality baseline
+        run: python ../../scripts/evaluate_processing.py --report-only --output ../../processing-quality.json
+      - name: Upload processing quality report
+        uses: actions/upload-artifact@v4
+        with:
+          name: processing-quality-baseline
+          path: processing-quality.json
 
   frontend:
     name: Frontend

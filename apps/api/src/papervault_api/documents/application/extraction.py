@@ -17,6 +17,14 @@ class OcrTextBlock:
 
 
 @dataclass(frozen=True, slots=True)
+class PdfPageAssessment:
+    page_number: int
+    requires_ocr: bool
+    image_coverage: float
+    reasons: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
 class TextExtractionResult:
     source: TextExtractionSource
     status: TextExtractionStatus
@@ -28,6 +36,7 @@ class TextExtractionResult:
     confidence_score: float | None = None
     extractor: str | None = None
     error_message: str | None = None
+    page_assessments: tuple[PdfPageAssessment, ...] = ()
 
 
 class TextExtractor(Protocol):
