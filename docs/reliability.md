@@ -8,7 +8,10 @@ that extraction, indexing, or later retrieval succeeded.
 
 - Originals remain in object storage and are recorded as immutable source versions.
 - Queued documents refresh automatically while the worker processes them.
-- Embedded PDF text is preserved. Mixed PDFs also run OCR for pages without text.
+- Embedded PDF text is preserved. Page inspection also routes image-bearing pages
+  to OCR even when they have native footer text. Missing required OCR coverage fails
+  explicitly. See [processing quality](processing-quality.md) for routing heuristics
+  and the separate content-quality benchmark.
 - OCR page limits are explicit failures; later pages are not silently discarded.
 - Optional analysis failure produces a review warning without hiding extracted text
   from keyword search. Model-backed summaries and embeddings remain unavailable
@@ -33,6 +36,9 @@ that extraction, indexing, or later retrieval succeeded.
 | A worker finishes before the upload request returns | Separate worker session, including lost queue acknowledgement |
 | A PDF contains a digital cover and scanned attachment | Adapter composition test; scanned text and page ordering are checked |
 | A scanned PDF exceeds its OCR page limit | Generated PDF and adapter preflight test |
+| A scanned page has a native scanner footer or a Form-wrapped image | Generated image-bearing PDFs, real pypdf inspection, and recording OCR adapter |
+| Required OCR is empty or only repeats a native footer | Failure and native-text preservation regressions |
+| Classification succeeds while facts and summaries are incomplete | Annotated quality corpus and independently scored checks |
 | The UI follows a queued document to readiness | Component test verifying that preview fetching begins after polling |
 | Search results explain a match | Component test for keyword requests and matching excerpts |
 | Numeric references, short names, and non-Latin queries | Keyword scoring, excerpt, and database retrieval regressions |

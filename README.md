@@ -97,6 +97,7 @@ Detailed setup, Windows commands, provider configuration, and validation steps a
 - [Product scope and roadmap](docs/product-scope.md)
 - [Architecture](docs/architecture.md)
 - [Document reliability and verification limits](docs/reliability.md)
+- [Processing quality benchmark and current gaps](docs/processing-quality.md)
 - [Database](docs/database.md)
 - [API](docs/api.md)
 - [Deployment](docs/deployment.md)

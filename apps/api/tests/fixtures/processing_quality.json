@@ -1,0 +1,78 @@
+[
+  {
+    "name": "Invoice with colon-delimited labels",
+    "text": "TAX INVOICE\nVendor: Acme Electronics\nInvoice Number: INV-204\nPurchase Date: 11/07/2026\nTotal Amount: INR 124,999.50\nBill To: Example Customer",
+    "expected_category": "invoice",
+    "expected_metadata": {"vendor": "Acme Electronics", "invoice_number": "INV-204", "purchase_date": "2026-07-11", "total_amount": 124999.5},
+    "summary_concepts": [["Acme Electronics"], ["INV-204"], ["124999.5", "124,999.50"]],
+    "tag_facets": [["invoice", "purchase"]],
+    "unhelpful_tags": ["vendor", "inr", "bill"]
+  },
+  {
+    "name": "Invoice fields arranged in columns",
+    "text": "TAX INVOICE\nVendor\tAcme Electronics\nInvoice Number\tINV-204\nPurchase Date\t11/07/2026\nTotal Amount\tINR 124,999.50\nBill To\tExample Customer",
+    "expected_category": "invoice",
+    "expected_metadata": {"vendor": "Acme Electronics", "invoice_number": "INV-204", "purchase_date": "2026-07-11", "total_amount": 124999.5},
+    "summary_concepts": [["Acme Electronics"], ["INV-204"]],
+    "tag_facets": [["invoice", "purchase"]],
+    "unhelpful_tags": ["vendor", "inr", "bill"]
+  },
+  {
+    "name": "Cancelled policy must describe ended coverage",
+    "text": "INSURANCE POLICY CANCELLATION NOTICE\nProvider: Example Insurance\nPolicy Number: POL-204\nPremium: INR 12000\nExpiry Date: 31/12/2026\nThis policy was cancelled effective 01/06/2026. No coverage remains. Refund INR 9000 issued.",
+    "expected_category": "insurance_policy",
+    "expected_metadata": {"provider": "Example Insurance", "policy_number": "POL-204", "premium": 12000},
+    "summary_concepts": [["cancelled", "canceled", "cancellation"], ["no coverage", "coverage ended", "coverage has ended"], ["refund"]],
+    "forbidden_summary_claims": ["policy is active", "coverage remains active"],
+    "tag_facets": [["cancelled", "cancellation", "cancelled-policy"]],
+    "unhelpful_tags": ["inr", "notice"]
+  },
+  {
+    "name": "Salary with zero net pay",
+    "text": "SALARY SLIP\nEmployer: Example Company\nMonth: March\nYear: 2026\nGross Salary: INR 10000\nDeductions: INR 10000\nNet Pay: INR 0",
+    "expected_category": "salary_slip",
+    "expected_metadata": {"employer": "Example Company", "month": 3, "year": 2026, "net_salary": 0, "gross_salary": 10000},
+    "summary_concepts": [["net salary: INR 0", "net pay is zero", "net pay: 0", "net salary: 0"]],
+    "tag_facets": [["salary-slip", "payroll"]],
+    "unhelpful_tags": ["inr", "slip", "employer"]
+  },
+  {
+    "name": "Card statement distinguishes minimum from total due",
+    "text": "CREDIT CARD STATEMENT\nBank: Example Bank\nStatement Period: September 2026\nDue Date: 20/10/2026\nTotal Due: INR 42000\nMinimum Due: INR 2100\nPaying the minimum does not settle the full balance.",
+    "expected_category": "credit_card_statement",
+    "expected_metadata": {"bank": "Example Bank", "due_date": "2026-10-20", "total_due": 42000, "minimum_due": 2100},
+    "summary_concepts": [["42000", "42,000"], ["2100", "2,100"], ["20/10/2026", "2026-10-20", "20 October 2026"]],
+    "forbidden_summary_claims": ["minimum payment settles the full balance"],
+    "tag_facets": [["credit-card-statement", "credit-card"]],
+    "unhelpful_tags": ["inr", "minimum", "due"]
+  },
+  {
+    "name": "Clinical finding preserves negation",
+    "text": "CLINICAL MEDICAL REPORT\nProvider: Example Diagnostics\nPatient Name: Example Person\nReport Date: 11/07/2026\nFindings: No evidence of fracture. Mild soft tissue swelling. Follow-up advised if symptoms persist.",
+    "expected_category": "medical_report",
+    "expected_metadata": {"provider": "Example Diagnostics", "patient_name": "Example Person", "report_date": "2026-07-11"},
+    "summary_concepts": [["no evidence of fracture", "no fracture", "fracture excluded"], ["swelling"]],
+    "forbidden_summary_claims": ["fracture confirmed", "fracture detected"],
+    "tag_facets": [["medical-report", "medical"]],
+    "unhelpful_tags": ["provider", "name"]
+  },
+  {
+    "name": "Withdrawn offer must preserve withdrawal",
+    "text": "WITHDRAWAL OF OFFER LETTER\nEmployer: Example Software\nPosition: Engineer\nOffer Date: 01/07/2026\nJoining Date: 01/08/2026\nThe employment offer has been withdrawn. The candidate must not report for joining.",
+    "expected_category": "offer_letter",
+    "expected_metadata": {"employer": "Example Software", "position": "Engineer", "offer_date": "2026-07-01"},
+    "summary_concepts": [["withdrawn", "withdrawal", "rescinded"], ["must not report", "do not join", "should not report"]],
+    "forbidden_summary_claims": ["offer is active", "report for joining on"],
+    "tag_facets": [["withdrawn", "withdrawal", "offer-withdrawal"]],
+    "unhelpful_tags": ["employer", "position"]
+  },
+  {
+    "name": "Statement table preserves closing balance",
+    "text": "BANK STATEMENT\nBank\tExample Bank\nAccount Last Four\t4321\nStatement Start\t01/09/2026\nStatement End\t30/09/2026\nOpening Balance\tINR 45000\nClosing Balance\tINR 51200\nDate\tDescription\tDebit\tCredit\n30/09/2026\tSalary\t0\t6200",
+    "expected_category": "bank_statement",
+    "expected_metadata": {"bank": "Example Bank", "account_last_four": "4321", "opening_balance": 45000, "closing_balance": 51200},
+    "summary_concepts": [["51200", "51,200"], ["4321"]],
+    "tag_facets": [["bank-statement", "banking"]],
+    "unhelpful_tags": ["debit", "credit", "inr", "last"]
+  }
+]
