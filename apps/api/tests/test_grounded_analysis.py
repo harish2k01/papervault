@@ -445,8 +445,8 @@ def test_prose_wraps_keep_source_spans_without_merging_labels_tables_or_lists() 
     assert [line.text for line in lines[1:]] == [
         "Employer: Example Company",
         "Employee Name: Example Person",
-        "Amount Tax",
-        "100 20",
+        "Amount  Tax",
+        "100  20",
         "- First item",
         "- Second item",
     ]

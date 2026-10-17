@@ -58,7 +58,7 @@ def numbered_lines(text: str) -> tuple[SourceLine, ...]:
                 boundary = raw.rfind(" ", offset, end)
                 if boundary > offset + 350:
                     end = boundary + 1
-            value = " ".join(raw[offset:end].split())
+            value = re.sub(r"[\r\n]+[ \t]*", " ", raw[offset:end])
             if value.strip():
                 lines.append(SourceLine(len(lines) + 1, value, start + offset, start + end))
             offset = end
