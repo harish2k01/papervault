@@ -121,6 +121,17 @@ async def _process_document(document_id: UUID) -> None:
                     )
                     await session.commit()
 
+    else:
+        async with AsyncSessionFactory() as session:
+            document = await session.get(Document, document_id)
+            if document is not None:
+                document.review_reasons = [
+                    reason
+                    for reason in document.review_reasons
+                    if reason != "analysis_pending:metadata"
+                ] + ["analysis_disabled:metadata"]
+                await session.commit()
+
     await _sync_smart_tags(document_id)
 
     async with AsyncSessionFactory() as session:

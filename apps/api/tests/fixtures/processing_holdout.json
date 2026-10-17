@@ -1,0 +1,32 @@
+[
+  {
+    "name": "Two-page policy with cancellation on the second page",
+    "pages": ["INSURANCE POLICY\nProvider: Northstar Mutual\nPolicy Number: NM-773901\nPremium: INR 18650\nExpiry Date: 31/12/2027", "POLICY STATUS UPDATE\nPolicy Number: NM-773901\nThis policy was cancelled effective 15/09/2026. No coverage remains. Refund INR 7400 issued."],
+    "current_category": "insurance_policy",
+    "expected_category": "insurance_policy",
+    "expected_metadata": {"provider": "Northstar Mutual", "policy_number": "NM-773901", "premium": 18650},
+    "summary_concepts": [["cancelled"], ["no coverage remains"], ["7400"]],
+    "tag_facets": [["cancellation"]],
+    "expected_warnings": ["status_change:reminders"],
+    "expected_pages": [1, 2]
+  },
+  {
+    "name": "Conflicting totals on invoice pages are withheld",
+    "pages": ["TAX INVOICE\nVendor: Willow Systems\nInvoice Number: WS-882\nTotal Amount: INR 1400", "INVOICE CORRECTION\nVendor: Willow Systems\nInvoice Number: WS-882\nTotal Amount: INR 1600"],
+    "current_category": "invoice",
+    "expected_category": "invoice",
+    "expected_metadata": {"vendor": "Willow Systems", "invoice_number": "WS-882"},
+    "withheld_fields": ["total_amount"],
+    "expected_warnings": ["conflicting_metadata:total_amount"],
+    "expected_pages": [1, 2]
+  },
+  {
+    "name": "Conditional cancellation clause does not mark a policy cancelled",
+    "text": "INSURANCE POLICY\nProvider: Cedar Cover\nPolicy Number: CC-93017\nPremium: INR 5800\nExpiry Date: 30/06/2027\nIf the policy is cancelled, a processing fee may apply.",
+    "current_category": "insurance_policy",
+    "expected_category": "insurance_policy",
+    "expected_metadata": {"provider": "Cedar Cover", "policy_number": "CC-93017", "premium": 5800},
+    "forbidden_warnings": ["status_change:reminders"],
+    "expected_pages": [1]
+  }
+]

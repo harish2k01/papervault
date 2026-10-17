@@ -11,6 +11,8 @@ PaperVault runs in the `papervault` namespace at
 - Password-authenticated Redis with a 2 GiB Longhorn volume and AOF persistence.
 - Digest-pinned RustFS S3 storage with a 20 GiB Longhorn volume. Its S3 service is
   private to the cluster and the console is disabled.
+- Digest-pinned Ollama with a 15 GiB Longhorn model volume, a private ClusterIP,
+  cloud inference disabled, and one CPU inference slot.
 
 These are single-instance services. Longhorn replication does not provide an
 independent database or object-store backup. Off-cluster backups and restore
@@ -18,8 +20,9 @@ verification remain required before treating the vault as the only copy of a fil
 
 The application uses PostgreSQL-backed search for this initial deployment, matching
 the primary exact-content retrieval workflow. OpenSearch indexing is disabled.
-The built-in local analysis and hashing embedding providers remain lexical baselines;
-the deployment does not claim model-level semantic understanding.
+Analysis uses local Qwen3 1.7B with server-validated source references. Embeddings
+and answers remain lexical baselines; this deployment does not provide model-based
+semantic retrieval.
 
 ## Credentials
 
@@ -71,8 +74,35 @@ must exist before migrations can run. The HTTPRoute remains disabled until migra
 the private documents bucket, and the owner account are ready. Later upgrades use
 the chart's migration hook with the existing runtime resources.
 
-Workers have explicit concurrency of two and a prefetch multiplier of one. Image
+Workers have concurrency of one and a prefetch multiplier of one to bound CPU model
+queueing. Image
 builders use the runner network to avoid a nested Docker MTU mismatch.
+
+## Local analysis model
+
+The profile selects `qwen3:1.7b`, manifest
+`8f68893c685c3ddff2aa3fffce2aa60a30bb2da65ca488b61fff134a4d1730e7`.
+On a fresh installation, provision these public weights before enabling the profile:
+
+```sh
+kubectl -n papervault rollout status statefulset/papervault-model
+kubectl -n papervault exec papervault-model-0 -- ollama pull qwen3:1.7b
+kubectl -n papervault exec papervault-model-0 -- ollama list
+```
+
+Verify the full manifest through `/api/tags`; the application rejects changed weights
+before sending document text. Tags can move upstream, so a future download may require
+a separately evaluated model update. Ollama has no ingress and `OLLAMA_NO_CLOUD=1`.
+Document content travels only from the worker to this cluster service. Public model
+downloads require internet access. Retain runtime and model identities with deployment
+records independently of application releases.
+
+The model pod requests 4 GiB, limits memory to 6 GiB and CPU to three cores, and uses
+a 16,384-token context. Each source window has a conservative input budget plus
+2,048 output tokens. Windows cover source pages instead of truncating a document at
+a fixed character count. A 300-second request timeout surfaces failures for review.
+Text search remains usable when enrichment fails. CPU processing can take minutes
+for long documents; the single worker provides limited throughput.
 
 ## Verification
 

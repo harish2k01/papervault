@@ -4,7 +4,11 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from papervault_api.documents.infrastructure.models import Document, DocumentMetadataRecord
+from papervault_api.documents.infrastructure.models import (
+    Document,
+    DocumentAIAnalysis,
+    DocumentMetadataRecord,
+)
 from papervault_api.notifications.domain.enums import NotificationKind, NotificationStatus
 from papervault_api.notifications.infrastructure.models import Notification
 
@@ -26,6 +30,15 @@ class NotificationService:
             return ()
 
         metadata = await self._get_current_metadata(document_id)
+        if metadata is not None and metadata.source == "ai":
+            analysis = await self._session.scalar(
+                select(DocumentAIAnalysis).where(
+                    DocumentAIAnalysis.document_id == document_id,
+                    DocumentAIAnalysis.is_current.is_(True),
+                )
+            )
+            if analysis is not None and "status_change:reminders" in analysis.quality_warnings:
+                metadata = None
         notifications: list[Notification] = []
         expected_notifications: set[tuple[str, date]] = set()
         if metadata is not None:

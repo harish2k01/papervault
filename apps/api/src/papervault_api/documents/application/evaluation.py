@@ -65,6 +65,46 @@ def evaluate_analysis(
         checks.append(
             QualityCheck("metadata", field, fact_matches(expected, actual), expected, actual)
         )
+    for field in case.get("withheld_fields", []):
+        checks.append(
+            QualityCheck(
+                "metadata_withheld",
+                field,
+                field not in normalized.data,
+                "absent",
+                normalized.data.get(field),
+            )
+        )
+    for warning in case.get("expected_warnings", []):
+        checks.append(
+            QualityCheck(
+                "quality_warning",
+                warning,
+                warning in analysis.quality_warnings,
+                "present",
+                list(analysis.quality_warnings),
+            )
+        )
+    for warning in case.get("forbidden_warnings", []):
+        checks.append(
+            QualityCheck(
+                "quality_warning_absent",
+                warning,
+                warning not in analysis.quality_warnings,
+                "absent",
+                list(analysis.quality_warnings),
+            )
+        )
+    if "expected_pages" in case:
+        checks.append(
+            QualityCheck(
+                "page_coverage",
+                "covered_pages",
+                list(analysis.covered_pages) == case["expected_pages"],
+                case["expected_pages"],
+                list(analysis.covered_pages),
+            )
+        )
     for index, alternatives in enumerate(case.get("summary_concepts", [])):
         checks.append(
             QualityCheck(

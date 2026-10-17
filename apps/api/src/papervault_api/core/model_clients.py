@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Protocol
+from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 from urllib.error import HTTPError, URLError
 from urllib.parse import urljoin
 from urllib.request import Request, urlopen
@@ -27,6 +27,12 @@ class ModelClient(Protocol):
         raise NotImplementedError
 
     def health(self) -> tuple[bool, str]:
+        raise NotImplementedError
+
+
+@runtime_checkable
+class StructuredModelClient(Protocol):
+    def complete_structured(self, *, system: str, user: str, schema: dict[str, Any]) -> str:
         raise NotImplementedError
 
 
@@ -91,29 +97,62 @@ class OllamaModelClient:
         embedding_model: str,
         timeout_seconds: float,
         http_client: JsonHttpClient | None = None,
+        context_tokens: int = 16384,
+        max_output_tokens: int = 2048,
+        expected_digest: str | None = None,
     ) -> None:
         self.chat_model = chat_model
         self.embedding_model = embedding_model
+        self._context_tokens = context_tokens
+        self._max_output_tokens = max_output_tokens
+        self.context_tokens = context_tokens
+        self.max_output_tokens = max_output_tokens
+        self._expected_digest = expected_digest.removeprefix("sha256:") if expected_digest else None
+        self._identity_verified = False
         self._http = http_client or JsonHttpClient(
             base_url=base_url,
             timeout_seconds=timeout_seconds,
         )
 
     def complete(self, *, system: str, user: str) -> str:
+        return self._complete(system=system, user=user, output_format="json")
+
+    def complete_structured(self, *, system: str, user: str, schema: dict[str, Any]) -> str:
+        return self._complete(system=system, user=user, output_format=schema)
+
+    def _complete(self, *, system: str, user: str, output_format: str | dict[str, Any]) -> str:
+        if self._expected_digest and not self._identity_verified:
+            models = self._http.request("GET", "/api/tags").body.get("models", [])
+            selected = next(
+                (model for model in models if model.get("name") == self.chat_model), None
+            )
+            if selected is None or selected.get("digest") != self._expected_digest:
+                raise ModelProviderError(
+                    "Installed analysis model does not match its configured digest"
+                )
+            self._identity_verified = True
         response = self._http.request(
             "POST",
             "/api/chat",
             {
                 "model": self.chat_model,
                 "stream": False,
-                "format": "json",
-                "options": {"temperature": 0},
+                "format": output_format,
+                "think": False,
+                "options": {
+                    "temperature": 0,
+                    "num_ctx": self._context_tokens,
+                    "num_predict": self._max_output_tokens,
+                    "num_thread": 3,
+                },
                 "messages": [
                     {"role": "system", "content": system},
                     {"role": "user", "content": user},
                 ],
             },
         )
+        if response.body.get("done_reason") == "length":
+            raise ModelProviderError("Model output exceeded its configured token budget")
         message = response.body.get("message")
         if not isinstance(message, dict) or not isinstance(message.get("content"), str):
             raise ModelProviderError("Ollama response is missing message content")
@@ -138,7 +177,13 @@ class OllamaModelClient:
 
     def health(self) -> tuple[bool, str]:
         try:
-            self._http.request("GET", "/api/tags")
+            models = self._http.request("GET", "/api/tags").body.get("models", [])
+            if self._expected_digest:
+                selected = next(
+                    (model for model in models if model.get("name") == self.chat_model), None
+                )
+                if selected is None or selected.get("digest") != self._expected_digest:
+                    return False, "Installed analysis model does not match its configured digest"
         except ModelProviderError as exc:
             return False, str(exc)
         return True, "Ollama is reachable"
@@ -250,6 +295,9 @@ def build_model_client(
             chat_model=settings.ollama_chat_model,
             embedding_model=settings.ollama_embedding_model,
             timeout_seconds=timeout,
+            context_tokens=settings.ollama_context_tokens,
+            max_output_tokens=settings.ollama_max_output_tokens,
+            expected_digest=settings.ollama_expected_digest,
         )
     if provider == "openai_compatible":
         return OpenAICompatibleModelClient(

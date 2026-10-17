@@ -68,6 +68,15 @@ class Settings(BaseSettings):
         default="nomic-embed-text",
         alias="PAPERVAULT_OLLAMA_EMBEDDING_MODEL",
     )
+    ollama_context_tokens: int = Field(
+        default=16384, ge=4096, le=65536, alias="PAPERVAULT_OLLAMA_CONTEXT_TOKENS"
+    )
+    ollama_max_output_tokens: int = Field(
+        default=2048, ge=256, le=8192, alias="PAPERVAULT_OLLAMA_MAX_OUTPUT_TOKENS"
+    )
+    ollama_expected_digest: str | None = Field(
+        default=None, alias="PAPERVAULT_OLLAMA_EXPECTED_DIGEST"
+    )
     openai_compatible_base_url: str = Field(
         default="https://api.openai.com/v1",
         alias="PAPERVAULT_OPENAI_COMPATIBLE_BASE_URL",
@@ -174,6 +183,7 @@ class Settings(BaseSettings):
         "oidc_redirect_uri",
         "otel_exporter_otlp_endpoint",
         "openai_compatible_api_key",
+        "ollama_expected_digest",
         "ocr_max_pdf_pages",
         mode="before",
     )

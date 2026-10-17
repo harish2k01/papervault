@@ -4,7 +4,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from papervault_api.documents.application.extraction import (
@@ -19,11 +19,15 @@ from papervault_api.documents.domain.enums import (
 )
 from papervault_api.documents.infrastructure.models import (
     Document,
+    DocumentAIAnalysis,
+    DocumentEmbedding,
+    DocumentMetadataRecord,
     DocumentTextBlock,
     DocumentTextExtraction,
     DocumentTextPage,
     DocumentVersion,
 )
+from papervault_api.tags.infrastructure.models import DocumentTag
 
 
 class DocumentProcessingService:
@@ -67,6 +71,20 @@ class DocumentProcessingService:
         page_texts = tuple(sanitize_extracted_text(text) for text in result.page_texts)
 
         await self._mark_existing_extractions_not_current(document.id)
+        for derived_model in (DocumentAIAnalysis, DocumentEmbedding, DocumentMetadataRecord):
+            statement = update(derived_model).where(
+                derived_model.document_id == document.id,
+                derived_model.is_current.is_(True),
+            )
+            if derived_model is DocumentMetadataRecord:
+                statement = statement.where(DocumentMetadataRecord.source == "ai")
+            await self._session.execute(statement.values(is_current=False))
+        document.summary = None
+        await self._session.execute(
+            delete(DocumentTag).where(
+                DocumentTag.document_id == document.id, DocumentTag.source == "ai"
+            )
+        )
         current_version_id = await self._session.scalar(
             select(DocumentVersion.id).where(
                 DocumentVersion.document_id == document.id,

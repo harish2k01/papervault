@@ -4,7 +4,11 @@ from uuid import uuid4
 
 import pytest
 
-from papervault_api.core.model_clients import JsonHttpResponse
+from papervault_api.core.model_clients import (
+    JsonHttpResponse,
+    ModelProviderError,
+    OllamaModelClient,
+)
 from papervault_api.documents.infrastructure.ai import (
     LocalDocumentAIProvider,
     ModelDocumentAIProvider,
@@ -46,11 +50,17 @@ def test_model_analysis_validates_structured_response() -> None:
                 "category": "salary_slip",
                 "confidence_score": 0.94,
                 "extracted_metadata": {"net_salary": 108500},
+                "field_evidence": [
+                    {"field": "net_salary", "page_number": 1, "quote": "Net Salary: INR 108500"}
+                ],
+                "summary_points": [
+                    {"page_number": 1, "quote": "Net Salary: INR 108500", "importance": 2}
+                ],
             }
         )
     )
 
-    result = provider.analyze("Document text", "generic_pdf")
+    result = provider.analyze("Salary Slip\nNet Salary: INR 108500", "generic_pdf")
 
     assert result.category == "salary_slip"
     assert result.confidence_score == 0.94
@@ -113,3 +123,53 @@ def test_local_provider_evaluation_fixture() -> None:
 def test_json_http_response_fixture_is_an_object() -> None:
     response = JsonHttpResponse(status_code=200, body={"ok": True})
     assert response.body == {"ok": True}
+
+
+def test_ollama_rejects_changed_weights_before_sending_document_contents() -> None:
+    class HTTP:
+        def __init__(self):
+            self.calls: list[str] = []
+
+        def request(self, method, path, body=None):
+            self.calls.append(path)
+            return JsonHttpResponse(200, {"models": [{"name": "local", "digest": "wrong"}]})
+
+    http = HTTP()
+    client = OllamaModelClient(
+        base_url="http://private",
+        chat_model="local",
+        embedding_model="unused",
+        timeout_seconds=10,
+        expected_digest="expected",
+        http_client=http,
+    )
+    with pytest.raises(ModelProviderError, match="digest"):
+        client.complete(system="contract", user="document")
+    assert http.calls == ["/api/tags"]
+
+
+def test_ollama_uses_structured_schema_and_rejects_truncated_output() -> None:
+    class HTTP:
+        body = None
+
+        def request(self, method, path, body=None):
+            self.body = body
+            return JsonHttpResponse(200, {"done_reason": "length", "message": {"content": "{}"}})
+
+    http = HTTP()
+    client = OllamaModelClient(
+        base_url="http://private",
+        chat_model="local",
+        embedding_model="unused",
+        timeout_seconds=10,
+        http_client=http,
+        context_tokens=8192,
+        max_output_tokens=1024,
+    )
+    schema = {"type": "object"}
+    with pytest.raises(ModelProviderError, match="token budget"):
+        client.complete_structured(system="contract", user="document", schema=schema)
+    assert http.body["format"] == schema
+    assert http.body["think"] is False
+    assert http.body["options"]["num_ctx"] == 8192
+    assert http.body["options"]["num_predict"] == 1024

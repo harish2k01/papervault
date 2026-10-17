@@ -100,6 +100,17 @@ class DocumentTag(Base):
     tag: Mapped[Tag] = relationship(back_populates="document_links")
 
 
+class DocumentTagSuppression(Base):
+    __tablename__ = "document_tag_suppressions"
+
+    document_id: Mapped[UUID] = mapped_column(
+        ForeignKey("documents.id", ondelete="CASCADE"), primary_key=True
+    )
+    tag_id: Mapped[UUID] = mapped_column(
+        ForeignKey("tags.id", ondelete="CASCADE"), primary_key=True
+    )
+
+
 class SmartTagRule(Base):
     __tablename__ = "smart_tag_rules"
 

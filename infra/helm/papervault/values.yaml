@@ -87,6 +87,9 @@ config:
   modelProviderTimeoutSeconds: "60"
   ollamaBaseUrl: http://ollama:11434
   ollamaChatModel: llama3.2
+  ollamaExpectedDigest: ""
+  ollamaContextTokens: "16384"
+  ollamaMaxOutputTokens: "2048"
   ollamaEmbeddingModel: nomic-embed-text
   openaiCompatibleBaseUrl: https://api.openai.com/v1
   openaiCompatibleChatModel: gpt-4.1-mini

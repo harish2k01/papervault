@@ -32,7 +32,7 @@
     "text": "SALARY SLIP\nEmployer: Example Company\nMonth: March\nYear: 2026\nGross Salary: INR 10000\nDeductions: INR 10000\nNet Pay: INR 0",
     "expected_category": "salary_slip",
     "expected_metadata": {"employer": "Example Company", "month": 3, "year": 2026, "net_salary": 0, "gross_salary": 10000},
-    "summary_concepts": [["net salary: INR 0", "net pay is zero", "net pay: 0", "net salary: 0"]],
+    "summary_concepts": [["net salary: INR 0", "net pay: INR 0", "net pay is zero", "net pay: 0", "net salary: 0"]],
     "tag_facets": [["salary-slip", "payroll"]],
     "unhelpful_tags": ["inr", "slip", "employer"]
   },

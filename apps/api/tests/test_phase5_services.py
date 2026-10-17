@@ -19,6 +19,7 @@ from papervault_api.documents.domain.enums import (
 from papervault_api.documents.infrastructure.ai import HashingEmbeddingProvider
 from papervault_api.documents.infrastructure.models import (
     Document,
+    DocumentAIAnalysis,
     DocumentEmbedding,
     DocumentMetadataRecord,
     DocumentTextExtraction,
@@ -52,6 +53,51 @@ class FakeSearchQueryIndex:
         self.requests.append(request)
         self.query_embeddings.append(query_embedding)
         return self.results
+
+
+async def test_cancelled_ai_policy_dismisses_reminders_until_dates_are_manually_confirmed(
+    session: AsyncSession,
+) -> None:
+    _, document = await create_document_with_text(
+        session,
+        title="Cancelled policy",
+        text="Policy was cancelled.",
+        document_type="insurance_policy",
+    )
+    metadata = DocumentMetadataRecord(
+        document_id=document.id,
+        schema_name="insurance_policy",
+        schema_version=1,
+        data={"expiry_date": "2027-01-01"},
+        source="ai",
+        is_current=True,
+    )
+    session.add(metadata)
+    await session.commit()
+    service = NotificationService(session)
+    existing = await service.generate_for_document(document.id)
+    assert len(existing) == 1
+    session.add(
+        DocumentAIAnalysis(
+            document_id=document.id,
+            provider="ollama",
+            model="test",
+            status="succeeded",
+            quality_warnings=["status_change:reminders"],
+            is_current=True,
+        )
+    )
+    # Approval may clear review reasons, but must not erase the persisted warning.
+    document.review_reasons = []
+    await session.commit()
+    assert await service.generate_for_document(document.id) == ()
+    await session.refresh(existing[0])
+    assert existing[0].status == NotificationStatus.DISMISSED.value
+    metadata.source = "manual"
+    metadata.data = {"expiry_date": "2027-02-01"}
+    await session.commit()
+    confirmed = await service.generate_for_document(document.id)
+    assert len(confirmed) == 1 and confirmed[0].due_date == date(2027, 2, 1)
 
 
 class FailingSearchQueryIndex:

@@ -265,10 +265,12 @@ export function AppShell() {
     refetchInterval: (query) =>
       query.state.data?.pages
         .flat()
-        .some((document) =>
-          ["uploaded", "pending_processing", "processing"].includes(
-            document.status,
-          ),
+        .some(
+          (document) =>
+            document.review_reasons?.includes("analysis_pending:metadata") ||
+            ["uploaded", "pending_processing", "processing"].includes(
+              document.status,
+            ),
         )
         ? 3000
         : false,
@@ -338,6 +340,9 @@ export function AppShell() {
     queryFn: () => getDocument(selectedDocumentId!),
     enabled: workspaceEnabled && selectedDocumentId !== null,
     refetchInterval: (query) =>
+      query.state.data?.document.review_reasons?.includes(
+        "analysis_pending:metadata",
+      ) ||
       ["uploaded", "pending_processing", "processing"].includes(
         query.state.data?.document.status ?? "",
       )
@@ -1360,6 +1365,7 @@ export function AppShell() {
               <div className="min-h-0 flex-1 overflow-auto">
                 {selectedDocumentId ? (
                   <DocumentPanel
+                    key={selectedDocumentId ?? "empty"}
                     detail={detailQuery.data}
                     documentTypes={documentTypesQuery.data ?? []}
                     duplicateGroups={duplicateGroups}
@@ -2618,6 +2624,7 @@ function DocumentPanel({
 }) {
   const [fieldsEditorOpen, setFieldsEditorOpen] = useState(false);
   const [metadataEditorOpen, setMetadataEditorOpen] = useState(false);
+  const [pageRequest, setPageRequest] = useState<{ pageNumber: number }>();
   const [activeTab, setActiveTab] = useState<
     "overview" | "details" | "activity" | "versions"
   >("overview");
@@ -2813,6 +2820,7 @@ function DocumentPanel({
                 <Suspense fallback={<PreviewLoadingState />}>
                   <DocumentPreview
                     document={detail.document}
+                    pageRequest={pageRequest}
                     ocrGeometryAvailable={
                       detail.text_extraction?.source === "ocr"
                     }
@@ -2832,14 +2840,19 @@ function DocumentPanel({
                       </span>
                     </div>
                     <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">
-                      {detail.ai_analysis?.summary ??
-                        "No summary generated yet."}
+                      {detail.document.review_reasons?.includes(
+                        "analysis_pending:metadata",
+                      )
+                        ? "Reading your document and preparing its summary…"
+                        : (detail.ai_analysis?.summary ??
+                          "No summary generated yet.")}
                     </p>
                   </div>
                   {confidence !== null && confidence !== undefined ? (
                     <div className="flex items-center gap-2">
                       <span className="rounded-full bg-muted px-3 py-1 text-xs text-muted-foreground">
-                        {Math.round(confidence * 100)}% confidence
+                        {Math.round(confidence * 100)}% classification
+                        confidence
                       </span>
                       <Button
                         size="sm"
@@ -2854,6 +2867,42 @@ function DocumentPanel({
                     </div>
                   ) : null}
                 </div>
+                {detail.ai_analysis?.summary_evidence?.length ||
+                detail.ai_analysis?.field_evidence?.length ? (
+                  <details className="mt-4 rounded-lg border border-border p-3">
+                    <summary className="cursor-pointer text-sm font-medium">
+                      Source evidence
+                    </summary>
+                    <p className="mt-2 text-xs text-muted-foreground">
+                      Check the passages used for the summary and suggested
+                      fields against the original.
+                    </p>
+                    <div className="mt-3 space-y-3">
+                      {[
+                        ...(detail.ai_analysis?.summary_evidence ?? []),
+                        ...(detail.ai_analysis?.field_evidence ?? []),
+                      ].map((item, index) => (
+                        <div key={`${item.page_number}-${index}`}>
+                          <button
+                            type="button"
+                            className="text-xs font-medium text-primary underline underline-offset-2"
+                            onClick={() =>
+                              setPageRequest({ pageNumber: item.page_number })
+                            }
+                          >
+                            Page {item.page_number}
+                            {"field" in item && item.field
+                              ? ` · ${humanizeLabel(item.field)}`
+                              : ""}
+                          </button>
+                          <blockquote className="mt-1 border-l-2 border-primary/30 pl-3 text-sm text-muted-foreground">
+                            {item.quote}
+                          </blockquote>
+                        </div>
+                      ))}
+                    </div>
+                  </details>
+                ) : null}
                 {detail.ai_analysis?.keywords?.length ? (
                   <div className="mt-4 flex flex-wrap gap-2">
                     {detail.ai_analysis.keywords.slice(0, 8).map((keyword) => (
