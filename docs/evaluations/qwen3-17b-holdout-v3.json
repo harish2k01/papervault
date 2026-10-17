@@ -1,0 +1,724 @@
+{
+  "schema_version": 1,
+  "passed": true,
+  "cases_passed": 3,
+  "cases_total": 3,
+  "metrics": {
+    "classification": {
+      "passed": 3,
+      "total": 3,
+      "rate": 1.0
+    },
+    "metadata": {
+      "passed": 8,
+      "total": 8,
+      "rate": 1.0
+    },
+    "quality_warning": {
+      "passed": 2,
+      "total": 2,
+      "rate": 1.0
+    },
+    "page_coverage": {
+      "passed": 3,
+      "total": 3,
+      "rate": 1.0
+    },
+    "summary_coverage": {
+      "passed": 3,
+      "total": 3,
+      "rate": 1.0
+    },
+    "tag_coverage": {
+      "passed": 1,
+      "total": 1,
+      "rate": 1.0
+    },
+    "metadata_withheld": {
+      "passed": 1,
+      "total": 1,
+      "rate": 1.0
+    },
+    "quality_warning_absent": {
+      "passed": 1,
+      "total": 1,
+      "rate": 1.0
+    }
+  },
+  "cases": [
+    {
+      "name": "Two-page policy with cancellation on the second page",
+      "passed": true,
+      "provider": "ollama",
+      "model": "qwen3:1.7b",
+      "classification_confidence": 1.0,
+      "checks": [
+        {
+          "metric": "classification",
+          "field": "category",
+          "passed": true,
+          "expected": "insurance_policy",
+          "actual": "insurance_policy"
+        },
+        {
+          "metric": "metadata",
+          "field": "provider",
+          "passed": true,
+          "expected": "Northstar Mutual",
+          "actual": "Northstar Mutual"
+        },
+        {
+          "metric": "metadata",
+          "field": "policy_number",
+          "passed": true,
+          "expected": "NM-773901",
+          "actual": "NM-773901"
+        },
+        {
+          "metric": "metadata",
+          "field": "premium",
+          "passed": true,
+          "expected": 18650,
+          "actual": 18650
+        },
+        {
+          "metric": "quality_warning",
+          "field": "status_change:reminders",
+          "passed": true,
+          "expected": "present",
+          "actual": [
+            "unsupported_metadata:provider",
+            "unsupported_metadata:policy_number",
+            "unsupported_metadata:coverage",
+            "unsupported_metadata:expiry_date",
+            "status_change:reminders"
+          ]
+        },
+        {
+          "metric": "page_coverage",
+          "field": "covered_pages",
+          "passed": true,
+          "expected": [
+            1,
+            2
+          ],
+          "actual": [
+            1,
+            2
+          ]
+        },
+        {
+          "metric": "summary_coverage",
+          "field": "0",
+          "passed": true,
+          "expected": [
+            "cancelled"
+          ],
+          "actual": "Premium: INR 18650 Expiry Date: 31/12/2027 This policy was cancelled effective 15/09/2026. No coverage remains. Refund INR 7400 issued. INSURANCE POLICY Provider: Northstar Mutual Policy Number: NM-773901"
+        },
+        {
+          "metric": "summary_coverage",
+          "field": "1",
+          "passed": true,
+          "expected": [
+            "no coverage remains"
+          ],
+          "actual": "Premium: INR 18650 Expiry Date: 31/12/2027 This policy was cancelled effective 15/09/2026. No coverage remains. Refund INR 7400 issued. INSURANCE POLICY Provider: Northstar Mutual Policy Number: NM-773901"
+        },
+        {
+          "metric": "summary_coverage",
+          "field": "2",
+          "passed": true,
+          "expected": [
+            "7400"
+          ],
+          "actual": "Premium: INR 18650 Expiry Date: 31/12/2027 This policy was cancelled effective 15/09/2026. No coverage remains. Refund INR 7400 issued. INSURANCE POLICY Provider: Northstar Mutual Policy Number: NM-773901"
+        },
+        {
+          "metric": "tag_coverage",
+          "field": "0",
+          "passed": true,
+          "expected": [
+            "cancellation"
+          ],
+          "actual": [
+            "insurance-policy",
+            "premium",
+            "cancellation"
+          ]
+        }
+      ],
+      "latency_seconds": 61.774,
+      "field_evidence": [
+        {
+          "page_number": 1,
+          "quote": "Premium: INR 18650",
+          "field": "premium"
+        },
+        {
+          "page_number": 1,
+          "quote": "Expiry Date: 31/12/2027",
+          "field": "expiry_date"
+        },
+        {
+          "page_number": 1,
+          "quote": "Provider: Northstar Mutual",
+          "field": "provider"
+        },
+        {
+          "page_number": 1,
+          "quote": "Policy Number: NM-773901",
+          "field": "policy_number"
+        }
+      ],
+      "summary_evidence": [
+        {
+          "page_number": 1,
+          "quote": "Premium: INR 18650",
+          "field": null
+        },
+        {
+          "page_number": 1,
+          "quote": "Expiry Date: 31/12/2027",
+          "field": null
+        },
+        {
+          "page_number": 2,
+          "quote": "This policy was cancelled effective 15/09/2026. No coverage remains. Refund INR 7400 issued.",
+          "field": null
+        },
+        {
+          "page_number": 1,
+          "quote": "INSURANCE POLICY",
+          "field": null
+        },
+        {
+          "page_number": 1,
+          "quote": "Provider: Northstar Mutual",
+          "field": null
+        },
+        {
+          "page_number": 1,
+          "quote": "Policy Number: NM-773901",
+          "field": null
+        }
+      ],
+      "quality_warnings": [
+        "unsupported_metadata:provider",
+        "unsupported_metadata:policy_number",
+        "unsupported_metadata:coverage",
+        "unsupported_metadata:expiry_date",
+        "status_change:reminders"
+      ],
+      "covered_pages": [
+        1,
+        2
+      ],
+      "analysis": {
+        "provider": "ollama",
+        "model": "qwen3:1.7b",
+        "summary": "Premium: INR 18650 Expiry Date: 31/12/2027 This policy was cancelled effective 15/09/2026. No coverage remains. Refund INR 7400 issued. INSURANCE POLICY Provider: Northstar Mutual Policy Number: NM-773901",
+        "keywords": [
+          "nm-773901",
+          "insurance",
+          "provider",
+          "northstar",
+          "mutual",
+          "premium",
+          "expiry",
+          "was",
+          "cancelled",
+          "effective",
+          "coverage",
+          "remains"
+        ],
+        "entities": [
+          {
+            "kind": "amount",
+            "value": "INR 18650",
+            "confidence_score": 0.7
+          },
+          {
+            "kind": "amount",
+            "value": "INR 7400",
+            "confidence_score": 0.7
+          },
+          {
+            "kind": "date",
+            "value": "31/12/2027",
+            "confidence_score": 0.7
+          },
+          {
+            "kind": "date",
+            "value": "15/09/2026",
+            "confidence_score": 0.7
+          }
+        ],
+        "suggested_tags": [
+          "insurance-policy",
+          "premium",
+          "cancellation"
+        ],
+        "category": "insurance_policy",
+        "confidence_score": 1.0,
+        "extracted_metadata": {
+          "premium": 18650,
+          "expiry_date": "2027-12-31",
+          "provider": "Northstar Mutual",
+          "policy_number": "NM-773901"
+        },
+        "field_evidence": [
+          {
+            "page_number": 1,
+            "quote": "Premium: INR 18650",
+            "field": "premium"
+          },
+          {
+            "page_number": 1,
+            "quote": "Expiry Date: 31/12/2027",
+            "field": "expiry_date"
+          },
+          {
+            "page_number": 1,
+            "quote": "Provider: Northstar Mutual",
+            "field": "provider"
+          },
+          {
+            "page_number": 1,
+            "quote": "Policy Number: NM-773901",
+            "field": "policy_number"
+          }
+        ],
+        "summary_evidence": [
+          {
+            "page_number": 1,
+            "quote": "Premium: INR 18650",
+            "field": null
+          },
+          {
+            "page_number": 1,
+            "quote": "Expiry Date: 31/12/2027",
+            "field": null
+          },
+          {
+            "page_number": 2,
+            "quote": "This policy was cancelled effective 15/09/2026. No coverage remains. Refund INR 7400 issued.",
+            "field": null
+          },
+          {
+            "page_number": 1,
+            "quote": "INSURANCE POLICY",
+            "field": null
+          },
+          {
+            "page_number": 1,
+            "quote": "Provider: Northstar Mutual",
+            "field": null
+          },
+          {
+            "page_number": 1,
+            "quote": "Policy Number: NM-773901",
+            "field": null
+          }
+        ],
+        "quality_warnings": [
+          "unsupported_metadata:provider",
+          "unsupported_metadata:policy_number",
+          "unsupported_metadata:coverage",
+          "unsupported_metadata:expiry_date",
+          "status_change:reminders"
+        ],
+        "covered_pages": [
+          1,
+          2
+        ]
+      }
+    },
+    {
+      "name": "Conflicting totals on invoice pages are withheld",
+      "passed": true,
+      "provider": "ollama",
+      "model": "qwen3:1.7b",
+      "classification_confidence": 1.0,
+      "checks": [
+        {
+          "metric": "classification",
+          "field": "category",
+          "passed": true,
+          "expected": "invoice",
+          "actual": "invoice"
+        },
+        {
+          "metric": "metadata",
+          "field": "vendor",
+          "passed": true,
+          "expected": "Willow Systems",
+          "actual": "Willow Systems"
+        },
+        {
+          "metric": "metadata",
+          "field": "invoice_number",
+          "passed": true,
+          "expected": "WS-882",
+          "actual": "WS-882"
+        },
+        {
+          "metric": "metadata_withheld",
+          "field": "total_amount",
+          "passed": true,
+          "expected": "absent",
+          "actual": null
+        },
+        {
+          "metric": "quality_warning",
+          "field": "conflicting_metadata:total_amount",
+          "passed": true,
+          "expected": "present",
+          "actual": [
+            "conflicting_metadata:total_amount"
+          ]
+        },
+        {
+          "metric": "page_coverage",
+          "field": "covered_pages",
+          "passed": true,
+          "expected": [
+            1,
+            2
+          ],
+          "actual": [
+            1,
+            2
+          ]
+        }
+      ],
+      "latency_seconds": 49.319,
+      "field_evidence": [
+        {
+          "page_number": 1,
+          "quote": "Vendor: Willow Systems",
+          "field": "vendor"
+        },
+        {
+          "page_number": 1,
+          "quote": "Invoice Number: WS-882",
+          "field": "invoice_number"
+        }
+      ],
+      "summary_evidence": [
+        {
+          "page_number": 1,
+          "quote": "Total Amount: INR 1400",
+          "field": null
+        },
+        {
+          "page_number": 2,
+          "quote": "Vendor: Willow Systems",
+          "field": null
+        },
+        {
+          "page_number": 2,
+          "quote": "Invoice Number: WS-882",
+          "field": null
+        },
+        {
+          "page_number": 2,
+          "quote": "Total Amount: INR 1600",
+          "field": null
+        }
+      ],
+      "quality_warnings": [
+        "conflicting_metadata:total_amount"
+      ],
+      "covered_pages": [
+        1,
+        2
+      ],
+      "analysis": {
+        "provider": "ollama",
+        "model": "qwen3:1.7b",
+        "summary": "Total Amount: INR 1400 Vendor: Willow Systems Invoice Number: WS-882 Total Amount: INR 1600",
+        "keywords": [
+          "willow",
+          "systems",
+          "ws-882",
+          "tax",
+          "correction"
+        ],
+        "entities": [
+          {
+            "kind": "amount",
+            "value": "INR 1400",
+            "confidence_score": 0.7
+          },
+          {
+            "kind": "amount",
+            "value": "INR 1600",
+            "confidence_score": 0.7
+          }
+        ],
+        "suggested_tags": [
+          "invoice"
+        ],
+        "category": "invoice",
+        "confidence_score": 1.0,
+        "extracted_metadata": {
+          "vendor": "Willow Systems",
+          "invoice_number": "WS-882"
+        },
+        "field_evidence": [
+          {
+            "page_number": 1,
+            "quote": "Vendor: Willow Systems",
+            "field": "vendor"
+          },
+          {
+            "page_number": 1,
+            "quote": "Invoice Number: WS-882",
+            "field": "invoice_number"
+          }
+        ],
+        "summary_evidence": [
+          {
+            "page_number": 1,
+            "quote": "Total Amount: INR 1400",
+            "field": null
+          },
+          {
+            "page_number": 2,
+            "quote": "Vendor: Willow Systems",
+            "field": null
+          },
+          {
+            "page_number": 2,
+            "quote": "Invoice Number: WS-882",
+            "field": null
+          },
+          {
+            "page_number": 2,
+            "quote": "Total Amount: INR 1600",
+            "field": null
+          }
+        ],
+        "quality_warnings": [
+          "conflicting_metadata:total_amount"
+        ],
+        "covered_pages": [
+          1,
+          2
+        ]
+      }
+    },
+    {
+      "name": "Conditional cancellation clause does not mark a policy cancelled",
+      "passed": true,
+      "provider": "ollama",
+      "model": "qwen3:1.7b",
+      "classification_confidence": 1.0,
+      "checks": [
+        {
+          "metric": "classification",
+          "field": "category",
+          "passed": true,
+          "expected": "insurance_policy",
+          "actual": "insurance_policy"
+        },
+        {
+          "metric": "metadata",
+          "field": "provider",
+          "passed": true,
+          "expected": "Cedar Cover",
+          "actual": "Cedar Cover"
+        },
+        {
+          "metric": "metadata",
+          "field": "policy_number",
+          "passed": true,
+          "expected": "CC-93017",
+          "actual": "CC-93017"
+        },
+        {
+          "metric": "metadata",
+          "field": "premium",
+          "passed": true,
+          "expected": 5800,
+          "actual": 5800
+        },
+        {
+          "metric": "quality_warning_absent",
+          "field": "status_change:reminders",
+          "passed": true,
+          "expected": "absent",
+          "actual": []
+        },
+        {
+          "metric": "page_coverage",
+          "field": "covered_pages",
+          "passed": true,
+          "expected": [
+            1
+          ],
+          "actual": [
+            1
+          ]
+        }
+      ],
+      "latency_seconds": 33.452,
+      "field_evidence": [
+        {
+          "page_number": 1,
+          "quote": "Provider: Cedar Cover",
+          "field": "provider"
+        },
+        {
+          "page_number": 1,
+          "quote": "Policy Number: CC-93017",
+          "field": "policy_number"
+        },
+        {
+          "page_number": 1,
+          "quote": "Premium: INR 5800",
+          "field": "premium"
+        },
+        {
+          "page_number": 1,
+          "quote": "Expiry Date: 30/06/2027",
+          "field": "expiry_date"
+        }
+      ],
+      "summary_evidence": [
+        {
+          "page_number": 1,
+          "quote": "Expiry Date: 30/06/2027",
+          "field": null
+        },
+        {
+          "page_number": 1,
+          "quote": "Provider: Cedar Cover",
+          "field": null
+        },
+        {
+          "page_number": 1,
+          "quote": "Policy Number: CC-93017",
+          "field": null
+        },
+        {
+          "page_number": 1,
+          "quote": "Premium: INR 5800",
+          "field": null
+        }
+      ],
+      "quality_warnings": [],
+      "covered_pages": [
+        1
+      ],
+      "analysis": {
+        "provider": "ollama",
+        "model": "qwen3:1.7b",
+        "summary": "Expiry Date: 30/06/2027 Provider: Cedar Cover Policy Number: CC-93017 Premium: INR 5800",
+        "keywords": [
+          "insurance",
+          "provider",
+          "cedar",
+          "cover",
+          "cc-93017",
+          "premium",
+          "expiry",
+          "cancelled",
+          "processing",
+          "fee",
+          "may",
+          "apply"
+        ],
+        "entities": [
+          {
+            "kind": "amount",
+            "value": "INR 5800",
+            "confidence_score": 0.7
+          },
+          {
+            "kind": "date",
+            "value": "30/06/2027",
+            "confidence_score": 0.7
+          }
+        ],
+        "suggested_tags": [
+          "insurance-policy"
+        ],
+        "category": "insurance_policy",
+        "confidence_score": 1.0,
+        "extracted_metadata": {
+          "provider": "Cedar Cover",
+          "policy_number": "CC-93017",
+          "premium": 5800,
+          "expiry_date": "2027-06-30"
+        },
+        "field_evidence": [
+          {
+            "page_number": 1,
+            "quote": "Provider: Cedar Cover",
+            "field": "provider"
+          },
+          {
+            "page_number": 1,
+            "quote": "Policy Number: CC-93017",
+            "field": "policy_number"
+          },
+          {
+            "page_number": 1,
+            "quote": "Premium: INR 5800",
+            "field": "premium"
+          },
+          {
+            "page_number": 1,
+            "quote": "Expiry Date: 30/06/2027",
+            "field": "expiry_date"
+          }
+        ],
+        "summary_evidence": [
+          {
+            "page_number": 1,
+            "quote": "Expiry Date: 30/06/2027",
+            "field": null
+          },
+          {
+            "page_number": 1,
+            "quote": "Provider: Cedar Cover",
+            "field": null
+          },
+          {
+            "page_number": 1,
+            "quote": "Policy Number: CC-93017",
+            "field": null
+          },
+          {
+            "page_number": 1,
+            "quote": "Premium: INR 5800",
+            "field": null
+          }
+        ],
+        "quality_warnings": [],
+        "covered_pages": [
+          1
+        ]
+      }
+    }
+  ],
+  "limitations": [
+    "Summary checks measure annotated phrase coverage and contradictions, not all factuality.",
+    "Only annotated metadata fields and tag facets are scored; unannotated claims need review.",
+    "Synthetic text cases do not measure photographed-document OCR or semantic retrieval."
+  ],
+  "corpus_complete": true,
+  "corpus_cases_total": 3,
+  "corpus_sha256": "d7cec287d681953cb0d00245b7b14358ce3324fad946db04ec1d8fdfcb8bbbfe",
+  "requested_provider": "ollama",
+  "inference_identity": {
+    "model_manifest_digest": "8f68893c685c3ddff2aa3fffce2aa60a30bb2da65ca488b61fff134a4d1730e7",
+    "server_version": "0.40.5",
+    "analysis_contract": "grounded-lines-v3",
+    "context_tokens": 8192,
+    "max_output_tokens": 2048,
+    "analysis_source_sha256": "c9c0b60d5f5328a5b0049c2d482ab33b01a7c7ee9ce6aa5332acf1eb8a1827ac"
+  }
+}
