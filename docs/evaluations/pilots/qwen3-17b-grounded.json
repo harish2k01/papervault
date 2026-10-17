@@ -1,0 +1,1103 @@
+{
+  "schema_version": 1,
+  "passed": false,
+  "cases_passed": 1,
+  "cases_total": 8,
+  "metrics": {
+    "classification": {
+      "passed": 3,
+      "total": 8,
+      "rate": 0.375
+    },
+    "metadata": {
+      "passed": 8,
+      "total": 30,
+      "rate": 0.2667
+    },
+    "summary_coverage": {
+      "passed": 15,
+      "total": 18,
+      "rate": 0.8333
+    },
+    "tag_coverage": {
+      "passed": 3,
+      "total": 8,
+      "rate": 0.375
+    },
+    "tag_noise": {
+      "passed": 22,
+      "total": 22,
+      "rate": 1.0
+    },
+    "summary_contradiction": {
+      "passed": 7,
+      "total": 7,
+      "rate": 1.0
+    }
+  },
+  "cases": [
+    {
+      "name": "Invoice with colon-delimited labels",
+      "passed": false,
+      "provider": "ollama",
+      "model": "qwen3:1.7b",
+      "classification_confidence": 0.9,
+      "checks": [
+        {
+          "metric": "classification",
+          "field": "category",
+          "passed": true,
+          "expected": "invoice",
+          "actual": "invoice"
+        },
+        {
+          "metric": "metadata",
+          "field": "vendor",
+          "passed": true,
+          "expected": "Acme Electronics",
+          "actual": "Acme Electronics"
+        },
+        {
+          "metric": "metadata",
+          "field": "invoice_number",
+          "passed": true,
+          "expected": "INV-204",
+          "actual": "INV-204"
+        },
+        {
+          "metric": "metadata",
+          "field": "purchase_date",
+          "passed": false,
+          "expected": "2026-07-11",
+          "actual": null
+        },
+        {
+          "metric": "metadata",
+          "field": "total_amount",
+          "passed": true,
+          "expected": 124999.5,
+          "actual": 124999.5
+        },
+        {
+          "metric": "summary_coverage",
+          "field": "0",
+          "passed": false,
+          "expected": [
+            "Acme Electronics"
+          ],
+          "actual": ""
+        },
+        {
+          "metric": "summary_coverage",
+          "field": "1",
+          "passed": false,
+          "expected": [
+            "INV-204"
+          ],
+          "actual": ""
+        },
+        {
+          "metric": "summary_coverage",
+          "field": "2",
+          "passed": false,
+          "expected": [
+            "124999.5",
+            "124,999.50"
+          ],
+          "actual": ""
+        },
+        {
+          "metric": "tag_coverage",
+          "field": "0",
+          "passed": true,
+          "expected": [
+            "invoice",
+            "purchase"
+          ],
+          "actual": [
+            "invoice"
+          ]
+        },
+        {
+          "metric": "tag_noise",
+          "field": "vendor",
+          "passed": true,
+          "expected": "absent",
+          "actual": [
+            "invoice"
+          ]
+        },
+        {
+          "metric": "tag_noise",
+          "field": "inr",
+          "passed": true,
+          "expected": "absent",
+          "actual": [
+            "invoice"
+          ]
+        },
+        {
+          "metric": "tag_noise",
+          "field": "bill",
+          "passed": true,
+          "expected": "absent",
+          "actual": [
+            "invoice"
+          ]
+        }
+      ],
+      "latency_seconds": 64.797,
+      "field_evidence": [
+        {
+          "page_number": 1,
+          "quote": "TAX INVOICE Vendor: Acme Electronics Invoice Number: INV-204 Purchase Date: 11/07/2026 Total Amount: INR 124,999.50 Bill To: Example Customer",
+          "field": "vendor"
+        },
+        {
+          "page_number": 1,
+          "quote": "TAX INVOICE Vendor: Acme Electronics Invoice Number: INV-204 Purchase Date: 11/07/2026 Total Amount: INR 124,999.50 Bill To: Example Customer",
+          "field": "invoice_number"
+        },
+        {
+          "page_number": 1,
+          "quote": "TAX INVOICE Vendor: Acme Electronics Invoice Number: INV-204 Purchase Date: 11/07/2026 Total Amount: INR 124,999.50 Bill To: Example Customer",
+          "field": "total_amount"
+        }
+      ],
+      "summary_evidence": [],
+      "quality_warnings": [
+        "unsupported_metadata:purchase_date",
+        "unsupported_metadata:bill_to",
+        "unsupported_metadata:tags",
+        "missing_summary:source"
+      ],
+      "covered_pages": [
+        1
+      ]
+    },
+    {
+      "name": "Invoice fields arranged in columns",
+      "passed": false,
+      "provider": "ollama",
+      "model": "qwen3:1.7b",
+      "classification_confidence": 0.9,
+      "checks": [
+        {
+          "metric": "classification",
+          "field": "category",
+          "passed": true,
+          "expected": "invoice",
+          "actual": "invoice"
+        },
+        {
+          "metric": "metadata",
+          "field": "vendor",
+          "passed": true,
+          "expected": "Acme Electronics",
+          "actual": "Acme Electronics"
+        },
+        {
+          "metric": "metadata",
+          "field": "invoice_number",
+          "passed": false,
+          "expected": "INV-204",
+          "actual": null
+        },
+        {
+          "metric": "metadata",
+          "field": "purchase_date",
+          "passed": false,
+          "expected": "2026-07-11",
+          "actual": null
+        },
+        {
+          "metric": "metadata",
+          "field": "total_amount",
+          "passed": false,
+          "expected": 124999.5,
+          "actual": null
+        },
+        {
+          "metric": "summary_coverage",
+          "field": "0",
+          "passed": true,
+          "expected": [
+            "Acme Electronics"
+          ],
+          "actual": "TAX INVOICE Vendor Acme Electronics Invoice Number INV-204 Purchase Date 11/07/2026 Total Amount INR 124,999.50 Bill To Example Customer"
+        },
+        {
+          "metric": "summary_coverage",
+          "field": "1",
+          "passed": true,
+          "expected": [
+            "INV-204"
+          ],
+          "actual": "TAX INVOICE Vendor Acme Electronics Invoice Number INV-204 Purchase Date 11/07/2026 Total Amount INR 124,999.50 Bill To Example Customer"
+        },
+        {
+          "metric": "tag_coverage",
+          "field": "0",
+          "passed": true,
+          "expected": [
+            "invoice",
+            "purchase"
+          ],
+          "actual": [
+            "invoice"
+          ]
+        },
+        {
+          "metric": "tag_noise",
+          "field": "vendor",
+          "passed": true,
+          "expected": "absent",
+          "actual": [
+            "invoice"
+          ]
+        },
+        {
+          "metric": "tag_noise",
+          "field": "inr",
+          "passed": true,
+          "expected": "absent",
+          "actual": [
+            "invoice"
+          ]
+        },
+        {
+          "metric": "tag_noise",
+          "field": "bill",
+          "passed": true,
+          "expected": "absent",
+          "actual": [
+            "invoice"
+          ]
+        }
+      ],
+      "latency_seconds": 21.441,
+      "field_evidence": [
+        {
+          "page_number": 1,
+          "quote": "TAX INVOICE Vendor Acme Electronics Invoice Number INV-204 Purchase Date 11/07/2026 Total Amount INR 124,999.50 Bill To Example Customer",
+          "field": "vendor"
+        }
+      ],
+      "summary_evidence": [
+        {
+          "page_number": 1,
+          "quote": "TAX INVOICE Vendor Acme Electronics Invoice Number INV-204 Purchase Date 11/07/2026 Total Amount INR 124,999.50 Bill To Example Customer",
+          "field": null
+        }
+      ],
+      "quality_warnings": [],
+      "covered_pages": [
+        1
+      ]
+    },
+    {
+      "name": "Cancelled policy must describe ended coverage",
+      "passed": false,
+      "provider": "ollama",
+      "model": "qwen3:1.7b",
+      "classification_confidence": 0.9,
+      "checks": [
+        {
+          "metric": "classification",
+          "field": "category",
+          "passed": false,
+          "expected": "insurance_policy",
+          "actual": "invoice"
+        },
+        {
+          "metric": "metadata",
+          "field": "provider",
+          "passed": false,
+          "expected": "Example Insurance",
+          "actual": null
+        },
+        {
+          "metric": "metadata",
+          "field": "policy_number",
+          "passed": false,
+          "expected": "POL-204",
+          "actual": null
+        },
+        {
+          "metric": "metadata",
+          "field": "premium",
+          "passed": false,
+          "expected": 12000,
+          "actual": null
+        },
+        {
+          "metric": "summary_coverage",
+          "field": "0",
+          "passed": true,
+          "expected": [
+            "cancelled",
+            "canceled",
+            "cancellation"
+          ],
+          "actual": "INSURANCE POLICY CANCELLATION NOTICE Provider: Example Insurance Policy Number: POL-204 Premium: INR 12000 Expiry Date: 31/12/2026 This policy was cancelled effective 01/06/2026. No coverage remains. Refund INR 9000 issued."
+        },
+        {
+          "metric": "summary_coverage",
+          "field": "1",
+          "passed": true,
+          "expected": [
+            "no coverage",
+            "coverage ended",
+            "coverage has ended"
+          ],
+          "actual": "INSURANCE POLICY CANCELLATION NOTICE Provider: Example Insurance Policy Number: POL-204 Premium: INR 12000 Expiry Date: 31/12/2026 This policy was cancelled effective 01/06/2026. No coverage remains. Refund INR 9000 issued."
+        },
+        {
+          "metric": "summary_coverage",
+          "field": "2",
+          "passed": true,
+          "expected": [
+            "refund"
+          ],
+          "actual": "INSURANCE POLICY CANCELLATION NOTICE Provider: Example Insurance Policy Number: POL-204 Premium: INR 12000 Expiry Date: 31/12/2026 This policy was cancelled effective 01/06/2026. No coverage remains. Refund INR 9000 issued."
+        },
+        {
+          "metric": "summary_contradiction",
+          "field": "policy is active",
+          "passed": true,
+          "expected": "absent",
+          "actual": "INSURANCE POLICY CANCELLATION NOTICE Provider: Example Insurance Policy Number: POL-204 Premium: INR 12000 Expiry Date: 31/12/2026 This policy was cancelled effective 01/06/2026. No coverage remains. Refund INR 9000 issued."
+        },
+        {
+          "metric": "summary_contradiction",
+          "field": "coverage remains active",
+          "passed": true,
+          "expected": "absent",
+          "actual": "INSURANCE POLICY CANCELLATION NOTICE Provider: Example Insurance Policy Number: POL-204 Premium: INR 12000 Expiry Date: 31/12/2026 This policy was cancelled effective 01/06/2026. No coverage remains. Refund INR 9000 issued."
+        },
+        {
+          "metric": "tag_coverage",
+          "field": "0",
+          "passed": false,
+          "expected": [
+            "cancelled",
+            "cancellation",
+            "cancelled-policy"
+          ],
+          "actual": [
+            "invoice"
+          ]
+        },
+        {
+          "metric": "tag_noise",
+          "field": "inr",
+          "passed": true,
+          "expected": "absent",
+          "actual": [
+            "invoice"
+          ]
+        },
+        {
+          "metric": "tag_noise",
+          "field": "notice",
+          "passed": true,
+          "expected": "absent",
+          "actual": [
+            "invoice"
+          ]
+        }
+      ],
+      "latency_seconds": 34.624,
+      "field_evidence": [
+        {
+          "page_number": 1,
+          "quote": "INSURANCE POLICY CANCELLATION NOTICE Provider: Example Insurance Policy Number: POL-204 Premium: INR 12000 Expiry Date: 31/12/2026 This policy was cancelled effective 01/06/2026. No coverage remains. Refund INR 9000 issued.",
+          "field": "vendor"
+        }
+      ],
+      "summary_evidence": [
+        {
+          "page_number": 1,
+          "quote": "INSURANCE POLICY CANCELLATION NOTICE Provider: Example Insurance Policy Number: POL-204 Premium: INR 12000 Expiry Date: 31/12/2026 This policy was cancelled effective 01/06/2026. No coverage remains. Refund INR 9000 issued.",
+          "field": null
+        }
+      ],
+      "quality_warnings": [],
+      "covered_pages": [
+        1
+      ]
+    },
+    {
+      "name": "Salary with zero net pay",
+      "passed": false,
+      "provider": "ollama",
+      "model": "qwen3:1.7b",
+      "classification_confidence": 0.9,
+      "checks": [
+        {
+          "metric": "classification",
+          "field": "category",
+          "passed": false,
+          "expected": "salary_slip",
+          "actual": "invoice"
+        },
+        {
+          "metric": "metadata",
+          "field": "employer",
+          "passed": false,
+          "expected": "Example Company",
+          "actual": null
+        },
+        {
+          "metric": "metadata",
+          "field": "month",
+          "passed": false,
+          "expected": 3,
+          "actual": null
+        },
+        {
+          "metric": "metadata",
+          "field": "year",
+          "passed": false,
+          "expected": 2026,
+          "actual": null
+        },
+        {
+          "metric": "metadata",
+          "field": "net_salary",
+          "passed": false,
+          "expected": 0,
+          "actual": null
+        },
+        {
+          "metric": "metadata",
+          "field": "gross_salary",
+          "passed": false,
+          "expected": 10000,
+          "actual": null
+        },
+        {
+          "metric": "summary_coverage",
+          "field": "0",
+          "passed": true,
+          "expected": [
+            "net salary: INR 0",
+            "net pay: INR 0",
+            "net pay is zero",
+            "net pay: 0",
+            "net salary: 0"
+          ],
+          "actual": "SALARY SLIP Employer: Example Company Month: March Year: 2026 Gross Salary: INR 10000 Deductions: INR 10000 Net Pay: INR 0"
+        },
+        {
+          "metric": "tag_coverage",
+          "field": "0",
+          "passed": false,
+          "expected": [
+            "salary-slip",
+            "payroll"
+          ],
+          "actual": [
+            "invoice"
+          ]
+        },
+        {
+          "metric": "tag_noise",
+          "field": "inr",
+          "passed": true,
+          "expected": "absent",
+          "actual": [
+            "invoice"
+          ]
+        },
+        {
+          "metric": "tag_noise",
+          "field": "slip",
+          "passed": true,
+          "expected": "absent",
+          "actual": [
+            "invoice"
+          ]
+        },
+        {
+          "metric": "tag_noise",
+          "field": "employer",
+          "passed": true,
+          "expected": "absent",
+          "actual": [
+            "invoice"
+          ]
+        }
+      ],
+      "latency_seconds": 25.79,
+      "field_evidence": [
+        {
+          "page_number": 1,
+          "quote": "SALARY SLIP Employer: Example Company Month: March Year: 2026 Gross Salary: INR 10000 Deductions: INR 10000 Net Pay: INR 0",
+          "field": "vendor"
+        }
+      ],
+      "summary_evidence": [
+        {
+          "page_number": 1,
+          "quote": "SALARY SLIP Employer: Example Company Month: March Year: 2026 Gross Salary: INR 10000 Deductions: INR 10000 Net Pay: INR 0",
+          "field": null
+        }
+      ],
+      "quality_warnings": [],
+      "covered_pages": [
+        1
+      ]
+    },
+    {
+      "name": "Card statement distinguishes minimum from total due",
+      "passed": false,
+      "provider": "ollama",
+      "model": "qwen3:1.7b",
+      "classification_confidence": 0.9,
+      "checks": [
+        {
+          "metric": "classification",
+          "field": "category",
+          "passed": false,
+          "expected": "credit_card_statement",
+          "actual": "invoice"
+        },
+        {
+          "metric": "metadata",
+          "field": "bank",
+          "passed": false,
+          "expected": "Example Bank",
+          "actual": null
+        },
+        {
+          "metric": "metadata",
+          "field": "due_date",
+          "passed": false,
+          "expected": "2026-10-20",
+          "actual": null
+        },
+        {
+          "metric": "metadata",
+          "field": "total_due",
+          "passed": false,
+          "expected": 42000,
+          "actual": null
+        },
+        {
+          "metric": "metadata",
+          "field": "minimum_due",
+          "passed": false,
+          "expected": 2100,
+          "actual": null
+        },
+        {
+          "metric": "summary_coverage",
+          "field": "0",
+          "passed": true,
+          "expected": [
+            "42000",
+            "42,000"
+          ],
+          "actual": "CREDIT CARD STATEMENT Bank: Example Bank Statement Period: September 2026 Due Date: 20/10/2026 Total Due: INR 42000 Minimum Due: INR 2100 Paying the minimum does not settle the full balance"
+        },
+        {
+          "metric": "summary_coverage",
+          "field": "1",
+          "passed": true,
+          "expected": [
+            "2100",
+            "2,100"
+          ],
+          "actual": "CREDIT CARD STATEMENT Bank: Example Bank Statement Period: September 2026 Due Date: 20/10/2026 Total Due: INR 42000 Minimum Due: INR 2100 Paying the minimum does not settle the full balance"
+        },
+        {
+          "metric": "summary_coverage",
+          "field": "2",
+          "passed": true,
+          "expected": [
+            "20/10/2026",
+            "2026-10-20",
+            "20 October 2026"
+          ],
+          "actual": "CREDIT CARD STATEMENT Bank: Example Bank Statement Period: September 2026 Due Date: 20/10/2026 Total Due: INR 42000 Minimum Due: INR 2100 Paying the minimum does not settle the full balance"
+        },
+        {
+          "metric": "summary_contradiction",
+          "field": "minimum payment settles the full balance",
+          "passed": true,
+          "expected": "absent",
+          "actual": "CREDIT CARD STATEMENT Bank: Example Bank Statement Period: September 2026 Due Date: 20/10/2026 Total Due: INR 42000 Minimum Due: INR 2100 Paying the minimum does not settle the full balance"
+        },
+        {
+          "metric": "tag_coverage",
+          "field": "0",
+          "passed": false,
+          "expected": [
+            "credit-card-statement",
+            "credit-card"
+          ],
+          "actual": [
+            "invoice"
+          ]
+        },
+        {
+          "metric": "tag_noise",
+          "field": "inr",
+          "passed": true,
+          "expected": "absent",
+          "actual": [
+            "invoice"
+          ]
+        },
+        {
+          "metric": "tag_noise",
+          "field": "minimum",
+          "passed": true,
+          "expected": "absent",
+          "actual": [
+            "invoice"
+          ]
+        },
+        {
+          "metric": "tag_noise",
+          "field": "due",
+          "passed": true,
+          "expected": "absent",
+          "actual": [
+            "invoice"
+          ]
+        }
+      ],
+      "latency_seconds": 31.162,
+      "field_evidence": [
+        {
+          "page_number": 1,
+          "quote": "CREDIT CARD STATEMENT Bank: Example Bank Statement Period: September 2026 Due Date: 20/10/2026 Total Due: INR 42000 Minimum Due: INR 2100 Paying the minimum does not settle the full balance",
+          "field": "vendor"
+        }
+      ],
+      "summary_evidence": [
+        {
+          "page_number": 1,
+          "quote": "CREDIT CARD STATEMENT Bank: Example Bank Statement Period: September 2026 Due Date: 20/10/2026 Total Due: INR 42000 Minimum Due: INR 2100 Paying the minimum does not settle the full balance",
+          "field": null
+        }
+      ],
+      "quality_warnings": [],
+      "covered_pages": [
+        1
+      ]
+    },
+    {
+      "name": "Clinical finding preserves negation",
+      "passed": false,
+      "provider": "ollama",
+      "model": "qwen3:1.7b",
+      "classification_confidence": 0.9,
+      "checks": [
+        {
+          "metric": "classification",
+          "field": "category",
+          "passed": false,
+          "expected": "medical_report",
+          "actual": "invoice"
+        },
+        {
+          "metric": "metadata",
+          "field": "provider",
+          "passed": false,
+          "expected": "Example Diagnostics",
+          "actual": null
+        },
+        {
+          "metric": "metadata",
+          "field": "patient_name",
+          "passed": false,
+          "expected": "Example Person",
+          "actual": null
+        },
+        {
+          "metric": "metadata",
+          "field": "report_date",
+          "passed": false,
+          "expected": "2026-07-11",
+          "actual": null
+        },
+        {
+          "metric": "summary_coverage",
+          "field": "0",
+          "passed": true,
+          "expected": [
+            "no evidence of fracture",
+            "no fracture",
+            "fracture excluded"
+          ],
+          "actual": "CLINICAL MEDICAL REPORT Provider: Example Diagnostics Patient Name: Example Person Report Date: 11/07/2026 Findings: No evidence of fracture. Mild soft tissue swelling. Follow-up advised if symptoms persist"
+        },
+        {
+          "metric": "summary_coverage",
+          "field": "1",
+          "passed": true,
+          "expected": [
+            "swelling"
+          ],
+          "actual": "CLINICAL MEDICAL REPORT Provider: Example Diagnostics Patient Name: Example Person Report Date: 11/07/2026 Findings: No evidence of fracture. Mild soft tissue swelling. Follow-up advised if symptoms persist"
+        },
+        {
+          "metric": "summary_contradiction",
+          "field": "fracture confirmed",
+          "passed": true,
+          "expected": "absent",
+          "actual": "CLINICAL MEDICAL REPORT Provider: Example Diagnostics Patient Name: Example Person Report Date: 11/07/2026 Findings: No evidence of fracture. Mild soft tissue swelling. Follow-up advised if symptoms persist"
+        },
+        {
+          "metric": "summary_contradiction",
+          "field": "fracture detected",
+          "passed": true,
+          "expected": "absent",
+          "actual": "CLINICAL MEDICAL REPORT Provider: Example Diagnostics Patient Name: Example Person Report Date: 11/07/2026 Findings: No evidence of fracture. Mild soft tissue swelling. Follow-up advised if symptoms persist"
+        },
+        {
+          "metric": "tag_coverage",
+          "field": "0",
+          "passed": false,
+          "expected": [
+            "medical-report",
+            "medical"
+          ],
+          "actual": [
+            "invoice"
+          ]
+        },
+        {
+          "metric": "tag_noise",
+          "field": "provider",
+          "passed": true,
+          "expected": "absent",
+          "actual": [
+            "invoice"
+          ]
+        },
+        {
+          "metric": "tag_noise",
+          "field": "name",
+          "passed": true,
+          "expected": "absent",
+          "actual": [
+            "invoice"
+          ]
+        }
+      ],
+      "latency_seconds": 26.013,
+      "field_evidence": [
+        {
+          "page_number": 1,
+          "quote": "CLINICAL MEDICAL REPORT Provider: Example Diagnostics Patient Name: Example Person Report Date: 11/07/2026 Findings: No evidence of fracture. Mild soft tissue swelling. Follow-up advised if symptoms persist",
+          "field": "vendor"
+        }
+      ],
+      "summary_evidence": [
+        {
+          "page_number": 1,
+          "quote": "CLINICAL MEDICAL REPORT Provider: Example Diagnostics Patient Name: Example Person Report Date: 11/07/2026 Findings: No evidence of fracture. Mild soft tissue swelling. Follow-up advised if symptoms persist",
+          "field": null
+        }
+      ],
+      "quality_warnings": [],
+      "covered_pages": [
+        1
+      ]
+    },
+    {
+      "name": "Withdrawn offer must preserve withdrawal",
+      "passed": false,
+      "provider": "ollama",
+      "model": "qwen3:1.7b",
+      "classification_confidence": 0.9,
+      "checks": [
+        {
+          "metric": "classification",
+          "field": "category",
+          "passed": false,
+          "expected": "offer_letter",
+          "actual": "invoice"
+        },
+        {
+          "metric": "metadata",
+          "field": "employer",
+          "passed": false,
+          "expected": "Example Software",
+          "actual": null
+        },
+        {
+          "metric": "metadata",
+          "field": "position",
+          "passed": false,
+          "expected": "Engineer",
+          "actual": null
+        },
+        {
+          "metric": "metadata",
+          "field": "offer_date",
+          "passed": false,
+          "expected": "2026-07-01",
+          "actual": null
+        },
+        {
+          "metric": "summary_coverage",
+          "field": "0",
+          "passed": true,
+          "expected": [
+            "withdrawn",
+            "withdrawal",
+            "rescinded"
+          ],
+          "actual": "WITHDRAWAL OF OFFER LETTER Employer: Example Software Position: Engineer Offer Date: 01/07/2026 Joining Date: 01/08/2026 The employment offer has been withdrawn. The candidate must not report for joining."
+        },
+        {
+          "metric": "summary_coverage",
+          "field": "1",
+          "passed": true,
+          "expected": [
+            "must not report",
+            "do not join",
+            "should not report"
+          ],
+          "actual": "WITHDRAWAL OF OFFER LETTER Employer: Example Software Position: Engineer Offer Date: 01/07/2026 Joining Date: 01/08/2026 The employment offer has been withdrawn. The candidate must not report for joining."
+        },
+        {
+          "metric": "summary_contradiction",
+          "field": "offer is active",
+          "passed": true,
+          "expected": "absent",
+          "actual": "WITHDRAWAL OF OFFER LETTER Employer: Example Software Position: Engineer Offer Date: 01/07/2026 Joining Date: 01/08/2026 The employment offer has been withdrawn. The candidate must not report for joining."
+        },
+        {
+          "metric": "summary_contradiction",
+          "field": "report for joining on",
+          "passed": true,
+          "expected": "absent",
+          "actual": "WITHDRAWAL OF OFFER LETTER Employer: Example Software Position: Engineer Offer Date: 01/07/2026 Joining Date: 01/08/2026 The employment offer has been withdrawn. The candidate must not report for joining."
+        },
+        {
+          "metric": "tag_coverage",
+          "field": "0",
+          "passed": false,
+          "expected": [
+            "withdrawn",
+            "withdrawal",
+            "offer-withdrawal"
+          ],
+          "actual": [
+            "invoice"
+          ]
+        },
+        {
+          "metric": "tag_noise",
+          "field": "employer",
+          "passed": true,
+          "expected": "absent",
+          "actual": [
+            "invoice"
+          ]
+        },
+        {
+          "metric": "tag_noise",
+          "field": "position",
+          "passed": true,
+          "expected": "absent",
+          "actual": [
+            "invoice"
+          ]
+        }
+      ],
+      "latency_seconds": 31.297,
+      "field_evidence": [
+        {
+          "page_number": 1,
+          "quote": "WITHDRAWAL OF OFFER LETTER Employer: Example Software Position: Engineer Offer Date: 01/07/2026 Joining Date: 01/08/2026 The employment offer has been withdrawn. The candidate must not report for joining.",
+          "field": "vendor"
+        }
+      ],
+      "summary_evidence": [
+        {
+          "page_number": 1,
+          "quote": "WITHDRAWAL OF OFFER LETTER Employer: Example Software Position: Engineer Offer Date: 01/07/2026 Joining Date: 01/08/2026 The employment offer has been withdrawn. The candidate must not report for joining.",
+          "field": null
+        }
+      ],
+      "quality_warnings": [],
+      "covered_pages": [
+        1
+      ]
+    },
+    {
+      "name": "Statement table preserves closing balance",
+      "passed": true,
+      "provider": "ollama",
+      "model": "qwen3:1.7b",
+      "classification_confidence": 0.9,
+      "checks": [
+        {
+          "metric": "classification",
+          "field": "category",
+          "passed": true,
+          "expected": "bank_statement",
+          "actual": "bank_statement"
+        },
+        {
+          "metric": "metadata",
+          "field": "bank",
+          "passed": true,
+          "expected": "Example Bank",
+          "actual": "Example Bank"
+        },
+        {
+          "metric": "metadata",
+          "field": "account_last_four",
+          "passed": true,
+          "expected": "4321",
+          "actual": "4321"
+        },
+        {
+          "metric": "metadata",
+          "field": "opening_balance",
+          "passed": true,
+          "expected": 45000,
+          "actual": 45000
+        },
+        {
+          "metric": "metadata",
+          "field": "closing_balance",
+          "passed": true,
+          "expected": 51200,
+          "actual": 51200
+        },
+        {
+          "metric": "summary_coverage",
+          "field": "0",
+          "passed": true,
+          "expected": [
+            "51200",
+            "51,200"
+          ],
+          "actual": "BANK STATEMENT Bank Example Bank Account Last Four 4321 Statement Start 01/09/2026 Statement End 30/09/2026 Opening Balance INR 45000 Closing Balance INR 51200 Date Description Debit Credit 30/09/2026 Salary 0 6200"
+        },
+        {
+          "metric": "summary_coverage",
+          "field": "1",
+          "passed": true,
+          "expected": [
+            "4321"
+          ],
+          "actual": "BANK STATEMENT Bank Example Bank Account Last Four 4321 Statement Start 01/09/2026 Statement End 30/09/2026 Opening Balance INR 45000 Closing Balance INR 51200 Date Description Debit Credit 30/09/2026 Salary 0 6200"
+        },
+        {
+          "metric": "tag_coverage",
+          "field": "0",
+          "passed": true,
+          "expected": [
+            "bank-statement",
+            "banking"
+          ],
+          "actual": [
+            "bank-statement"
+          ]
+        },
+        {
+          "metric": "tag_noise",
+          "field": "debit",
+          "passed": true,
+          "expected": "absent",
+          "actual": [
+            "bank-statement"
+          ]
+        },
+        {
+          "metric": "tag_noise",
+          "field": "credit",
+          "passed": true,
+          "expected": "absent",
+          "actual": [
+            "bank-statement"
+          ]
+        },
+        {
+          "metric": "tag_noise",
+          "field": "inr",
+          "passed": true,
+          "expected": "absent",
+          "actual": [
+            "bank-statement"
+          ]
+        },
+        {
+          "metric": "tag_noise",
+          "field": "last",
+          "passed": true,
+          "expected": "absent",
+          "actual": [
+            "bank-statement"
+          ]
+        }
+      ],
+      "latency_seconds": 71.521,
+      "field_evidence": [
+        {
+          "page_number": 1,
+          "quote": "BANK STATEMENT Bank Example Bank Account Last Four 4321 Statement Start 01/09/2026 Statement End 30/09/2026 Opening Balance INR 45000 Closing Balance INR 51200 Date Description Debit Credit 30/09/2026 Salary 0 6200",
+          "field": "bank"
+        },
+        {
+          "page_number": 1,
+          "quote": "BANK STATEMENT Bank Example Bank Account Last Four 4321 Statement Start 01/09/2026 Statement End 30/09/2026 Opening Balance INR 45000 Closing Balance INR 51200 Date Description Debit Credit 30/09/2026 Salary 0 6200",
+          "field": "account_last_four"
+        },
+        {
+          "page_number": 1,
+          "quote": "BANK STATEMENT Bank Example Bank Account Last Four 4321 Statement Start 01/09/2026 Statement End 30/09/2026 Opening Balance INR 45000 Closing Balance INR 51200 Date Description Debit Credit 30/09/2026 Salary 0 6200",
+          "field": "statement_start"
+        },
+        {
+          "page_number": 1,
+          "quote": "BANK STATEMENT Bank Example Bank Account Last Four 4321 Statement Start 01/09/2026 Statement End 30/09/2026 Opening Balance INR 45000 Closing Balance INR 51200 Date Description Debit Credit 30/09/2026 Salary 0 6200",
+          "field": "statement_end"
+        },
+        {
+          "page_number": 1,
+          "quote": "BANK STATEMENT Bank Example Bank Account Last Four 4321 Statement Start 01/09/2026 Statement End 30/09/2026 Opening Balance INR 45000 Closing Balance INR 51200 Date Description Debit Credit 30/09/2026 Salary 0 6200",
+          "field": "opening_balance"
+        },
+        {
+          "page_number": 1,
+          "quote": "BANK STATEMENT Bank Example Bank Account Last Four 4321 Statement Start 01/09/2026 Statement End 30/09/2026 Opening Balance INR 45000 Closing Balance INR 51200 Date Description Debit Credit 30/09/2026 Salary 0 6200",
+          "field": "closing_balance"
+        }
+      ],
+      "summary_evidence": [
+        {
+          "page_number": 1,
+          "quote": "BANK STATEMENT Bank Example Bank Account Last Four 4321 Statement Start 01/09/2026 Statement End 30/09/2026 Opening Balance INR 45000 Closing Balance INR 51200 Date Description Debit Credit 30/09/2026 Salary 0 6200",
+          "field": null
+        }
+      ],
+      "quality_warnings": [
+        "unsupported_metadata:date",
+        "unsupported_metadata:description",
+        "unsupported_metadata:debit",
+        "unsupported_metadata:credit"
+      ],
+      "covered_pages": [
+        1
+      ]
+    }
+  ],
+  "limitations": [
+    "Summary checks measure annotated phrase coverage and contradictions, not all factuality.",
+    "Only annotated metadata fields and tag facets are scored; unannotated claims need review.",
+    "Synthetic text cases do not measure photographed-document OCR or semantic retrieval."
+  ],
+  "corpus_sha256": "07808aae64234ee0224865d3471ebad836df5b3ce081d459f161506334a9a409",
+  "requested_provider": "ollama"
+}

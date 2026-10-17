@@ -161,7 +161,60 @@
             "electronics"
           ]
         }
-      ]
+      ],
+      "latency_seconds": 0.004,
+      "field_evidence": [],
+      "summary_evidence": [],
+      "quality_warnings": [],
+      "covered_pages": [],
+      "analysis": {
+        "provider": "local",
+        "model": "rules-v1",
+        "summary": "This document is classified as Invoice. Extracted details include vendor: Acme Electronics; invoice number: INV-204; purchase date: 11/07/2026; total amount: 124999.5. Detected amounts: INR 124,999.50. Detected dates: 11/07/2026. This is a purchase record that may contain payment and warranty details.",
+        "keywords": [
+          "tax",
+          "vendor",
+          "acme",
+          "electronics",
+          "inv-204",
+          "purchase",
+          "inr",
+          "bill",
+          "example",
+          "customer"
+        ],
+        "entities": [
+          {
+            "kind": "amount",
+            "value": "INR 124,999.50",
+            "confidence_score": 0.7
+          },
+          {
+            "kind": "date",
+            "value": "11/07/2026",
+            "confidence_score": 0.7
+          }
+        ],
+        "suggested_tags": [
+          "invoice",
+          "tax",
+          "vendor",
+          "acme",
+          "electronics"
+        ],
+        "category": "invoice",
+        "confidence_score": 0.95,
+        "extracted_metadata": {
+          "vendor": "Acme Electronics",
+          "invoice_number": "INV-204",
+          "purchase_date": "11/07/2026",
+          "total_amount": 124999.5
+        },
+        "field_evidence": [],
+        "summary_evidence": [],
+        "quality_warnings": [],
+        "covered_pages": []
+      }
     },
     {
       "name": "Invoice fields arranged in columns",
@@ -278,7 +331,55 @@
             "electronics"
           ]
         }
-      ]
+      ],
+      "latency_seconds": 0.001,
+      "field_evidence": [],
+      "summary_evidence": [],
+      "quality_warnings": [],
+      "covered_pages": [],
+      "analysis": {
+        "provider": "local",
+        "model": "rules-v1",
+        "summary": "This document is classified as Invoice. Detected amounts: INR 124,999.50. Detected dates: 11/07/2026. This is a purchase record that may contain payment and warranty details.",
+        "keywords": [
+          "tax",
+          "vendor",
+          "acme",
+          "electronics",
+          "inv-204",
+          "purchase",
+          "inr",
+          "bill",
+          "example",
+          "customer"
+        ],
+        "entities": [
+          {
+            "kind": "amount",
+            "value": "INR 124,999.50",
+            "confidence_score": 0.7
+          },
+          {
+            "kind": "date",
+            "value": "11/07/2026",
+            "confidence_score": 0.7
+          }
+        ],
+        "suggested_tags": [
+          "invoice",
+          "tax",
+          "vendor",
+          "acme",
+          "electronics"
+        ],
+        "category": "invoice",
+        "confidence_score": 0.95,
+        "extracted_metadata": {},
+        "field_evidence": [],
+        "summary_evidence": [],
+        "quality_warnings": [],
+        "covered_pages": []
+      }
     },
     {
       "name": "Cancelled policy must describe ended coverage",
@@ -403,7 +504,72 @@
             "notice"
           ]
         }
-      ]
+      ],
+      "latency_seconds": 0.001,
+      "field_evidence": [],
+      "summary_evidence": [],
+      "quality_warnings": [],
+      "covered_pages": [],
+      "analysis": {
+        "provider": "local",
+        "model": "rules-v1",
+        "summary": "This document is classified as Insurance Policy. Extracted details include provider: Example Insurance; policy number: POL-204; premium: 12000.0; expiry date: 31/12/2026. Detected amounts: INR 12000, INR 9000. Detected dates: 31/12/2026, 01/06/2026. Review the policy coverage, premium, and expiry details.",
+        "keywords": [
+          "insurance",
+          "inr",
+          "cancellation",
+          "notice",
+          "provider",
+          "example",
+          "pol-204",
+          "premium",
+          "expiry",
+          "was",
+          "cancelled",
+          "effective"
+        ],
+        "entities": [
+          {
+            "kind": "amount",
+            "value": "INR 12000",
+            "confidence_score": 0.7
+          },
+          {
+            "kind": "amount",
+            "value": "INR 9000",
+            "confidence_score": 0.7
+          },
+          {
+            "kind": "date",
+            "value": "31/12/2026",
+            "confidence_score": 0.7
+          },
+          {
+            "kind": "date",
+            "value": "01/06/2026",
+            "confidence_score": 0.7
+          }
+        ],
+        "suggested_tags": [
+          "insurance-policy",
+          "insurance",
+          "inr",
+          "cancellation",
+          "notice"
+        ],
+        "category": "insurance_policy",
+        "confidence_score": 0.95,
+        "extracted_metadata": {
+          "provider": "Example Insurance",
+          "policy_number": "POL-204",
+          "premium": 12000.0,
+          "expiry_date": "31/12/2026"
+        },
+        "field_evidence": [],
+        "summary_evidence": [],
+        "quality_warnings": [],
+        "covered_pages": []
+      }
     },
     {
       "name": "Salary with zero net pay",
@@ -460,6 +626,7 @@
           "passed": true,
           "expected": [
             "net salary: INR 0",
+            "net pay: INR 0",
             "net pay is zero",
             "net pay: 0",
             "net salary: 0"
@@ -521,7 +688,68 @@
             "example"
           ]
         }
-      ]
+      ],
+      "latency_seconds": 0.001,
+      "field_evidence": [],
+      "summary_evidence": [],
+      "quality_warnings": [],
+      "covered_pages": [],
+      "analysis": {
+        "provider": "local",
+        "model": "rules-v1",
+        "summary": "This document is classified as Salary Slip. Extracted details include employer: Example Company; month: March; year: 2026; net salary: INR 0; gross salary: 10000.0. Detected amounts: INR 10000, INR 10000, INR 0. Review gross earnings, deductions, and net salary for the pay period.",
+        "keywords": [
+          "inr",
+          "slip",
+          "employer",
+          "example",
+          "company",
+          "month",
+          "march",
+          "year",
+          "gross",
+          "deductions",
+          "net",
+          "pay"
+        ],
+        "entities": [
+          {
+            "kind": "amount",
+            "value": "INR 10000",
+            "confidence_score": 0.7
+          },
+          {
+            "kind": "amount",
+            "value": "INR 10000",
+            "confidence_score": 0.7
+          },
+          {
+            "kind": "amount",
+            "value": "INR 0",
+            "confidence_score": 0.7
+          }
+        ],
+        "suggested_tags": [
+          "salary-slip",
+          "inr",
+          "slip",
+          "employer",
+          "example"
+        ],
+        "category": "salary_slip",
+        "confidence_score": 0.95,
+        "extracted_metadata": {
+          "employer": "Example Company",
+          "month": "March",
+          "year": 2026,
+          "net_salary": "INR 0",
+          "gross_salary": 10000.0
+        },
+        "field_evidence": [],
+        "summary_evidence": [],
+        "quality_warnings": [],
+        "covered_pages": []
+      }
     },
     {
       "name": "Card statement distinguishes minimum from total due",
@@ -658,7 +886,68 @@
             "credit"
           ]
         }
-      ]
+      ],
+      "latency_seconds": 0.001,
+      "field_evidence": [],
+      "summary_evidence": [],
+      "quality_warnings": [],
+      "covered_pages": [],
+      "analysis": {
+        "provider": "local",
+        "model": "rules-v1",
+        "summary": "This document is classified as Credit Card Statement. Extracted details include bank: Example Bank; statement period: September 2026; due date: 20/10/2026; total due: 42000.0; minimum due: 2100.0. Detected amounts: INR 42000, INR 2100. Detected dates: 20/10/2026.",
+        "keywords": [
+          "due",
+          "inr",
+          "minimum",
+          "credit",
+          "example",
+          "period",
+          "september",
+          "paying",
+          "does",
+          "settle",
+          "full",
+          "balance"
+        ],
+        "entities": [
+          {
+            "kind": "amount",
+            "value": "INR 42000",
+            "confidence_score": 0.7
+          },
+          {
+            "kind": "amount",
+            "value": "INR 2100",
+            "confidence_score": 0.7
+          },
+          {
+            "kind": "date",
+            "value": "20/10/2026",
+            "confidence_score": 0.7
+          }
+        ],
+        "suggested_tags": [
+          "credit-card-statement",
+          "due",
+          "inr",
+          "minimum",
+          "credit"
+        ],
+        "category": "credit_card_statement",
+        "confidence_score": 0.81,
+        "extracted_metadata": {
+          "bank": "Example Bank",
+          "statement_period": "September 2026",
+          "due_date": "20/10/2026",
+          "total_due": 42000.0,
+          "minimum_due": 2100.0
+        },
+        "field_evidence": [],
+        "summary_evidence": [],
+        "quality_warnings": [],
+        "covered_pages": []
+      }
     },
     {
       "name": "Clinical finding preserves negation",
@@ -771,7 +1060,57 @@
             "medical"
           ]
         }
-      ]
+      ],
+      "latency_seconds": 0.001,
+      "field_evidence": [],
+      "summary_evidence": [],
+      "quality_warnings": [],
+      "covered_pages": [],
+      "analysis": {
+        "provider": "local",
+        "model": "rules-v1",
+        "summary": "This document is classified as Medical Report. Extracted details include provider: Example Diagnostics; patient name: Example Person; report date: 11/07/2026; findings: No evidence of fracture. Mild soft tissue swelling. Follow-up advised if symptoms persist.. Detected dates: 11/07/2026.",
+        "keywords": [
+          "report",
+          "example",
+          "clinical",
+          "medical",
+          "provider",
+          "diagnostics",
+          "patient",
+          "name",
+          "person",
+          "findings",
+          "evidence",
+          "fracture"
+        ],
+        "entities": [
+          {
+            "kind": "date",
+            "value": "11/07/2026",
+            "confidence_score": 0.7
+          }
+        ],
+        "suggested_tags": [
+          "medical-report",
+          "report",
+          "example",
+          "clinical",
+          "medical"
+        ],
+        "category": "medical_report",
+        "confidence_score": 0.9,
+        "extracted_metadata": {
+          "provider": "Example Diagnostics",
+          "patient_name": "Example Person",
+          "report_date": "11/07/2026",
+          "findings": "No evidence of fracture. Mild soft tissue swelling. Follow-up advised if symptoms persist."
+        },
+        "field_evidence": [],
+        "summary_evidence": [],
+        "quality_warnings": [],
+        "covered_pages": []
+      }
     },
     {
       "name": "Withdrawn offer must preserve withdrawal",
@@ -887,7 +1226,62 @@
             "letter"
           ]
         }
-      ]
+      ],
+      "latency_seconds": 0.001,
+      "field_evidence": [],
+      "summary_evidence": [],
+      "quality_warnings": [],
+      "covered_pages": [],
+      "analysis": {
+        "provider": "local",
+        "model": "rules-v1",
+        "summary": "This document is classified as Offer Letter. Extracted details include employer: Example Software; position: Engineer; offer date: 01/07/2026; joining date: 01/08/2026. Detected dates: 01/07/2026, 01/08/2026.",
+        "keywords": [
+          "offer",
+          "joining",
+          "withdrawal",
+          "letter",
+          "employer",
+          "example",
+          "software",
+          "position",
+          "engineer",
+          "employment",
+          "withdrawn",
+          "candidate"
+        ],
+        "entities": [
+          {
+            "kind": "date",
+            "value": "01/07/2026",
+            "confidence_score": 0.7
+          },
+          {
+            "kind": "date",
+            "value": "01/08/2026",
+            "confidence_score": 0.7
+          }
+        ],
+        "suggested_tags": [
+          "offer-letter",
+          "offer",
+          "joining",
+          "withdrawal",
+          "letter"
+        ],
+        "category": "offer_letter",
+        "confidence_score": 0.835,
+        "extracted_metadata": {
+          "employer": "Example Software",
+          "position": "Engineer",
+          "offer_date": "01/07/2026",
+          "joining_date": "01/08/2026"
+        },
+        "field_evidence": [],
+        "summary_evidence": [],
+        "quality_warnings": [],
+        "covered_pages": []
+      }
     },
     {
       "name": "Statement table preserves closing balance",
@@ -1018,7 +1412,72 @@
             "account"
           ]
         }
-      ]
+      ],
+      "latency_seconds": 0.001,
+      "field_evidence": [],
+      "summary_evidence": [],
+      "quality_warnings": [],
+      "covered_pages": [],
+      "analysis": {
+        "provider": "local",
+        "model": "rules-v1",
+        "summary": "This document is classified as Bank Statement. Detected amounts: INR 45000, INR 51200. Detected dates: 01/09/2026, 30/09/2026, 30/09/2026. Review the account period, transaction activity, and opening and closing balances.",
+        "keywords": [
+          "balance",
+          "inr",
+          "example",
+          "account",
+          "last",
+          "four",
+          "start",
+          "end",
+          "opening",
+          "closing",
+          "description",
+          "debit"
+        ],
+        "entities": [
+          {
+            "kind": "amount",
+            "value": "INR 45000",
+            "confidence_score": 0.7
+          },
+          {
+            "kind": "amount",
+            "value": "INR 51200",
+            "confidence_score": 0.7
+          },
+          {
+            "kind": "date",
+            "value": "01/09/2026",
+            "confidence_score": 0.7
+          },
+          {
+            "kind": "date",
+            "value": "30/09/2026",
+            "confidence_score": 0.7
+          },
+          {
+            "kind": "date",
+            "value": "30/09/2026",
+            "confidence_score": 0.7
+          }
+        ],
+        "suggested_tags": [
+          "bank-statement",
+          "balance",
+          "inr",
+          "example",
+          "account"
+        ],
+        "category": "bank_statement",
+        "confidence_score": 0.95,
+        "extracted_metadata": {},
+        "field_evidence": [],
+        "summary_evidence": [],
+        "quality_warnings": [],
+        "covered_pages": []
+      }
     }
   ],
   "limitations": [
@@ -1026,6 +1485,9 @@
     "Only annotated metadata fields and tag facets are scored; unannotated claims need review.",
     "Synthetic text cases do not measure photographed-document OCR or semantic retrieval."
   ],
-  "corpus_sha256": "4ce5644ca255835b428cf9c8dabc59bc4d559b71c26795e71aa32ea711c566fa",
-  "requested_provider": "local"
+  "corpus_complete": true,
+  "corpus_cases_total": 8,
+  "corpus_sha256": "07808aae64234ee0224865d3471ebad836df5b3ce081d459f161506334a9a409",
+  "requested_provider": "local",
+  "inference_identity": {}
 }

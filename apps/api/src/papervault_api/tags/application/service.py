@@ -6,7 +6,7 @@ from datetime import UTC, datetime
 from decimal import Decimal
 from uuid import UUID
 
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from papervault_api.documents.application.rules import apply_document_rule, matches_document
@@ -15,7 +15,12 @@ from papervault_api.documents.domain.enums import DocumentStatus
 from papervault_api.documents.domain.rules import DocumentRule
 from papervault_api.documents.infrastructure.models import Document
 from papervault_api.tags.domain.enums import TagSource
-from papervault_api.tags.infrastructure.models import DocumentTag, SmartTagRule, Tag
+from papervault_api.tags.infrastructure.models import (
+    DocumentTag,
+    DocumentTagSuppression,
+    SmartTagRule,
+    Tag,
+)
 from papervault_api.timeline.domain.events import TimelineEventType
 from papervault_api.timeline.infrastructure.models import TimelineEvent
 
@@ -313,6 +318,11 @@ class TagService:
         ):
             return False
 
+        suppression = await self._session.get(
+            DocumentTagSuppression, {"document_id": document_id, "tag_id": tag_id}
+        )
+        if suppression is not None:
+            await self._session.delete(suppression)
         existing = await self._session.get(
             DocumentTag, {"document_id": document_id, "tag_id": tag_id}
         )
@@ -338,6 +348,15 @@ class TagService:
             existing.source = TagSource.MANUAL.value
             existing.assigned_by_id = owner_id
             existing.confidence_score = None
+            self._session.add(
+                TimelineEvent(
+                    owner_id=owner_id,
+                    actor_id=owner_id,
+                    document_id=document_id,
+                    event_type=TimelineEventType.TAGS_CHANGED.value,
+                    payload={"action": "attached", "tag": tag.slug},
+                )
+            )
         await self._session.commit()
         return True
 
@@ -352,6 +371,11 @@ class TagService:
         ):
             return False
 
+        suppression = await self._session.get(
+            DocumentTagSuppression, {"document_id": document_id, "tag_id": tag_id}
+        )
+        if suppression is None:
+            self._session.add(DocumentTagSuppression(document_id=document_id, tag_id=tag_id))
         existing = await self._session.get(
             DocumentTag, {"document_id": document_id, "tag_id": tag_id}
         )
@@ -378,19 +402,25 @@ class TagService:
         confidence_score: float,
     ) -> tuple[Tag, ...]:
         if confidence_score < 0.6:
+            await self._session.execute(
+                delete(DocumentTag).where(
+                    DocumentTag.document_id == document_id, DocumentTag.source == TagSource.AI.value
+                )
+            )
             return ()
 
         normalized = tuple(
             dict.fromkeys(
                 suggestion.strip()[:80] for suggestion in suggestions if suggestion.strip()
             )
-        )[:5]
-        if not normalized:
-            return ()
+        )[:8]
 
         applied: list[Tag] = []
+        desired: set[UUID] = set()
         for suggestion in normalized:
             slug = slugify(suggestion)
+            if not slug:
+                continue
             tag = await self._session.scalar(
                 select(Tag).where(Tag.owner_id == owner_id, Tag.slug == slug),
             )
@@ -404,6 +434,34 @@ class TagService:
                 self._session.add(tag)
                 await self._session.flush()
 
+            current_link = await self._session.get(
+                DocumentTag, {"document_id": document_id, "tag_id": tag.id}
+            )
+            if current_link is not None and current_link.source == TagSource.MANUAL.value:
+                desired.add(tag.id)
+                continue
+            suppression = await self._session.get(
+                DocumentTagSuppression, {"document_id": document_id, "tag_id": tag.id}
+            )
+            if suppression is not None:
+                continue
+            last_decision = await self._session.scalar(
+                select(TimelineEvent.payload)
+                .where(
+                    TimelineEvent.owner_id == owner_id,
+                    TimelineEvent.document_id == document_id,
+                    TimelineEvent.actor_id.is_not(None),
+                    TimelineEvent.event_type == TimelineEventType.TAGS_CHANGED.value,
+                    TimelineEvent.payload["tag"].as_string() == tag.slug,
+                    TimelineEvent.payload["action"].as_string().in_(["attached", "detached"]),
+                )
+                .order_by(TimelineEvent.occurred_at.desc(), TimelineEvent.id.desc())
+                .limit(1)
+            )
+            if last_decision is not None and last_decision.get("action") == "detached":
+                self._session.add(DocumentTagSuppression(document_id=document_id, tag_id=tag.id))
+                continue
+            desired.add(tag.id)
             link = await self._session.get(
                 DocumentTag,
                 {"document_id": document_id, "tag_id": tag.id},
@@ -420,6 +478,14 @@ class TagService:
                 applied.append(tag)
             elif link.source == TagSource.AI.value:
                 link.confidence_score = Decimal(str(confidence_score))
+
+        await self._session.execute(
+            delete(DocumentTag).where(
+                DocumentTag.document_id == document_id,
+                DocumentTag.source == TagSource.AI.value,
+                DocumentTag.tag_id.not_in(desired),
+            )
+        )
 
         if applied:
             self._session.add(

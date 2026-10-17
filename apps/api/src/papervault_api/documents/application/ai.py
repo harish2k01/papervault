@@ -1,6 +1,6 @@
 import hashlib
 from dataclasses import asdict, dataclass
-from typing import Protocol
+from typing import Protocol, runtime_checkable
 from uuid import UUID
 
 from sqlalchemy import delete, select
@@ -10,6 +10,7 @@ from papervault_api.documents.application.chunking import chunk_page_text
 from papervault_api.documents.domain.enums import (
     AIAnalysisStatus,
     DocumentReviewStatus,
+    DocumentStatus,
     MetadataSource,
     TextExtractionStatus,
 )
@@ -34,6 +35,19 @@ class ExtractedEntity:
 
 
 @dataclass(frozen=True, slots=True)
+class AnalysisPage:
+    page_number: int
+    text: str
+
+
+@dataclass(frozen=True, slots=True)
+class DocumentEvidence:
+    page_number: int
+    quote: str
+    field: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
 class DocumentAIAnalysisResult:
     provider: str
     model: str
@@ -44,6 +58,10 @@ class DocumentAIAnalysisResult:
     category: str
     confidence_score: float
     extracted_metadata: dict[str, object]
+    field_evidence: tuple[DocumentEvidence, ...] = ()
+    summary_evidence: tuple[DocumentEvidence, ...] = ()
+    quality_warnings: tuple[str, ...] = ()
+    covered_pages: tuple[int, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -62,6 +80,14 @@ class DocumentAIProvider(Protocol):
 
 class EmbeddingProvider(Protocol):
     def embed(self, text: str) -> EmbeddingResult:
+        raise NotImplementedError
+
+
+@runtime_checkable
+class PageAwareDocumentAIProvider(Protocol):
+    def analyze_pages(
+        self, pages: tuple[AnalysisPage, ...], current_document_type: str
+    ) -> DocumentAIAnalysisResult:
         raise NotImplementedError
 
 
@@ -90,16 +116,38 @@ class DocumentAIProcessingService:
         if text_extraction is None or not text_extraction.content_text:
             return
 
-        analysis = self._ai_provider.analyze(
-            text_extraction.content_text,
-            document.document_type,
-        )
+        if isinstance(self._ai_provider, PageAwareDocumentAIProvider):
+            page_rows = (
+                await self._session.scalars(
+                    select(DocumentTextPage)
+                    .where(DocumentTextPage.text_extraction_id == text_extraction.id)
+                    .order_by(DocumentTextPage.page_number)
+                )
+            ).all()
+            pages = tuple(AnalysisPage(row.page_number, row.content_text) for row in page_rows)
+            if not pages:
+                pages = (AnalysisPage(1, text_extraction.content_text),)
+            analysis = self._ai_provider.analyze_pages(pages, document.document_type)
+        else:
+            analysis = self._ai_provider.analyze(
+                text_extraction.content_text,
+                document.document_type,
+            )
         embedding = self._embedding_provider.embed(text_extraction.content_text)
         normalized_metadata = normalize_document_metadata(
             analysis.category,
             analysis.extracted_metadata,
             locale=self._metadata_locale,
         )
+        await self._session.refresh(document, attribute_names=["status", "archived_at"])
+        current_extraction = await self._get_current_successful_text_extraction(document_id)
+        if (
+            document.status == DocumentStatus.ARCHIVED.value
+            or document.archived_at is not None
+            or current_extraction is None
+            or current_extraction.id != text_extraction.id
+        ):
+            return
         text_hash = hashlib.sha256(text_extraction.content_text.encode("utf-8")).hexdigest()
 
         await self._mark_existing_ai_outputs_not_current(document_id)
@@ -117,6 +165,10 @@ class DocumentAIProcessingService:
                 category=analysis.category,
                 confidence_score=analysis.confidence_score,
                 extracted_metadata=normalized_metadata.data,
+                field_evidence=[asdict(item) for item in analysis.field_evidence],
+                summary_evidence=[asdict(item) for item in analysis.summary_evidence],
+                quality_warnings=list(analysis.quality_warnings),
+                covered_pages=list(analysis.covered_pages),
                 is_current=True,
             ),
         )
@@ -135,6 +187,13 @@ class DocumentAIProcessingService:
         )
         await self._replace_text_chunks(document_id, text_extraction.id)
 
+        manual_metadata = await self._session.scalar(
+            select(DocumentMetadataRecord).where(
+                DocumentMetadataRecord.document_id == document_id,
+                DocumentMetadataRecord.is_current.is_(True),
+                DocumentMetadataRecord.source == MetadataSource.MANUAL.value,
+            )
+        )
         if normalized_metadata.data:
             self._session.add(
                 DocumentMetadataRecord(
@@ -143,17 +202,20 @@ class DocumentAIProcessingService:
                     schema_version=1,
                     data=normalized_metadata.data,
                     source=MetadataSource.AI.value,
-                    confidence_score=analysis.confidence_score,
+                    confidence_score=None if analysis.field_evidence else analysis.confidence_score,
                     extractor=f"{analysis.provider}:{analysis.model}",
-                    is_current=True,
+                    is_current=manual_metadata is None,
                 ),
             )
 
         document.summary = analysis.summary
-        if analysis.confidence_score >= self._classification_threshold:
+        if manual_metadata is None and analysis.confidence_score >= self._classification_threshold:
             document.document_type = analysis.category
 
         review_reasons = [f"{issue.code}:{issue.field}" for issue in normalized_metadata.issues]
+        review_reasons.extend(analysis.quality_warnings)
+        if manual_metadata is not None:
+            review_reasons.append("manual_metadata_preserved:metadata")
         if analysis.confidence_score < self._classification_threshold:
             review_reasons.append("low_confidence:classification")
         if analysis.category == "generic_pdf":

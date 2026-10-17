@@ -34,9 +34,11 @@ const MIN_QUERY_LENGTH = 2;
 export function DocumentPreview({
   document,
   ocrGeometryAvailable = false,
+  pageRequest,
 }: {
   document: DocumentItem;
   ocrGeometryAvailable?: boolean;
+  pageRequest?: { pageNumber: number };
 }) {
   const canLoadPreview = document.status === "ready";
   const fileQuery = useQuery({
@@ -55,6 +57,19 @@ export function DocumentPreview({
   const [zoom, setZoom] = useState(1);
   const viewerRef = useRef<HTMLDivElement>(null);
   const [viewerWidth, setViewerWidth] = useState(760);
+
+  useEffect(() => {
+    if (pageRequest) {
+      setPageNumber(
+        Math.max(
+          1,
+          pageCount > 0
+            ? Math.min(pageCount, pageRequest.pageNumber)
+            : pageRequest.pageNumber,
+        ),
+      );
+    }
+  }, [pageRequest, pageCount]);
 
   const searchQuery = useQuery({
     queryKey: ["document-text-search", document.id, submittedQuery],

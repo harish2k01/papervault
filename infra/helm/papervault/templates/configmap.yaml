@@ -22,6 +22,9 @@ data:
   PAPERVAULT_MODEL_PROVIDER_TIMEOUT_SECONDS: {{ .Values.config.modelProviderTimeoutSeconds | quote }}
   PAPERVAULT_OLLAMA_BASE_URL: {{ .Values.config.ollamaBaseUrl | quote }}
   PAPERVAULT_OLLAMA_CHAT_MODEL: {{ .Values.config.ollamaChatModel | quote }}
+  PAPERVAULT_OLLAMA_EXPECTED_DIGEST: {{ .Values.config.ollamaExpectedDigest | default "" | quote }}
+  PAPERVAULT_OLLAMA_CONTEXT_TOKENS: {{ .Values.config.ollamaContextTokens | default "16384" | quote }}
+  PAPERVAULT_OLLAMA_MAX_OUTPUT_TOKENS: {{ .Values.config.ollamaMaxOutputTokens | default "2048" | quote }}
   PAPERVAULT_OLLAMA_EMBEDDING_MODEL: {{ .Values.config.ollamaEmbeddingModel | quote }}
   PAPERVAULT_OPENAI_COMPATIBLE_BASE_URL: {{ .Values.config.openaiCompatibleBaseUrl | quote }}
   PAPERVAULT_OPENAI_COMPATIBLE_CHAT_MODEL: {{ .Values.config.openaiCompatibleChatModel | quote }}

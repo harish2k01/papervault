@@ -28,6 +28,21 @@ omitting critical information; both checks must pass.
 
 ## Reproducing the benchmark
 
+The selected private Qwen3 1.7B hybrid pipeline passes **8/8 cases**, including
+**30/30 fields**, **18/18 summary concepts**, **8/8 tag facets**, and **22/22 noise-tag
+checks**. Its [full report](evaluations/qwen3-17b-grounded-lines.json) records actual
+source evidence and remaining warnings. It also passes the three separate
+[multi-page and conditional cases](evaluations/qwen3-17b-holdout.json).
+
+Measured on three CPU cores of an AMD Ryzen 5 2500U, single-page cases took
+28.5–42.3 seconds; the two-page policy took 57.8 seconds. The model container used
+about 3.9 GiB during this run. These are observed development measurements, not
+latency guarantees or a production accuracy estimate. Rejected quote-copying pilots
+are retained under [evaluations/pilots](evaluations/pilots); their failures motivated
+line selection and direct parsing of explicit labels. An 8/8 pipeline result does
+not mean the small model alone extracted every field correctly: rejected attempts,
+direct-label recovery, and optional-field failures remain visible in the reports.
+
 Install the backend with its development dependencies. From the repository root:
 
 ```sh
@@ -48,8 +63,8 @@ python scripts/evaluate_processing.py --provider ollama --output ollama-quality.
 
 The benchmark supports only the deterministic local provider and Ollama. Corpus text
 goes to the configured Ollama endpoint when selected; deployments must use an internal
-endpoint to preserve the on-premises processing boundary. No hosted provider is enabled
-by this milestone.
+endpoint to preserve the on-premises processing boundary. The homelab uses a private
+cluster endpoint with cloud inference disabled.
 
 ## Page-aware PDF extraction
 
@@ -85,7 +100,41 @@ documents, handwriting, semantic retrieval, or processing latency.
 The next evaluation must add representative local documents with per-page expected
 text, field values, evidence locations, important summary facts, and retrieval queries.
 Any replacement parser/model must be evaluated on held-out layouts, not just these
-fixtures. A local model is selected only after measuring quality, peak RAM, and latency
-on available hardware. Subsequent work must add field-level source evidence, preserve
-manual corrections during reprocessing, and expose incomplete or uncertain stages to
-the user before considering generated results trustworthy.
+fixtures. A local model is selected only after measuring quality, RAM, and latency
+on available hardware.
+
+## Grounded local analysis
+
+The `grounded-lines-v1` contract sends numbered source lines to a private Ollama
+endpoint. Structured output restricts categories and field names. The server builds
+quotes from selected lines, normalizes dates using the configured locale, verifies
+values against the source, and rejects invalid references. Explicit colon, tab, and
+line-separated labels are also parsed directly. Conflicting values are withheld.
+These checks establish source support, not that every field has the right meaning.
+
+Summaries are extractive: selected passages, supported key fields, and conservative
+critical-statement rules preserve source wording. They are not free-form generated
+prose. Source evidence includes page numbers, with navigation to the original PDF.
+Tags use supported topics and the classified document type; frequency-only words and
+currency codes are excluded. Small-model omissions and unsupported attempts remain
+visible as quality warnings. Classification confidence is never field accuracy.
+
+Reprocessing invalidates stale generated outputs. Manual metadata and tags remain;
+removed automatic tags are suppressed until explicitly reattached. Detected affirmative
+cancellation, withdrawal, or termination statements hold automatic date reminders until
+dates are manually confirmed. This is a conservative guard, not general legal-status
+understanding; other wording can require human review.
+
+The additional `processing_holdout.json` corpus exercises two-page cancellation,
+conflicting totals, and a conditional cancellation clause. Reproduce it with:
+
+```sh
+python scripts/evaluate_processing.py --provider ollama \
+  --corpus apps/api/tests/fixtures/processing_holdout.json --output holdout-quality.json
+```
+
+The recorded pilot reports retain failures from smaller contracts. They are rejected
+candidates, not production quality claims. Full model identity, contract version,
+context budget, corpus hash, warnings, evidence, and per-case latency accompany each
+current benchmark. Synthetic text checks still do not prove real-world OCR accuracy,
+table reconstruction, handwriting recognition, or reliable semantic retrieval.

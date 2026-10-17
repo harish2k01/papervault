@@ -388,6 +388,10 @@ async def get_document_detail(
                 keywords=detail.current_ai_analysis.keywords,
                 entities=detail.current_ai_analysis.entities,
                 suggested_tags=detail.current_ai_analysis.suggested_tags,
+                field_evidence=detail.current_ai_analysis.field_evidence,
+                summary_evidence=detail.current_ai_analysis.summary_evidence,
+                quality_warnings=detail.current_ai_analysis.quality_warnings,
+                covered_pages=detail.current_ai_analysis.covered_pages,
                 category=detail.current_ai_analysis.category,
                 confidence_score=float(detail.current_ai_analysis.confidence_score)
                 if detail.current_ai_analysis.confidence_score is not None

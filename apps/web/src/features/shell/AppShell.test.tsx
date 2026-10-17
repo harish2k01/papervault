@@ -222,9 +222,28 @@ describe("AppShell", () => {
     vi.mocked(listDocuments).mockResolvedValue([document]);
     vi.mocked(getDocument)
       .mockResolvedValueOnce(detail)
+      .mockResolvedValueOnce({
+        ...detail,
+        document: {
+          ...document,
+          status: "ready",
+          review_reasons: ["analysis_pending:metadata"],
+        },
+      })
       .mockResolvedValue({
         ...detail,
         document: { ...document, status: "ready" },
+        ai_analysis: {
+          provider: "ollama",
+          model: "local",
+          summary: "Net Pay: INR 0",
+          keywords: [],
+          entities: [],
+          suggested_tags: [],
+          category: "salary_slip",
+          confidence_score: 0.9,
+          summary_evidence: [{ page_number: 2, quote: "Net Pay: INR 0" }],
+        },
       });
     renderAppShell();
     await openDocumentFromLibrary("Processing receipt");
@@ -233,7 +252,18 @@ describe("AppShell", () => {
       () => expect(getDocumentFile).toHaveBeenCalledWith("polling-document"),
       { timeout: 4000 },
     );
-  });
+    const evidence = await screen.findByText(
+      "Source evidence",
+      {},
+      { timeout: 6000 },
+    );
+    fireEvent.click(evidence);
+    fireEvent.click(screen.getByRole("button", { name: "Page 2" }));
+    await waitFor(() =>
+      expect(screen.getByTestId("pdf-page")).toHaveTextContent("Page 2"),
+    );
+    expect(getDocument).toHaveBeenCalledTimes(3);
+  }, 10000);
 
   it("searches extracted content without requiring AI and shows the matching passage", async () => {
     vi.mocked(searchDocuments).mockResolvedValueOnce([

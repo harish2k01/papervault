@@ -1,0 +1,1042 @@
+{
+  "schema_version": 1,
+  "passed": false,
+  "cases_passed": 0,
+  "cases_total": 8,
+  "metrics": {
+    "classification": {
+      "passed": 2,
+      "total": 8,
+      "rate": 0.25
+    },
+    "metadata": {
+      "passed": 0,
+      "total": 30,
+      "rate": 0.0
+    },
+    "summary_coverage": {
+      "passed": 6,
+      "total": 18,
+      "rate": 0.3333
+    },
+    "tag_coverage": {
+      "passed": 2,
+      "total": 8,
+      "rate": 0.25
+    },
+    "tag_noise": {
+      "passed": 22,
+      "total": 22,
+      "rate": 1.0
+    },
+    "summary_contradiction": {
+      "passed": 7,
+      "total": 7,
+      "rate": 1.0
+    }
+  },
+  "cases": [
+    {
+      "name": "Invoice with colon-delimited labels",
+      "passed": false,
+      "provider": "ollama",
+      "model": "qwen3.5:2b",
+      "classification_confidence": 1.0,
+      "checks": [
+        {
+          "metric": "classification",
+          "field": "category",
+          "passed": false,
+          "expected": "invoice",
+          "actual": "generic_pdf"
+        },
+        {
+          "metric": "metadata",
+          "field": "vendor",
+          "passed": false,
+          "expected": "Acme Electronics",
+          "actual": null
+        },
+        {
+          "metric": "metadata",
+          "field": "invoice_number",
+          "passed": false,
+          "expected": "INV-204",
+          "actual": null
+        },
+        {
+          "metric": "metadata",
+          "field": "purchase_date",
+          "passed": false,
+          "expected": "2026-07-11",
+          "actual": null
+        },
+        {
+          "metric": "metadata",
+          "field": "total_amount",
+          "passed": false,
+          "expected": 124999.5,
+          "actual": null
+        },
+        {
+          "metric": "summary_coverage",
+          "field": "0",
+          "passed": true,
+          "expected": [
+            "Acme Electronics"
+          ],
+          "actual": "Vendor: Acme Electronics"
+        },
+        {
+          "metric": "summary_coverage",
+          "field": "1",
+          "passed": false,
+          "expected": [
+            "INV-204"
+          ],
+          "actual": "Vendor: Acme Electronics"
+        },
+        {
+          "metric": "summary_coverage",
+          "field": "2",
+          "passed": false,
+          "expected": [
+            "124999.5",
+            "124,999.50"
+          ],
+          "actual": "Vendor: Acme Electronics"
+        },
+        {
+          "metric": "tag_coverage",
+          "field": "0",
+          "passed": false,
+          "expected": [
+            "invoice",
+            "purchase"
+          ],
+          "actual": [
+            "generic-pdf"
+          ]
+        },
+        {
+          "metric": "tag_noise",
+          "field": "vendor",
+          "passed": true,
+          "expected": "absent",
+          "actual": [
+            "generic-pdf"
+          ]
+        },
+        {
+          "metric": "tag_noise",
+          "field": "inr",
+          "passed": true,
+          "expected": "absent",
+          "actual": [
+            "generic-pdf"
+          ]
+        },
+        {
+          "metric": "tag_noise",
+          "field": "bill",
+          "passed": true,
+          "expected": "absent",
+          "actual": [
+            "generic-pdf"
+          ]
+        }
+      ],
+      "latency_seconds": 82.376,
+      "field_evidence": [],
+      "summary_evidence": [
+        {
+          "page_number": 1,
+          "quote": "Vendor: Acme Electronics",
+          "field": null
+        }
+      ],
+      "quality_warnings": [
+        "unsupported_metadata:vendor"
+      ],
+      "covered_pages": [
+        1
+      ]
+    },
+    {
+      "name": "Invoice fields arranged in columns",
+      "passed": false,
+      "provider": "ollama",
+      "model": "qwen3.5:2b",
+      "classification_confidence": 1.0,
+      "checks": [
+        {
+          "metric": "classification",
+          "field": "category",
+          "passed": false,
+          "expected": "invoice",
+          "actual": "generic_pdf"
+        },
+        {
+          "metric": "metadata",
+          "field": "vendor",
+          "passed": false,
+          "expected": "Acme Electronics",
+          "actual": null
+        },
+        {
+          "metric": "metadata",
+          "field": "invoice_number",
+          "passed": false,
+          "expected": "INV-204",
+          "actual": null
+        },
+        {
+          "metric": "metadata",
+          "field": "purchase_date",
+          "passed": false,
+          "expected": "2026-07-11",
+          "actual": null
+        },
+        {
+          "metric": "metadata",
+          "field": "total_amount",
+          "passed": false,
+          "expected": 124999.5,
+          "actual": null
+        },
+        {
+          "metric": "summary_coverage",
+          "field": "0",
+          "passed": true,
+          "expected": [
+            "Acme Electronics"
+          ],
+          "actual": "Vendor Acme Electronics"
+        },
+        {
+          "metric": "summary_coverage",
+          "field": "1",
+          "passed": false,
+          "expected": [
+            "INV-204"
+          ],
+          "actual": "Vendor Acme Electronics"
+        },
+        {
+          "metric": "tag_coverage",
+          "field": "0",
+          "passed": false,
+          "expected": [
+            "invoice",
+            "purchase"
+          ],
+          "actual": [
+            "generic-pdf"
+          ]
+        },
+        {
+          "metric": "tag_noise",
+          "field": "vendor",
+          "passed": true,
+          "expected": "absent",
+          "actual": [
+            "generic-pdf"
+          ]
+        },
+        {
+          "metric": "tag_noise",
+          "field": "inr",
+          "passed": true,
+          "expected": "absent",
+          "actual": [
+            "generic-pdf"
+          ]
+        },
+        {
+          "metric": "tag_noise",
+          "field": "bill",
+          "passed": true,
+          "expected": "absent",
+          "actual": [
+            "generic-pdf"
+          ]
+        }
+      ],
+      "latency_seconds": 64.925,
+      "field_evidence": [],
+      "summary_evidence": [
+        {
+          "page_number": 1,
+          "quote": "Vendor Acme Electronics",
+          "field": null
+        }
+      ],
+      "quality_warnings": [
+        "unsupported_metadata:vendor"
+      ],
+      "covered_pages": [
+        1
+      ]
+    },
+    {
+      "name": "Cancelled policy must describe ended coverage",
+      "passed": false,
+      "provider": "ollama",
+      "model": "qwen3.5:2b",
+      "classification_confidence": 1.0,
+      "checks": [
+        {
+          "metric": "classification",
+          "field": "category",
+          "passed": false,
+          "expected": "insurance_policy",
+          "actual": "generic_pdf"
+        },
+        {
+          "metric": "metadata",
+          "field": "provider",
+          "passed": false,
+          "expected": "Example Insurance",
+          "actual": null
+        },
+        {
+          "metric": "metadata",
+          "field": "policy_number",
+          "passed": false,
+          "expected": "POL-204",
+          "actual": null
+        },
+        {
+          "metric": "metadata",
+          "field": "premium",
+          "passed": false,
+          "expected": 12000,
+          "actual": null
+        },
+        {
+          "metric": "summary_coverage",
+          "field": "0",
+          "passed": true,
+          "expected": [
+            "cancelled",
+            "canceled",
+            "cancellation"
+          ],
+          "actual": "This policy was cancelled effective 01/06/2026. No coverage remains."
+        },
+        {
+          "metric": "summary_coverage",
+          "field": "1",
+          "passed": true,
+          "expected": [
+            "no coverage",
+            "coverage ended",
+            "coverage has ended"
+          ],
+          "actual": "This policy was cancelled effective 01/06/2026. No coverage remains."
+        },
+        {
+          "metric": "summary_coverage",
+          "field": "2",
+          "passed": false,
+          "expected": [
+            "refund"
+          ],
+          "actual": "This policy was cancelled effective 01/06/2026. No coverage remains."
+        },
+        {
+          "metric": "summary_contradiction",
+          "field": "policy is active",
+          "passed": true,
+          "expected": "absent",
+          "actual": "This policy was cancelled effective 01/06/2026. No coverage remains."
+        },
+        {
+          "metric": "summary_contradiction",
+          "field": "coverage remains active",
+          "passed": true,
+          "expected": "absent",
+          "actual": "This policy was cancelled effective 01/06/2026. No coverage remains."
+        },
+        {
+          "metric": "tag_coverage",
+          "field": "0",
+          "passed": false,
+          "expected": [
+            "cancelled",
+            "cancellation",
+            "cancelled-policy"
+          ],
+          "actual": [
+            "generic-pdf"
+          ]
+        },
+        {
+          "metric": "tag_noise",
+          "field": "inr",
+          "passed": true,
+          "expected": "absent",
+          "actual": [
+            "generic-pdf"
+          ]
+        },
+        {
+          "metric": "tag_noise",
+          "field": "notice",
+          "passed": true,
+          "expected": "absent",
+          "actual": [
+            "generic-pdf"
+          ]
+        }
+      ],
+      "latency_seconds": 91.173,
+      "field_evidence": [],
+      "summary_evidence": [
+        {
+          "page_number": 1,
+          "quote": "This policy was cancelled effective 01/06/2026. No coverage remains.",
+          "field": null
+        }
+      ],
+      "quality_warnings": [
+        "unsupported_metadata:policy_number",
+        "unsupported_metadata:expiry_date",
+        "unsupported_metadata:issue_date"
+      ],
+      "covered_pages": [
+        1
+      ]
+    },
+    {
+      "name": "Salary with zero net pay",
+      "passed": false,
+      "provider": "ollama",
+      "model": "qwen3.5:2b",
+      "classification_confidence": 1.0,
+      "checks": [
+        {
+          "metric": "classification",
+          "field": "category",
+          "passed": true,
+          "expected": "salary_slip",
+          "actual": "salary_slip"
+        },
+        {
+          "metric": "metadata",
+          "field": "employer",
+          "passed": false,
+          "expected": "Example Company",
+          "actual": null
+        },
+        {
+          "metric": "metadata",
+          "field": "month",
+          "passed": false,
+          "expected": 3,
+          "actual": null
+        },
+        {
+          "metric": "metadata",
+          "field": "year",
+          "passed": false,
+          "expected": 2026,
+          "actual": null
+        },
+        {
+          "metric": "metadata",
+          "field": "net_salary",
+          "passed": false,
+          "expected": 0,
+          "actual": null
+        },
+        {
+          "metric": "metadata",
+          "field": "gross_salary",
+          "passed": false,
+          "expected": 10000,
+          "actual": null
+        },
+        {
+          "metric": "summary_coverage",
+          "field": "0",
+          "passed": false,
+          "expected": [
+            "net salary: INR 0",
+            "net pay: INR 0",
+            "net pay is zero",
+            "net pay: 0",
+            "net salary: 0"
+          ],
+          "actual": "Gross Salary: INR 10000"
+        },
+        {
+          "metric": "tag_coverage",
+          "field": "0",
+          "passed": true,
+          "expected": [
+            "salary-slip",
+            "payroll"
+          ],
+          "actual": [
+            "salary-slip"
+          ]
+        },
+        {
+          "metric": "tag_noise",
+          "field": "inr",
+          "passed": true,
+          "expected": "absent",
+          "actual": [
+            "salary-slip"
+          ]
+        },
+        {
+          "metric": "tag_noise",
+          "field": "slip",
+          "passed": true,
+          "expected": "absent",
+          "actual": [
+            "salary-slip"
+          ]
+        },
+        {
+          "metric": "tag_noise",
+          "field": "employer",
+          "passed": true,
+          "expected": "absent",
+          "actual": [
+            "salary-slip"
+          ]
+        }
+      ],
+      "latency_seconds": 78.904,
+      "field_evidence": [],
+      "summary_evidence": [
+        {
+          "page_number": 1,
+          "quote": "Gross Salary: INR 10000",
+          "field": null
+        }
+      ],
+      "quality_warnings": [
+        "unsupported_metadata:employer",
+        "unsupported_metadata:month",
+        "unsupported_metadata:year",
+        "unsupported_metadata:net_salary"
+      ],
+      "covered_pages": [
+        1
+      ]
+    },
+    {
+      "name": "Card statement distinguishes minimum from total due",
+      "passed": false,
+      "provider": "ollama",
+      "model": "qwen3.5:2b",
+      "classification_confidence": 1.0,
+      "checks": [
+        {
+          "metric": "classification",
+          "field": "category",
+          "passed": true,
+          "expected": "credit_card_statement",
+          "actual": "credit_card_statement"
+        },
+        {
+          "metric": "metadata",
+          "field": "bank",
+          "passed": false,
+          "expected": "Example Bank",
+          "actual": null
+        },
+        {
+          "metric": "metadata",
+          "field": "due_date",
+          "passed": false,
+          "expected": "2026-10-20",
+          "actual": null
+        },
+        {
+          "metric": "metadata",
+          "field": "total_due",
+          "passed": false,
+          "expected": 42000,
+          "actual": null
+        },
+        {
+          "metric": "metadata",
+          "field": "minimum_due",
+          "passed": false,
+          "expected": 2100,
+          "actual": null
+        },
+        {
+          "metric": "summary_coverage",
+          "field": "0",
+          "passed": false,
+          "expected": [
+            "42000",
+            "42,000"
+          ],
+          "actual": ""
+        },
+        {
+          "metric": "summary_coverage",
+          "field": "1",
+          "passed": false,
+          "expected": [
+            "2100",
+            "2,100"
+          ],
+          "actual": ""
+        },
+        {
+          "metric": "summary_coverage",
+          "field": "2",
+          "passed": false,
+          "expected": [
+            "20/10/2026",
+            "2026-10-20",
+            "20 October 2026"
+          ],
+          "actual": ""
+        },
+        {
+          "metric": "summary_contradiction",
+          "field": "minimum payment settles the full balance",
+          "passed": true,
+          "expected": "absent",
+          "actual": ""
+        },
+        {
+          "metric": "tag_coverage",
+          "field": "0",
+          "passed": true,
+          "expected": [
+            "credit-card-statement",
+            "credit-card"
+          ],
+          "actual": [
+            "credit-card-statement"
+          ]
+        },
+        {
+          "metric": "tag_noise",
+          "field": "inr",
+          "passed": true,
+          "expected": "absent",
+          "actual": [
+            "credit-card-statement"
+          ]
+        },
+        {
+          "metric": "tag_noise",
+          "field": "minimum",
+          "passed": true,
+          "expected": "absent",
+          "actual": [
+            "credit-card-statement"
+          ]
+        },
+        {
+          "metric": "tag_noise",
+          "field": "due",
+          "passed": true,
+          "expected": "absent",
+          "actual": [
+            "credit-card-statement"
+          ]
+        }
+      ],
+      "latency_seconds": 96.212,
+      "field_evidence": [],
+      "summary_evidence": [],
+      "quality_warnings": [
+        "unsupported_metadata:bank",
+        "unsupported_metadata:statement_period",
+        "unsupported_metadata:due_date",
+        "unsupported_metadata:total_due",
+        "unsupported_metadata:minimum_due",
+        "unsupported_summary:source",
+        "missing_summary:source"
+      ],
+      "covered_pages": [
+        1
+      ]
+    },
+    {
+      "name": "Clinical finding preserves negation",
+      "passed": false,
+      "provider": "ollama",
+      "model": "qwen3.5:2b",
+      "classification_confidence": 1.0,
+      "checks": [
+        {
+          "metric": "classification",
+          "field": "category",
+          "passed": false,
+          "expected": "medical_report",
+          "actual": "generic_pdf"
+        },
+        {
+          "metric": "metadata",
+          "field": "provider",
+          "passed": false,
+          "expected": "Example Diagnostics",
+          "actual": null
+        },
+        {
+          "metric": "metadata",
+          "field": "patient_name",
+          "passed": false,
+          "expected": "Example Person",
+          "actual": null
+        },
+        {
+          "metric": "metadata",
+          "field": "report_date",
+          "passed": false,
+          "expected": "2026-07-11",
+          "actual": null
+        },
+        {
+          "metric": "summary_coverage",
+          "field": "0",
+          "passed": false,
+          "expected": [
+            "no evidence of fracture",
+            "no fracture",
+            "fracture excluded"
+          ],
+          "actual": "Patient Name: Example Person"
+        },
+        {
+          "metric": "summary_coverage",
+          "field": "1",
+          "passed": false,
+          "expected": [
+            "swelling"
+          ],
+          "actual": "Patient Name: Example Person"
+        },
+        {
+          "metric": "summary_contradiction",
+          "field": "fracture confirmed",
+          "passed": true,
+          "expected": "absent",
+          "actual": "Patient Name: Example Person"
+        },
+        {
+          "metric": "summary_contradiction",
+          "field": "fracture detected",
+          "passed": true,
+          "expected": "absent",
+          "actual": "Patient Name: Example Person"
+        },
+        {
+          "metric": "tag_coverage",
+          "field": "0",
+          "passed": false,
+          "expected": [
+            "medical-report",
+            "medical"
+          ],
+          "actual": [
+            "generic-pdf"
+          ]
+        },
+        {
+          "metric": "tag_noise",
+          "field": "provider",
+          "passed": true,
+          "expected": "absent",
+          "actual": [
+            "generic-pdf"
+          ]
+        },
+        {
+          "metric": "tag_noise",
+          "field": "name",
+          "passed": true,
+          "expected": "absent",
+          "actual": [
+            "generic-pdf"
+          ]
+        }
+      ],
+      "latency_seconds": 66.104,
+      "field_evidence": [],
+      "summary_evidence": [
+        {
+          "page_number": 1,
+          "quote": "Patient Name: Example Person",
+          "field": null
+        }
+      ],
+      "quality_warnings": [
+        "unsupported_metadata:patient_name"
+      ],
+      "covered_pages": [
+        1
+      ]
+    },
+    {
+      "name": "Withdrawn offer must preserve withdrawal",
+      "passed": false,
+      "provider": "ollama",
+      "model": "qwen3.5:2b",
+      "classification_confidence": 1.0,
+      "checks": [
+        {
+          "metric": "classification",
+          "field": "category",
+          "passed": false,
+          "expected": "offer_letter",
+          "actual": "generic_pdf"
+        },
+        {
+          "metric": "metadata",
+          "field": "employer",
+          "passed": false,
+          "expected": "Example Software",
+          "actual": null
+        },
+        {
+          "metric": "metadata",
+          "field": "position",
+          "passed": false,
+          "expected": "Engineer",
+          "actual": null
+        },
+        {
+          "metric": "metadata",
+          "field": "offer_date",
+          "passed": false,
+          "expected": "2026-07-01",
+          "actual": null
+        },
+        {
+          "metric": "summary_coverage",
+          "field": "0",
+          "passed": true,
+          "expected": [
+            "withdrawn",
+            "withdrawal",
+            "rescinded"
+          ],
+          "actual": "WITHDRAWAL OF OFFER LETTER Employer: Example Software Position: Engineer Offer Date: 01/07/2026 Joining Date: 01/08/2026 The employment offer has been withdrawn. The candidate must not report for joining."
+        },
+        {
+          "metric": "summary_coverage",
+          "field": "1",
+          "passed": true,
+          "expected": [
+            "must not report",
+            "do not join",
+            "should not report"
+          ],
+          "actual": "WITHDRAWAL OF OFFER LETTER Employer: Example Software Position: Engineer Offer Date: 01/07/2026 Joining Date: 01/08/2026 The employment offer has been withdrawn. The candidate must not report for joining."
+        },
+        {
+          "metric": "summary_contradiction",
+          "field": "offer is active",
+          "passed": true,
+          "expected": "absent",
+          "actual": "WITHDRAWAL OF OFFER LETTER Employer: Example Software Position: Engineer Offer Date: 01/07/2026 Joining Date: 01/08/2026 The employment offer has been withdrawn. The candidate must not report for joining."
+        },
+        {
+          "metric": "summary_contradiction",
+          "field": "report for joining on",
+          "passed": true,
+          "expected": "absent",
+          "actual": "WITHDRAWAL OF OFFER LETTER Employer: Example Software Position: Engineer Offer Date: 01/07/2026 Joining Date: 01/08/2026 The employment offer has been withdrawn. The candidate must not report for joining."
+        },
+        {
+          "metric": "tag_coverage",
+          "field": "0",
+          "passed": false,
+          "expected": [
+            "withdrawn",
+            "withdrawal",
+            "offer-withdrawal"
+          ],
+          "actual": [
+            "generic-pdf"
+          ]
+        },
+        {
+          "metric": "tag_noise",
+          "field": "employer",
+          "passed": true,
+          "expected": "absent",
+          "actual": [
+            "generic-pdf"
+          ]
+        },
+        {
+          "metric": "tag_noise",
+          "field": "position",
+          "passed": true,
+          "expected": "absent",
+          "actual": [
+            "generic-pdf"
+          ]
+        }
+      ],
+      "latency_seconds": 94.844,
+      "field_evidence": [],
+      "summary_evidence": [
+        {
+          "page_number": 1,
+          "quote": "WITHDRAWAL OF OFFER LETTER Employer: Example Software Position: Engineer Offer Date: 01/07/2026 Joining Date: 01/08/2026 The employment offer has been withdrawn. The candidate must not report for joining.",
+          "field": null
+        }
+      ],
+      "quality_warnings": [
+        "unsupported_metadata:employer",
+        "unsupported_metadata:position",
+        "unsupported_metadata:offer_date",
+        "unsupported_metadata:joining_date"
+      ],
+      "covered_pages": [
+        1
+      ]
+    },
+    {
+      "name": "Statement table preserves closing balance",
+      "passed": false,
+      "provider": "ollama",
+      "model": "qwen3.5:2b",
+      "classification_confidence": 1.0,
+      "checks": [
+        {
+          "metric": "classification",
+          "field": "category",
+          "passed": false,
+          "expected": "bank_statement",
+          "actual": "generic_pdf"
+        },
+        {
+          "metric": "metadata",
+          "field": "bank",
+          "passed": false,
+          "expected": "Example Bank",
+          "actual": null
+        },
+        {
+          "metric": "metadata",
+          "field": "account_last_four",
+          "passed": false,
+          "expected": "4321",
+          "actual": null
+        },
+        {
+          "metric": "metadata",
+          "field": "opening_balance",
+          "passed": false,
+          "expected": 45000,
+          "actual": null
+        },
+        {
+          "metric": "metadata",
+          "field": "closing_balance",
+          "passed": false,
+          "expected": 51200,
+          "actual": null
+        },
+        {
+          "metric": "summary_coverage",
+          "field": "0",
+          "passed": false,
+          "expected": [
+            "51200",
+            "51,200"
+          ],
+          "actual": ""
+        },
+        {
+          "metric": "summary_coverage",
+          "field": "1",
+          "passed": false,
+          "expected": [
+            "4321"
+          ],
+          "actual": ""
+        },
+        {
+          "metric": "tag_coverage",
+          "field": "0",
+          "passed": false,
+          "expected": [
+            "bank-statement",
+            "banking"
+          ],
+          "actual": [
+            "generic-pdf"
+          ]
+        },
+        {
+          "metric": "tag_noise",
+          "field": "debit",
+          "passed": true,
+          "expected": "absent",
+          "actual": [
+            "generic-pdf"
+          ]
+        },
+        {
+          "metric": "tag_noise",
+          "field": "credit",
+          "passed": true,
+          "expected": "absent",
+          "actual": [
+            "generic-pdf"
+          ]
+        },
+        {
+          "metric": "tag_noise",
+          "field": "inr",
+          "passed": true,
+          "expected": "absent",
+          "actual": [
+            "generic-pdf"
+          ]
+        },
+        {
+          "metric": "tag_noise",
+          "field": "last",
+          "passed": true,
+          "expected": "absent",
+          "actual": [
+            "generic-pdf"
+          ]
+        }
+      ],
+      "latency_seconds": 116.127,
+      "field_evidence": [],
+      "summary_evidence": [],
+      "quality_warnings": [
+        "unsupported_metadata:bank",
+        "unsupported_metadata:account_last_four",
+        "unsupported_metadata:statement_start",
+        "unsupported_metadata:statement_end",
+        "unsupported_metadata:opening_balance",
+        "unsupported_metadata:closing_balance",
+        "unsupported_metadata:date_of_birth",
+        "unsupported_summary:source",
+        "missing_summary:source"
+      ],
+      "covered_pages": [
+        1
+      ]
+    }
+  ],
+  "limitations": [
+    "Summary checks measure annotated phrase coverage and contradictions, not all factuality.",
+    "Only annotated metadata fields and tag facets are scored; unannotated claims need review.",
+    "Synthetic text cases do not measure photographed-document OCR or semantic retrieval."
+  ],
+  "corpus_sha256": "07808aae64234ee0224865d3471ebad836df5b3ce081d459f161506334a9a409",
+  "requested_provider": "ollama"
+}

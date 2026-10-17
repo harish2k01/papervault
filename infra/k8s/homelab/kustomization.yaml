@@ -6,3 +6,4 @@ resources:
   - database.yaml
   - redis.yaml
   - object-storage.yaml
+  - model.yaml

@@ -15,6 +15,9 @@ secret:
   create: false
   existingSecret: papervault-runtime
 
+worker:
+  concurrency: 1
+
 config:
   environment: production
   authAllowDevHeaders: "false"
@@ -26,6 +29,13 @@ config:
   # PostgreSQL is authoritative; no optional OpenSearch dependency is required.
   searchIndexEnabled: "false"
   searchQueryBackend: database
+  aiProvider: ollama
+  ollamaBaseUrl: http://papervault-model:11434
+  ollamaChatModel: qwen3:1.7b
+  ollamaExpectedDigest: 8f68893c685c3ddff2aa3fffce2aa60a30bb2da65ca488b61fff134a4d1730e7
+  ollamaContextTokens: "16384"
+  ollamaMaxOutputTokens: "2048"
+  modelProviderTimeoutSeconds: "300"
 
 gateway:
   httpRoute:

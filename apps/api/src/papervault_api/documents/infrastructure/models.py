@@ -260,6 +260,12 @@ class DocumentAIAnalysis(UuidPrimaryKeyMixin, TimestampMixin, Base):
     category: Mapped[str | None] = mapped_column(String(80))
     confidence_score: Mapped[Decimal | None] = mapped_column(Numeric(5, 4))
     extracted_metadata: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False, default=dict)
+    field_evidence: Mapped[list[dict[str, Any]]] = mapped_column(JSON, nullable=False, default=list)
+    summary_evidence: Mapped[list[dict[str, Any]]] = mapped_column(
+        JSON, nullable=False, default=list
+    )
+    quality_warnings: Mapped[list[str]] = mapped_column(JSON, nullable=False, default=list)
+    covered_pages: Mapped[list[int]] = mapped_column(JSON, nullable=False, default=list)
     error_message: Mapped[str | None] = mapped_column(Text)
     is_current: Mapped[bool] = mapped_column(nullable=False, default=True, server_default="true")
 

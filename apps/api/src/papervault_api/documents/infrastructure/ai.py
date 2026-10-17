@@ -1,5 +1,4 @@
 import hashlib
-import json
 import math
 import re
 from collections import Counter
@@ -9,9 +8,9 @@ from papervault_api.core.config import Settings
 from papervault_api.core.model_clients import (
     ModelClient,
     build_model_client,
-    parse_json_object,
 )
 from papervault_api.documents.application.ai import (
+    AnalysisPage,
     DocumentAIAnalysisResult,
     DocumentAIProvider,
     EmbeddingProvider,
@@ -21,7 +20,6 @@ from papervault_api.documents.application.ai import (
 from papervault_api.documents.domain.document_types import (
     UnknownDocumentTypeError,
     get_document_type,
-    list_document_types,
 )
 
 WORD_PATTERN = re.compile(r"[A-Za-z][A-Za-z0-9_-]{2,}")
@@ -222,57 +220,20 @@ class HashingEmbeddingProvider(EmbeddingProvider):
 
 
 class ModelDocumentAIProvider(DocumentAIProvider):
-    def __init__(self, client: ModelClient) -> None:
+    def __init__(self, client: ModelClient, metadata_locale: str = "en-IN") -> None:
         self._client = client
+        self._metadata_locale = metadata_locale
 
     def analyze(self, text: str, current_document_type: str) -> DocumentAIAnalysisResult:
-        categories = ", ".join(definition.key for definition in list_document_types())
-        metadata_schemas = json.dumps(
-            {
-                definition.key: [field.key for field in definition.metadata_fields]
-                for definition in list_document_types()
-                if definition.metadata_fields
-            },
-            separators=(",", ":"),
-        )
-        payload = parse_json_object(
-            self._client.complete(
-                system=(
-                    "You classify and extract personal documents. Return only JSON with keys: "
-                    "summary, keywords, entities, suggested_tags, category, confidence_score, "
-                    "extracted_metadata. Every claim must come from the supplied text. "
-                    f"category must be one of: {categories}. entities is an array of objects with "
-                    "kind, value, and optional confidence_score."
-                    f" extracted_metadata must use only the selected category's fields: "
-                    f"{metadata_schemas}. Use arrays of objects for table fields."
-                ),
-                user=(f"Current category: {current_document_type}\nDocument text:\n{text[:50000]}"),
-            )
-        )
-        category = validated_category(payload.get("category"), current_document_type)
-        confidence = bounded_float(payload.get("confidence_score"), default=0.5)
-        entities = tuple(
-            ExtractedEntity(
-                kind=str(item.get("kind", "entity"))[:80],
-                value=str(item.get("value", ""))[:500],
-                confidence_score=bounded_float(
-                    item.get("confidence_score"),
-                    default=confidence,
-                ),
-            )
-            for item in object_list(payload.get("entities"))[:30]
-            if str(item.get("value", "")).strip()
-        )
-        return DocumentAIAnalysisResult(
-            provider=self._client.provider,
-            model=self._client.chat_model,
-            summary=str(payload.get("summary", "")).strip()[:2000],
-            keywords=string_tuple(payload.get("keywords"), limit=20),
-            entities=entities,
-            suggested_tags=string_tuple(payload.get("suggested_tags"), limit=8),
-            category=category,
-            confidence_score=confidence,
-            extracted_metadata=object_dict(payload.get("extracted_metadata")),
+        return self.analyze_pages((AnalysisPage(1, text),), current_document_type)
+
+    def analyze_pages(
+        self, pages: tuple[AnalysisPage, ...], current_document_type: str
+    ) -> DocumentAIAnalysisResult:
+        from papervault_api.documents.infrastructure.grounded_ai import analyze_pages_with_model
+
+        return analyze_pages_with_model(
+            self._client, pages, current_document_type, self._metadata_locale
         )
 
 
@@ -307,7 +268,9 @@ def build_document_ai_provider(
     if settings is None:
         raise ValueError(f"Settings are required for AI provider: {provider}")
     if provider in {"ollama", "openai_compatible"}:
-        return ModelDocumentAIProvider(build_model_client(provider, settings))
+        return ModelDocumentAIProvider(
+            build_model_client(provider, settings), settings.metadata_locale
+        )
     raise ValueError(f"Unsupported AI provider: {provider}")
 
 

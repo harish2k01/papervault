@@ -236,6 +236,18 @@ export type DocumentDetail = {
     suggested_tags: string[];
     category: string | null;
     confidence_score: number | null;
+    field_evidence?: {
+      field: string | null;
+      page_number: number;
+      quote: string;
+    }[];
+    summary_evidence?: {
+      field?: string | null;
+      page_number: number;
+      quote: string;
+    }[];
+    quality_warnings?: string[];
+    covered_pages?: number[];
   } | null;
   metadata: {
     schema_name: string;

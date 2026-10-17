@@ -84,6 +84,10 @@ class AIAnalysisResponse(BaseModel):
     suggested_tags: list[str]
     category: str | None
     confidence_score: float | None
+    field_evidence: list[dict[str, Any]] = Field(default_factory=list)
+    summary_evidence: list[dict[str, Any]] = Field(default_factory=list)
+    quality_warnings: list[str] = Field(default_factory=list)
+    covered_pages: list[int] = Field(default_factory=list)
 
 
 class MetadataResponse(BaseModel):
