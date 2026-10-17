@@ -4,7 +4,7 @@ from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
 from io import BytesIO
 from pathlib import Path
-from uuid import UUID
+from uuid import UUID, uuid4
 
 import pytest
 from pypdf import PdfWriter
@@ -150,8 +150,11 @@ async def test_fast_worker_completion_is_not_overwritten_by_upload_response(
     assert uploaded.document.status == "ready"
 
 
+@pytest.mark.parametrize(
+    "delivery", ["inline", "queued", "queued_notification_failed", "publication_failed"]
+)
 async def test_real_pdf_text_is_searchable_and_indexed_even_when_analysis_fails(
-    session: AsyncSession, monkeypatch: pytest.MonkeyPatch
+    session: AsyncSession, monkeypatch: pytest.MonkeyPatch, delivery: str
 ) -> None:
     user = User(email="ingestion-check@example.com")
     session.add(user)
@@ -189,10 +192,30 @@ async def test_real_pdf_text_is_searchable_and_indexed_even_when_analysis_fails(
             yield db
 
     monkeypatch.setattr(worker, "AsyncSessionFactory", worker_session)
-    monkeypatch.setattr(worker, "get_settings", lambda: Settings(ai_enabled=True))
+    monkeypatch.setattr(
+        worker,
+        "get_settings",
+        lambda: Settings(ai_enabled=True, enrichment_queue_enabled=delivery != "inline"),
+    )
     monkeypatch.setattr(worker, "S3ObjectStorage", lambda **kwargs: storage)
     monkeypatch.setattr(worker, "build_document_ai_provider", lambda *args: UnavailableAnalysis())
     monkeypatch.setattr(worker, "build_search_document_index", lambda settings: index)
+    published: list[tuple[str, list[str], str]] = []
+
+    def publish(name: str, *, args: list[str], queue: str) -> None:
+        if delivery == "publication_failed":
+            raise ConnectionError("Broker unavailable")
+        published.append((name, args, queue))
+
+    monkeypatch.setattr(worker.celery_app, "send_task", publish)
+    if delivery == "queued_notification_failed":
+
+        async def unavailable_notifications(self: object, document_id: UUID) -> None:
+            raise ConnectionError("Notification refresh unavailable")
+
+        monkeypatch.setattr(
+            worker.NotificationService, "generate_for_document", unavailable_notifications
+        )
 
     await worker._process_document(document_id)
     await session.refresh(document)
@@ -205,12 +228,32 @@ async def test_real_pdf_text_is_searchable_and_indexed_even_when_analysis_fails(
     assert document.status == "ready"
     assert document.processing_error is None
     assert document.review_status == "pending"
-    assert document.review_reasons == ["analysis_failed:metadata"]
+    assert document.review_reasons == [
+        "analysis_pending:metadata" if delivery.startswith("queued") else "analysis_failed:metadata"
+    ]
     assert extraction is not None and "ZXQ918273" in (extraction.content_text or "")
-    assert len(index.documents) == 1
+    assert index.documents
     assert index.documents[0].status == "ready"
     assert "ZXQ918273" in (index.documents[0].text or "")
     results = await DocumentSearchService(
         session=session, embedding_provider_name="local", embedding_dimensions=64
     ).search(SearchRequest(owner_id=owner_id, query="ZXQ918273", mode=SearchMode.KEYWORD))
     assert [result.document_id for result in results] == [document_id]
+    if delivery.startswith("queued"):
+        assert published == [
+            (
+                "papervault.documents.enrich_document",
+                [str(document_id), str(extraction.id)],
+                "papervault-enrichment",
+            )
+        ]
+        await worker._mark_enrichment_failed(document_id, uuid4())
+        await session.refresh(document)
+        assert document.review_reasons == ["analysis_pending:metadata"]
+        # The searchable text above is available before the model has run.
+        await worker._enrich_document(document_id, extraction.id)
+        await session.refresh(document)
+        assert document.status == "ready"
+        assert document.review_reasons == ["analysis_failed:metadata"]
+    else:
+        assert not published

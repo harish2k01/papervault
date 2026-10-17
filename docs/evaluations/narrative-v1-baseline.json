@@ -1,0 +1,782 @@
+{
+  "schema_version": 1,
+  "passed": false,
+  "cases_passed": 0,
+  "cases_total": 3,
+  "metrics": {
+    "classification": {
+      "passed": 0,
+      "total": 3,
+      "rate": 0.0
+    },
+    "metadata": {
+      "passed": 0,
+      "total": 16,
+      "rate": 0.0
+    },
+    "quality_warning_absent": {
+      "passed": 5,
+      "total": 5,
+      "rate": 1.0
+    },
+    "page_coverage": {
+      "passed": 2,
+      "total": 2,
+      "rate": 1.0
+    },
+    "summary_coverage": {
+      "passed": 4,
+      "total": 5,
+      "rate": 0.8
+    },
+    "tag_noise": {
+      "passed": 10,
+      "total": 10,
+      "rate": 1.0
+    },
+    "metadata_withheld": {
+      "passed": 2,
+      "total": 2,
+      "rate": 1.0
+    }
+  },
+  "cases": [
+    {
+      "name": "Contract parties before role definitions and a compensation annexure",
+      "passed": false,
+      "provider": "ollama",
+      "model": "qwen3:1.7b",
+      "classification_confidence": 1.0,
+      "checks": [
+        {
+          "metric": "classification",
+          "field": "category",
+          "passed": false,
+          "expected": "employment_contract",
+          "actual": "generic_pdf"
+        },
+        {
+          "metric": "metadata",
+          "field": "employer",
+          "passed": false,
+          "expected": "Northbridge Labs Private Limited",
+          "actual": null
+        },
+        {
+          "metric": "metadata",
+          "field": "employee_name",
+          "passed": false,
+          "expected": "Leela Rao",
+          "actual": null
+        },
+        {
+          "metric": "metadata",
+          "field": "position",
+          "passed": false,
+          "expected": "Senior Platform Engineer",
+          "actual": null
+        },
+        {
+          "metric": "metadata",
+          "field": "start_date",
+          "passed": false,
+          "expected": "2026-08-14",
+          "actual": null
+        },
+        {
+          "metric": "metadata",
+          "field": "end_date",
+          "passed": false,
+          "expected": "2028-08-13",
+          "actual": null
+        },
+        {
+          "metric": "metadata",
+          "field": "annual_compensation",
+          "passed": false,
+          "expected": 2400000,
+          "actual": null
+        },
+        {
+          "metric": "quality_warning_absent",
+          "field": "status_change:reminders",
+          "passed": true,
+          "expected": "absent",
+          "actual": []
+        },
+        {
+          "metric": "quality_warning_absent",
+          "field": "conflicting_metadata:employer",
+          "passed": true,
+          "expected": "absent",
+          "actual": []
+        },
+        {
+          "metric": "quality_warning_absent",
+          "field": "conflicting_metadata:employee_name",
+          "passed": true,
+          "expected": "absent",
+          "actual": []
+        },
+        {
+          "metric": "page_coverage",
+          "field": "covered_pages",
+          "passed": true,
+          "expected": [
+            1,
+            2
+          ],
+          "actual": [
+            1,
+            2
+          ]
+        },
+        {
+          "metric": "summary_coverage",
+          "field": "0",
+          "passed": true,
+          "expected": [
+            "14 August 2026"
+          ],
+          "actual": "The Employee is appointed as Senior Platform Engineer. Employment will commence on 14 August 2026. This fixed-term contract ends on 13 August 2028. The annual CTC includes variable compensation; reimbursements and the one-time joining bonus must not be added to the stated annual CTC. Reimbursement Limit: INR 15000 EMPLOYMENT AGREEMENT This agreement is made on 03 July 2026 between Northbridge Labs Private Limited (hereinafter referred to as the Employer) and Leela Rao (hereinafter referred to as the Employee). The employee must give 30 days notice before resignation. If the contract is terminated, access must be returned. This clause does not record an actual termination. Employee Name: LEELA RAO Employer: NORTHBRIDGE LABS PRIVATE LIMITED"
+        },
+        {
+          "metric": "summary_coverage",
+          "field": "1",
+          "passed": false,
+          "expected": [
+            "24 lakh"
+          ],
+          "actual": "The Employee is appointed as Senior Platform Engineer. Employment will commence on 14 August 2026. This fixed-term contract ends on 13 August 2028. The annual CTC includes variable compensation; reimbursements and the one-time joining bonus must not be added to the stated annual CTC. Reimbursement Limit: INR 15000 EMPLOYMENT AGREEMENT This agreement is made on 03 July 2026 between Northbridge Labs Private Limited (hereinafter referred to as the Employer) and Leela Rao (hereinafter referred to as the Employee). The employee must give 30 days notice before resignation. If the contract is terminated, access must be returned. This clause does not record an actual termination. Employee Name: LEELA RAO Employer: NORTHBRIDGE LABS PRIVATE LIMITED"
+        },
+        {
+          "metric": "summary_coverage",
+          "field": "2",
+          "passed": true,
+          "expected": [
+            "30 days notice"
+          ],
+          "actual": "The Employee is appointed as Senior Platform Engineer. Employment will commence on 14 August 2026. This fixed-term contract ends on 13 August 2028. The annual CTC includes variable compensation; reimbursements and the one-time joining bonus must not be added to the stated annual CTC. Reimbursement Limit: INR 15000 EMPLOYMENT AGREEMENT This agreement is made on 03 July 2026 between Northbridge Labs Private Limited (hereinafter referred to as the Employer) and Leela Rao (hereinafter referred to as the Employee). The employee must give 30 days notice before resignation. If the contract is terminated, access must be returned. This clause does not record an actual termination. Employee Name: LEELA RAO Employer: NORTHBRIDGE LABS PRIVATE LIMITED"
+        },
+        {
+          "metric": "tag_noise",
+          "field": "annexure",
+          "passed": true,
+          "expected": "absent",
+          "actual": [
+            "generic-pdf"
+          ]
+        },
+        {
+          "metric": "tag_noise",
+          "field": "employee",
+          "passed": true,
+          "expected": "absent",
+          "actual": [
+            "generic-pdf"
+          ]
+        },
+        {
+          "metric": "tag_noise",
+          "field": "inr",
+          "passed": true,
+          "expected": "absent",
+          "actual": [
+            "generic-pdf"
+          ]
+        },
+        {
+          "metric": "tag_noise",
+          "field": "agreement",
+          "passed": true,
+          "expected": "absent",
+          "actual": [
+            "generic-pdf"
+          ]
+        }
+      ],
+      "latency_seconds": 33.655,
+      "field_evidence": [],
+      "summary_evidence": [
+        {
+          "page_number": 1,
+          "quote": "The Employee is appointed as Senior Platform Engineer. Employment will commence on 14 August 2026. This fixed-term contract ends on 13 August 2028.",
+          "field": null
+        },
+        {
+          "page_number": 2,
+          "quote": "The annual CTC includes variable compensation; reimbursements and the one-time joining bonus must not be added to the stated annual CTC.",
+          "field": null
+        },
+        {
+          "page_number": 2,
+          "quote": "Reimbursement Limit: INR 15000",
+          "field": null
+        },
+        {
+          "page_number": 1,
+          "quote": "EMPLOYMENT AGREEMENT",
+          "field": null
+        },
+        {
+          "page_number": 1,
+          "quote": "This agreement is made on 03 July 2026 between Northbridge Labs Private Limited (hereinafter referred to as the Employer) and Leela Rao (hereinafter referred to as the Employee).",
+          "field": null
+        },
+        {
+          "page_number": 1,
+          "quote": "The employee must give 30 days notice before resignation. If the contract is terminated, access must be returned. This clause does not record an actual termination.",
+          "field": null
+        },
+        {
+          "page_number": 2,
+          "quote": "Employee Name: LEELA RAO",
+          "field": null
+        },
+        {
+          "page_number": 2,
+          "quote": "Employer: NORTHBRIDGE LABS PRIVATE LIMITED",
+          "field": null
+        }
+      ],
+      "quality_warnings": [],
+      "covered_pages": [
+        1,
+        2
+      ],
+      "analysis": {
+        "provider": "ollama",
+        "model": "qwen3:1.7b",
+        "summary": "The Employee is appointed as Senior Platform Engineer. Employment will commence on 14 August 2026. This fixed-term contract ends on 13 August 2028. The annual CTC includes variable compensation; reimbursements and the one-time joining bonus must not be added to the stated annual CTC. Reimbursement Limit: INR 15000 EMPLOYMENT AGREEMENT This agreement is made on 03 July 2026 between Northbridge Labs Private Limited (hereinafter referred to as the Employer) and Leela Rao (hereinafter referred to as the Employee). The employee must give 30 days notice before resignation. If the contract is terminated, access must be returned. This clause does not record an actual termination. Employee Name: LEELA RAO Employer: NORTHBRIDGE LABS PRIVATE LIMITED",
+        "keywords": [
+          "employee",
+          "inr",
+          "must",
+          "annual",
+          "ctc",
+          "employment",
+          "agreement",
+          "northbridge",
+          "labs",
+          "private",
+          "limited",
+          "hereinafter"
+        ],
+        "entities": [
+          {
+            "kind": "amount",
+            "value": "INR 24",
+            "confidence_score": 0.7
+          },
+          {
+            "kind": "amount",
+            "value": "INR 180000",
+            "confidence_score": 0.7
+          },
+          {
+            "kind": "amount",
+            "value": "INR 50000",
+            "confidence_score": 0.7
+          },
+          {
+            "kind": "amount",
+            "value": "INR 15000",
+            "confidence_score": 0.7
+          }
+        ],
+        "suggested_tags": [
+          "generic-pdf"
+        ],
+        "category": "generic_pdf",
+        "confidence_score": 1.0,
+        "extracted_metadata": {},
+        "field_evidence": [],
+        "summary_evidence": [
+          {
+            "page_number": 1,
+            "quote": "The Employee is appointed as Senior Platform Engineer. Employment will commence on 14 August 2026. This fixed-term contract ends on 13 August 2028.",
+            "field": null
+          },
+          {
+            "page_number": 2,
+            "quote": "The annual CTC includes variable compensation; reimbursements and the one-time joining bonus must not be added to the stated annual CTC.",
+            "field": null
+          },
+          {
+            "page_number": 2,
+            "quote": "Reimbursement Limit: INR 15000",
+            "field": null
+          },
+          {
+            "page_number": 1,
+            "quote": "EMPLOYMENT AGREEMENT",
+            "field": null
+          },
+          {
+            "page_number": 1,
+            "quote": "This agreement is made on 03 July 2026 between Northbridge Labs Private Limited (hereinafter referred to as the Employer) and Leela Rao (hereinafter referred to as the Employee).",
+            "field": null
+          },
+          {
+            "page_number": 1,
+            "quote": "The employee must give 30 days notice before resignation. If the contract is terminated, access must be returned. This clause does not record an actual termination.",
+            "field": null
+          },
+          {
+            "page_number": 2,
+            "quote": "Employee Name: LEELA RAO",
+            "field": null
+          },
+          {
+            "page_number": 2,
+            "quote": "Employer: NORTHBRIDGE LABS PRIVATE LIMITED",
+            "field": null
+          }
+        ],
+        "quality_warnings": [],
+        "covered_pages": [
+          1,
+          2
+        ]
+      }
+    },
+    {
+      "name": "Narrative dates distinguish signing from joining and preserve legal names",
+      "passed": false,
+      "provider": "ollama",
+      "model": "qwen3:1.7b",
+      "classification_confidence": 1.0,
+      "checks": [
+        {
+          "metric": "classification",
+          "field": "category",
+          "passed": false,
+          "expected": "employment_contract",
+          "actual": "generic_pdf"
+        },
+        {
+          "metric": "metadata",
+          "field": "employer",
+          "passed": false,
+          "expected": "Willow Systems (India) Limited",
+          "actual": null
+        },
+        {
+          "metric": "metadata",
+          "field": "employee_name",
+          "passed": false,
+          "expected": "Arjun Menon",
+          "actual": null
+        },
+        {
+          "metric": "metadata",
+          "field": "position",
+          "passed": false,
+          "expected": "Data Engineer",
+          "actual": null
+        },
+        {
+          "metric": "metadata",
+          "field": "start_date",
+          "passed": false,
+          "expected": "2026-09-21",
+          "actual": null
+        },
+        {
+          "metric": "metadata",
+          "field": "end_date",
+          "passed": false,
+          "expected": "2027-09-20",
+          "actual": null
+        },
+        {
+          "metric": "metadata",
+          "field": "annual_compensation",
+          "passed": false,
+          "expected": 1800000,
+          "actual": null
+        },
+        {
+          "metric": "quality_warning_absent",
+          "field": "status_change:reminders",
+          "passed": true,
+          "expected": "absent",
+          "actual": []
+        },
+        {
+          "metric": "summary_coverage",
+          "field": "0",
+          "passed": true,
+          "expected": [
+            "September 21, 2026"
+          ],
+          "actual": "You are appointed as Data Engineer. Your date of joining is September 21, 2026. The contract expires on 20th September 2027. Your annual remuneration is INR 1,800,000 per annum. Travel reimbursement is capped at INR 20000. Signed on 02 September 2026. Willow Systems (India) Limited is the employer under this contract. The employee is Arjun Menon."
+        },
+        {
+          "metric": "summary_coverage",
+          "field": "1",
+          "passed": true,
+          "expected": [
+            "1,800,000"
+          ],
+          "actual": "You are appointed as Data Engineer. Your date of joining is September 21, 2026. The contract expires on 20th September 2027. Your annual remuneration is INR 1,800,000 per annum. Travel reimbursement is capped at INR 20000. Signed on 02 September 2026. Willow Systems (India) Limited is the employer under this contract. The employee is Arjun Menon."
+        },
+        {
+          "metric": "tag_noise",
+          "field": "employee",
+          "passed": true,
+          "expected": "absent",
+          "actual": [
+            "generic-pdf"
+          ]
+        },
+        {
+          "metric": "tag_noise",
+          "field": "inr",
+          "passed": true,
+          "expected": "absent",
+          "actual": [
+            "generic-pdf"
+          ]
+        },
+        {
+          "metric": "tag_noise",
+          "field": "contract",
+          "passed": true,
+          "expected": "absent",
+          "actual": [
+            "generic-pdf"
+          ]
+        }
+      ],
+      "latency_seconds": 20.426,
+      "field_evidence": [],
+      "summary_evidence": [
+        {
+          "page_number": 1,
+          "quote": "You are appointed as Data Engineer. Your date of joining is September 21, 2026. The contract expires on 20th September 2027.",
+          "field": null
+        },
+        {
+          "page_number": 1,
+          "quote": "Your annual remuneration is INR 1,800,000 per annum. Travel reimbursement is capped at INR 20000.",
+          "field": null
+        },
+        {
+          "page_number": 1,
+          "quote": "Signed on 02 September 2026.",
+          "field": null
+        },
+        {
+          "page_number": 1,
+          "quote": "Willow Systems (India) Limited is the employer under this contract. The employee is Arjun Menon.",
+          "field": null
+        }
+      ],
+      "quality_warnings": [],
+      "covered_pages": [
+        1
+      ],
+      "analysis": {
+        "provider": "ollama",
+        "model": "qwen3:1.7b",
+        "summary": "You are appointed as Data Engineer. Your date of joining is September 21, 2026. The contract expires on 20th September 2027. Your annual remuneration is INR 1,800,000 per annum. Travel reimbursement is capped at INR 20000. Signed on 02 September 2026. Willow Systems (India) Limited is the employer under this contract. The employee is Arjun Menon.",
+        "keywords": [
+          "contract",
+          "september",
+          "employment",
+          "employee",
+          "inr",
+          "signed",
+          "willow",
+          "systems",
+          "india",
+          "limited",
+          "employer",
+          "under"
+        ],
+        "entities": [
+          {
+            "kind": "amount",
+            "value": "INR 1,800,000",
+            "confidence_score": 0.7
+          },
+          {
+            "kind": "amount",
+            "value": "INR 20000",
+            "confidence_score": 0.7
+          }
+        ],
+        "suggested_tags": [
+          "generic-pdf"
+        ],
+        "category": "generic_pdf",
+        "confidence_score": 1.0,
+        "extracted_metadata": {},
+        "field_evidence": [],
+        "summary_evidence": [
+          {
+            "page_number": 1,
+            "quote": "You are appointed as Data Engineer. Your date of joining is September 21, 2026. The contract expires on 20th September 2027.",
+            "field": null
+          },
+          {
+            "page_number": 1,
+            "quote": "Your annual remuneration is INR 1,800,000 per annum. Travel reimbursement is capped at INR 20000.",
+            "field": null
+          },
+          {
+            "page_number": 1,
+            "quote": "Signed on 02 September 2026.",
+            "field": null
+          },
+          {
+            "page_number": 1,
+            "quote": "Willow Systems (India) Limited is the employer under this contract. The employee is Arjun Menon.",
+            "field": null
+          }
+        ],
+        "quality_warnings": [],
+        "covered_pages": [
+          1
+        ]
+      }
+    },
+    {
+      "name": "Monthly-only pay is not invented as annual compensation",
+      "passed": false,
+      "provider": "ollama",
+      "model": "qwen3:1.7b",
+      "classification_confidence": 1.0,
+      "checks": [
+        {
+          "metric": "classification",
+          "field": "category",
+          "passed": false,
+          "expected": "employment_contract",
+          "actual": "generic_pdf"
+        },
+        {
+          "metric": "metadata",
+          "field": "employer",
+          "passed": false,
+          "expected": "Cedar Operations Limited",
+          "actual": null
+        },
+        {
+          "metric": "metadata",
+          "field": "employee_name",
+          "passed": false,
+          "expected": "Priya Nair",
+          "actual": null
+        },
+        {
+          "metric": "metadata",
+          "field": "position",
+          "passed": false,
+          "expected": "Support Engineer",
+          "actual": null
+        },
+        {
+          "metric": "metadata",
+          "field": "start_date",
+          "passed": false,
+          "expected": "2026-10-01",
+          "actual": null
+        },
+        {
+          "metric": "metadata_withheld",
+          "field": "annual_compensation",
+          "passed": true,
+          "expected": "absent",
+          "actual": null
+        },
+        {
+          "metric": "metadata_withheld",
+          "field": "end_date",
+          "passed": true,
+          "expected": "absent",
+          "actual": null
+        },
+        {
+          "metric": "quality_warning_absent",
+          "field": "status_change:reminders",
+          "passed": true,
+          "expected": "absent",
+          "actual": []
+        },
+        {
+          "metric": "page_coverage",
+          "field": "covered_pages",
+          "passed": true,
+          "expected": [
+            1
+          ],
+          "actual": [
+            1
+          ]
+        },
+        {
+          "metric": "tag_noise",
+          "field": "employee",
+          "passed": true,
+          "expected": "absent",
+          "actual": [
+            "generic-pdf"
+          ]
+        },
+        {
+          "metric": "tag_noise",
+          "field": "inr",
+          "passed": true,
+          "expected": "absent",
+          "actual": [
+            "generic-pdf"
+          ]
+        },
+        {
+          "metric": "tag_noise",
+          "field": "agreement",
+          "passed": true,
+          "expected": "absent",
+          "actual": [
+            "generic-pdf"
+          ]
+        }
+      ],
+      "latency_seconds": 21.196,
+      "field_evidence": [],
+      "summary_evidence": [
+        {
+          "page_number": 1,
+          "quote": "Date of Joining: 01/10/2026",
+          "field": null
+        },
+        {
+          "page_number": 1,
+          "quote": "Monthly Gross: INR 100000",
+          "field": null
+        },
+        {
+          "page_number": 1,
+          "quote": "EMPLOYMENT AGREEMENT",
+          "field": null
+        },
+        {
+          "page_number": 1,
+          "quote": "Employer: Cedar Operations Limited",
+          "field": null
+        },
+        {
+          "page_number": 1,
+          "quote": "Employee Name: Priya Nair",
+          "field": null
+        },
+        {
+          "page_number": 1,
+          "quote": "Designation: Support Engineer",
+          "field": null
+        }
+      ],
+      "quality_warnings": [],
+      "covered_pages": [
+        1
+      ],
+      "analysis": {
+        "provider": "ollama",
+        "model": "qwen3:1.7b",
+        "summary": "Date of Joining: 01/10/2026 Monthly Gross: INR 100000 EMPLOYMENT AGREEMENT Employer: Cedar Operations Limited Employee Name: Priya Nair Designation: Support Engineer",
+        "keywords": [
+          "agreement",
+          "employee",
+          "inr",
+          "employment",
+          "employer",
+          "cedar",
+          "operations",
+          "limited",
+          "name",
+          "priya",
+          "nair",
+          "designation"
+        ],
+        "entities": [
+          {
+            "kind": "amount",
+            "value": "INR 100000",
+            "confidence_score": 0.7
+          },
+          {
+            "kind": "amount",
+            "value": "INR 5000",
+            "confidence_score": 0.7
+          },
+          {
+            "kind": "date",
+            "value": "01/10/2026",
+            "confidence_score": 0.7
+          }
+        ],
+        "suggested_tags": [
+          "generic-pdf"
+        ],
+        "category": "generic_pdf",
+        "confidence_score": 1.0,
+        "extracted_metadata": {},
+        "field_evidence": [],
+        "summary_evidence": [
+          {
+            "page_number": 1,
+            "quote": "Date of Joining: 01/10/2026",
+            "field": null
+          },
+          {
+            "page_number": 1,
+            "quote": "Monthly Gross: INR 100000",
+            "field": null
+          },
+          {
+            "page_number": 1,
+            "quote": "EMPLOYMENT AGREEMENT",
+            "field": null
+          },
+          {
+            "page_number": 1,
+            "quote": "Employer: Cedar Operations Limited",
+            "field": null
+          },
+          {
+            "page_number": 1,
+            "quote": "Employee Name: Priya Nair",
+            "field": null
+          },
+          {
+            "page_number": 1,
+            "quote": "Designation: Support Engineer",
+            "field": null
+          }
+        ],
+        "quality_warnings": [],
+        "covered_pages": [
+          1
+        ]
+      }
+    }
+  ],
+  "limitations": [
+    "Summary checks measure annotated phrase coverage and contradictions, not all factuality.",
+    "Only annotated metadata fields and tag facets are scored; unannotated claims need review.",
+    "Synthetic text cases do not measure photographed-document OCR or semantic retrieval."
+  ],
+  "corpus_complete": true,
+  "corpus_cases_total": 3,
+  "corpus_sha256": "b878db876edb51583887fb19ed4d4e1dff3cf92d0f4da0fd201a72d3aa363c28",
+  "requested_provider": "ollama",
+  "inference_identity": {
+    "model_manifest_digest": "8f68893c685c3ddff2aa3fffce2aa60a30bb2da65ca488b61fff134a4d1730e7",
+    "server_version": "0.40.5",
+    "analysis_contract": "grounded-lines-v1",
+    "context_tokens": 16384,
+    "max_output_tokens": 2048
+  }
+}

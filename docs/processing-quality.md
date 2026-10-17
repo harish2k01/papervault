@@ -30,13 +30,13 @@ omitting critical information; both checks must pass.
 
 The selected private Qwen3 1.7B hybrid pipeline passes **8/8 cases**, including
 **30/30 fields**, **18/18 summary concepts**, **8/8 tag facets**, and **22/22 noise-tag
-checks**. Its [full report](evaluations/qwen3-17b-grounded-lines.json) records actual
+checks**. Its [full report](evaluations/qwen3-17b-lines-v2.json) records actual
 source evidence and remaining warnings. It also passes the three separate
-[multi-page and conditional cases](evaluations/qwen3-17b-holdout.json).
+[multi-page and conditional cases](evaluations/qwen3-17b-holdout-v2.json).
 
 Measured on three CPU cores of an AMD Ryzen 5 2500U, single-page cases took
-28.5–42.3 seconds; the two-page policy took 57.8 seconds. The model container used
-about 3.9 GiB during this run. These are observed development measurements, not
+35.3–45.0 seconds; the two-page policy holdout took 67.2 seconds. These are observed
+development measurements, not
 latency guarantees or a production accuracy estimate. Rejected quote-copying pilots
 are retained under [evaluations/pilots](evaluations/pilots); their failures motivated
 line selection and direct parsing of explicit labels. An 8/8 pipeline result does
@@ -105,12 +105,46 @@ on available hardware.
 
 ## Grounded local analysis
 
-The `grounded-lines-v1` contract sends numbered source lines to a private Ollama
+The `grounded-lines-v2` contract sends numbered source lines to a private Ollama
 endpoint. Structured output restricts categories and field names. The server builds
 quotes from selected lines, normalizes dates using the configured locale, verifies
 values against the source, and rejects invalid references. Explicit colon, tab, and
 line-separated labels are also parsed directly. Conflicting values are withheld.
 These checks establish source support, not that every field has the right meaning.
+
+Version two requires both a typed value and line references for each selected fact.
+It recognizes narrative joining/end dates, ordinal and month-first dates, explicit
+annual compensation with lakh/crore units, and appointment clauses. Monthly pay is
+not annualized. Explicit employer/employee definitions reject reversed parties;
+entity names differing only in case do not create artificial conflicts. Strong
+document headings can supply the initial category hint for fresh uploads. Supported
+values still require literal source text or a defined date/amount normalization.
+
+The separate `processing_narrative.json` set contains three synthetic employment
+cases with 16 annotated fields, including legal party definitions, annexures,
+signing versus joining dates, conditional termination and monthly-only pay. The
+[deployed-v1 baseline](evaluations/narrative-v1-baseline.json) failed all three as
+fresh generic uploads, including classification; this comparison measures the whole
+pipeline, rather than isolating one parser change. It does not establish accuracy
+on a representative production corpus.
+
+The [version-two narrative report](evaluations/narrative-v2.json) passes all three
+cases, all 16 annotated fields, five required summary concepts and the two checks
+that absent annual pay/end dates remain withheld. Cases took 39.4–79.1 seconds on
+the same private CPU service. Combined with the original and multi-page sets, this
+is 14 passing synthetic cases and 54/54 annotated metadata checks. All three reports
+record the same analysis source hash, model manifest and runtime version. Remaining
+unsupported model attempts remain visible even when direct source parsing recovers
+a field. The limited corpus does not measure arbitrary document accuracy.
+
+```sh
+python scripts/evaluate_processing.py --provider ollama \
+  --corpus apps/api/tests/fixtures/processing_narrative.json --output narrative-quality.json
+```
+
+Reports include a source-code hash. `--resume` continues a matching partial report
+only when provider, model identity, settings, source hash, corpus and completed case
+order match. Completed quality failures remain in resumed results.
 
 Summaries are extractive: selected passages, supported key fields, and conservative
 critical-statement rules preserve source wording. They are not free-form generated

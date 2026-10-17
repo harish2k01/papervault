@@ -166,7 +166,9 @@ def parse_date(value: Any, *, locale: str) -> str:
     if isinstance(value, datetime):
         return value.date().isoformat()
     text = normalize_string(value)
+    text = re.sub(r"(?<=\d)(?:st|nd|rd|th)\b", "", text, flags=re.I)
     formats = ["%Y-%m-%d", "%Y/%m/%d", "%d-%b-%Y", "%d-%B-%Y", "%d %b %Y", "%d %B %Y"]
+    formats.extend(["%B %d, %Y", "%b %d, %Y", "%B %d %Y", "%b %d %Y"])
     if locale.lower().startswith("en-us"):
         formats.extend(["%m/%d/%Y", "%m-%d-%Y"])
     else:

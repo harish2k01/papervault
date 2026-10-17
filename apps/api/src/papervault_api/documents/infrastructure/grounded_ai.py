@@ -19,9 +19,9 @@ from papervault_api.documents.domain.document_types import (
     get_document_type,
     list_document_types,
 )
-from papervault_api.documents.domain.metadata import normalize_field, parse_date, parse_number
+from papervault_api.documents.domain.metadata import normalize_field, parse_number
 from papervault_api.documents.infrastructure.ai import (
-    FIELD_PATTERNS,
+    CATEGORY_STRONG_KEYWORDS,
     STOPWORDS,
     bounded_float,
     classify_document,
@@ -30,6 +30,12 @@ from papervault_api.documents.infrastructure.ai import (
     object_dict,
     object_list,
     validated_category,
+)
+from papervault_api.documents.infrastructure.field_context import (
+    bound_party_role,
+    contextual_amount,
+    contextual_date,
+    equivalent_values,
 )
 from papervault_api.documents.infrastructure.source_grounding import (
     action_topics,
@@ -41,8 +47,21 @@ from papervault_api.documents.infrastructure.source_grounding import (
 )
 
 MAX_SOURCE_BYTES = 6000
-PROMPT_VERSION = "grounded-lines-v1"
+PROMPT_VERSION = "grounded-lines-v2"
 NOISE_TAGS = STOPWORDS | {
+    "status",
+    "update",
+    "annexure",
+    "schedule",
+    "employee",
+    "agreement",
+    "contract",
+    "terms",
+    "conditions",
+    "private",
+    "limited",
+    "ltd",
+    "pvt",
     "inr",
     "vendor",
     "employer",
@@ -93,28 +112,7 @@ def valid_quote(item: dict[str, Any], page: AnalysisPage, window: str) -> str | 
 
 
 def source_date(quote: str, field: MetadataFieldDefinition, locale: str) -> str | None:
-    aliases = {field.label, field.key.replace("_", " ")}
-    for patterns in FIELD_PATTERNS.values():
-        aliases.update(patterns.get(field.key, ()))
-    if field.key == "expiry_date":
-        aliases.add("date of expiry")
-    if field.key == "issue_date":
-        aliases.add("date of issue")
-    for alias in sorted(aliases, key=len, reverse=True):
-        match = re.search(r"\b" + re.escape(alias) + r"\b", quote, flags=re.I)
-        if match:
-            dates = re.findall(
-                r"\b(?:\d{4}[-/]\d{1,2}[-/]\d{1,2}|"
-                r"\d{1,2}[-/.]\d{1,2}[-/.]\d{4}|"
-                r"\d{1,2}[ -][A-Za-z]+[ -]\d{4})\b",
-                quote[match.end() :],
-            )
-            if dates:
-                try:
-                    return parse_date(dates[0], locale=locale)
-                except ValueError:
-                    return None
-    return None
+    return contextual_date(quote, field, locale)
 
 
 def supports_value(
@@ -126,15 +124,7 @@ def supports_value(
         return str(value).casefold() in quote.casefold()
     if isinstance(value, int | float):
         if field.field_type in {MetadataFieldType.CURRENCY, MetadataFieldType.DECIMAL}:
-            aliases = {field.label, field.key.replace("_", " ")}
-            for patterns in FIELD_PATTERNS.values():
-                aliases.update(patterns.get(field.key, ()))
-            for alias in sorted(aliases, key=len, reverse=True):
-                match = re.search(r"\b" + re.escape(alias) + r"\b", quote, flags=re.I)
-                if match:
-                    amounts = re.findall(r"[-+]?\d[\d,]*(?:\.\d+)?", quote[match.end() :])
-                    return bool(amounts) and parse_number(amounts[0]) == value
-            return False
+            return contextual_amount(quote, field) == value
         for number in re.findall(r"[-+]?\d[\d,]*(?:\.\d+)?", quote):
             if parse_number(number) == value:
                 return True
@@ -147,6 +137,23 @@ def supports_value(
                     continue
         return False
     if isinstance(value, str):
+        if normalized(value).casefold() in {
+            "unknown",
+            "not specified",
+            "n/a",
+            "none",
+            "the company",
+            "company",
+            "employer",
+            "employee",
+            "you",
+        }:
+            return False
+        if field.key in {"employer", "employee_name"}:
+            role = bound_party_role(quote, value)
+            expected = "employee" if field.key == "employee_name" else "employer"
+            if role is not None and role != expected:
+                return False
         return (
             bool(value)
             and re.search(r"(?<!\w)" + re.escape(normalized(value)) + r"(?!\w)", quote, flags=re.I)
@@ -184,7 +191,12 @@ def analysis_prompt() -> str:
         "tags (actual useful tag name to integer line-ID array). "
         "document_data maps integer line IDs to verbatim source text. Select source lines; "
         "do not copy quotes or invent IDs. Each field must reference its label AND value. "
-        "For labelled scalar fields the server derives the value from the selected lines. "
+        "Every field MUST include a value as well as source lines. Names and identifiers must "
+        "be copied verbatim, even when they precede a parenthetical role in narrative prose. "
+        "Identify the employer and employee, not a client, manager, signatory, or example. "
+        "Use joining/commencement dates, not signing or birth dates, for start_date. "
+        "Annual compensation requires explicit annual/per-annum wording; "
+        "never annualize monthly pay. "
         "Omit absent fields. Arrays only for table fields. "
         "summary: up to 6 line IDs covering key parties, identifiers, amounts, "
         "dates, and actual status. "
@@ -205,9 +217,25 @@ def analysis_schema(line_count: int = 1000) -> dict[str, Any]:
     fact = {
         "type": "object",
         "properties": {"value": {}, "lines": references},
-        "required": ["lines"],
+        "required": ["lines", "value"],
         "additionalProperties": False,
     }
+
+    def typed_fact(field: MetadataFieldDefinition) -> dict[str, Any]:
+        if field.field_type is MetadataFieldType.OBJECT_LIST:
+            value = {"type": ["array", "null"], "items": {"type": "object"}, "maxItems": 20}
+        elif field.field_type in {
+            MetadataFieldType.CURRENCY,
+            MetadataFieldType.DECIMAL,
+            MetadataFieldType.INTEGER,
+        }:
+            value = {"type": ["number", "string", "null"]}
+        elif field.field_type is MetadataFieldType.BOOLEAN:
+            value = {"type": ["boolean", "null"]}
+        else:
+            value = {"type": ["string", "null"], "maxLength": 300}
+        return {**fact, "properties": {"value": value, "lines": references}}
+
     base: dict[str, Any] = {
         "type": "object",
         "properties": {
@@ -219,7 +247,7 @@ def analysis_schema(line_count: int = 1000) -> dict[str, Any]:
             "fields": {
                 "type": "object",
                 "properties": {
-                    field.key: fact
+                    field.key: typed_fact(field)
                     for definition in list_document_types()
                     for field in definition.metadata_fields
                 },
@@ -245,7 +273,7 @@ def analysis_schema(line_count: int = 1000) -> dict[str, Any]:
         properties["category"] = {"type": "string", "enum": [definition.key]}
         properties["fields"] = {
             "type": "object",
-            "properties": {field.key: fact for field in definition.metadata_fields},
+            "properties": {field.key: typed_fact(field) for field in definition.metadata_fields},
             "additionalProperties": False,
         }
         variants.append({**base, "properties": properties})
@@ -356,7 +384,7 @@ def parse_window(
             continue
         if value is None or not supports_value(value, quote, definition, locale):
             continue
-        if name in metadata and metadata[name] != value:
+        if name in metadata and not equivalent_values(name, metadata[name], value):
             conflicts.add(name)
             warnings.append(f"conflicting_metadata:{name}")
         elif name not in metadata:
@@ -388,7 +416,14 @@ def parse_window(
         if isinstance(tag_name, str) and quote:
             slug = re.sub(r"[^\w]+", "-", tag_name.casefold()).strip("-")[:80]
             words = slug.split("-")
-            if slug and slug not in NOISE_TAGS and all(word in quote.casefold() for word in words):
+            if (
+                slug
+                and slug not in NOISE_TAGS
+                and all(
+                    re.search(r"(?<!\w)" + re.escape(word) + r"(?!\w)", quote, re.I)
+                    for word in words
+                )
+            ):
                 tags.append(slug)
     return WindowAnalysis(
         category,
@@ -414,7 +449,17 @@ def analyze_pages_with_model(
     windows: list[WindowAnalysis] = []
     hint = current_document_type
     rule_category, rule_confidence = classify_document("\n".join(page.text for page in pages), hint)
-    if hint == "generic_pdf" and rule_confidence >= 0.75:
+    headings = [
+        normalized(line).casefold()
+        for line in pages[0].text.splitlines()[:8]
+        if 4 <= len(line.strip()) <= 100 and ":" not in line and "\t" not in line
+    ]
+    explicit_heading = any(
+        re.search(r"(?<!\w)" + re.escape(phrase) + r"(?!\w)", heading)
+        for phrase in CATEGORY_STRONG_KEYWORDS.get(rule_category, ())
+        for heading in headings
+    )
+    if rule_confidence >= 0.75 or explicit_heading:
         hint = rule_category
     prompt = analysis_prompt() + f" Source date locale: {metadata_locale}."
     # UTF-8 bytes conservatively bound tokens, including numbering/JSON overhead.
@@ -461,7 +506,7 @@ def analyze_pages_with_model(
         if analyzed_window.category != category:
             continue
         for name, value in analyzed_window.metadata.items():
-            if name in metadata and metadata[name] != value:
+            if name in metadata and not equivalent_values(name, metadata[name], value):
                 conflicts.add(name)
                 warnings.append(f"conflicting_metadata:{name}")
             elif name not in metadata:
@@ -491,7 +536,9 @@ def analyze_pages_with_model(
         provider=client.provider,
         model=client.chat_model,
         summary=" ".join(item.quote for item in summaries),
-        keywords=extract_keywords(text),
+        keywords=tuple(
+            word for word in extract_keywords(text, limit=100) if word.casefold() not in NOISE_TAGS
+        )[:12],
         entities=extract_entities(text),
         suggested_tags=tags,
         category=category,

@@ -17,6 +17,7 @@ secret:
 
 worker:
   concurrency: 1
+  separateEnrichment: true
 
 config:
   environment: production
@@ -46,6 +47,13 @@ gateway:
     hostnames: [papervault.k8s.harish2k01.xyz]
 
 resources:
+  enrichment:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
   api:
     requests:
       cpu: 100m

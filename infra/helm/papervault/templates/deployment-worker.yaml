@@ -1,52 +1,61 @@
+{{- $root := . -}}
+{{- range $role := list "worker" "enrichment" }}
+{{- if or (eq $role "worker") $root.Values.worker.separateEnrichment }}
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "papervault.fullname" . }}-worker
+  name: {{ include "papervault.fullname" $root }}-{{ $role }}
   labels:
-    {{- include "papervault.labels" . | nindent 4 }}
-    app.kubernetes.io/component: worker
+    {{- include "papervault.labels" $root | nindent 4 }}
+    app.kubernetes.io/component: {{ $role }}
 spec:
-  replicas: {{ .Values.replicaCount.worker }}
+  replicas: {{ index $root.Values.replicaCount $role | default 1 }}
   selector:
     matchLabels:
-      {{- include "papervault.selectorLabels" . | nindent 6 }}
-      app.kubernetes.io/component: worker
+      {{- include "papervault.selectorLabels" $root | nindent 6 }}
+      app.kubernetes.io/component: {{ $role }}
   template:
     metadata:
       labels:
-        {{- include "papervault.selectorLabels" . | nindent 8 }}
-        app.kubernetes.io/component: worker
-      {{- with .Values.podAnnotations }}
+        {{- include "papervault.selectorLabels" $root | nindent 8 }}
+        app.kubernetes.io/component: {{ $role }}
+      {{- with $root.Values.podAnnotations }}
       annotations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
     spec:
-      serviceAccountName: {{ include "papervault.serviceAccountName" . }}
-      {{- with .Values.imagePullSecrets }}
+      serviceAccountName: {{ include "papervault.serviceAccountName" $root }}
+      {{- with $root.Values.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       securityContext:
-        {{- toYaml .Values.podSecurityContext.worker | nindent 8 }}
+        {{- toYaml $root.Values.podSecurityContext.worker | nindent 8 }}
       containers:
         - name: worker
-          image: {{ include "papervault.image" .Values.image.worker | quote }}
-          imagePullPolicy: {{ .Values.image.worker.pullPolicy }}
+          image: {{ include "papervault.image" $root.Values.image.worker | quote }}
+          imagePullPolicy: {{ $root.Values.image.worker.pullPolicy }}
           command:
             - celery
             - -A
             - papervault_api.worker.celery_app:celery_app
             - worker
             - --loglevel=INFO
-            - {{ printf "--concurrency=%v" (.Values.worker.concurrency | default 2) | quote }}
+            - {{ printf "--concurrency=%v" (ternary ($root.Values.worker.concurrency | default 2) ($root.Values.worker.enrichmentConcurrency | default 1) (eq $role "worker")) | quote }}
             - --prefetch-multiplier=1
+            {{- if $root.Values.worker.separateEnrichment }}
+            - {{ ternary "--queues=celery" "--queues=papervault-enrichment" (eq $role "worker") | quote }}
+            {{- else }}
+            - --queues=celery,papervault-enrichment
+            {{- end }}
           securityContext:
-            {{- toYaml .Values.containerSecurityContext.worker | nindent 12 }}
+            {{- toYaml $root.Values.containerSecurityContext.worker | nindent 12 }}
           envFrom:
             - configMapRef:
-                name: {{ include "papervault.configMapName" . }}
+                name: {{ include "papervault.configMapName" $root }}
             - secretRef:
-                name: {{ include "papervault.secretName" . }}
+                name: {{ include "papervault.secretName" $root }}
           readinessProbe:
             exec:
               command:
@@ -64,7 +73,10 @@ spec:
             - name: tmp
               mountPath: /tmp
           resources:
-            {{- toYaml .Values.resources.worker | nindent 12 }}
+            {{- toYaml (get $root.Values.resources $role | default $root.Values.resources.worker) | nindent 12 }}
       volumes:
         - name: tmp
           emptyDir: {}
+
+{{- end }}
+{{- end }}

@@ -2,6 +2,7 @@ import asyncio
 from uuid import UUID
 
 import structlog
+from sqlalchemy import select
 
 from papervault_api.core.config import get_settings
 from papervault_api.db import models as _models  # noqa: F401
@@ -17,7 +18,7 @@ from papervault_api.documents.infrastructure.ai import (
     build_document_ai_provider,
     build_embedding_provider,
 )
-from papervault_api.documents.infrastructure.models import Document
+from papervault_api.documents.infrastructure.models import Document, DocumentTextExtraction
 from papervault_api.documents.infrastructure.storage import S3ObjectStorage
 from papervault_api.documents.infrastructure.text_extractors import build_default_text_extractor
 from papervault_api.notifications.application.service import NotificationService
@@ -83,8 +84,85 @@ async def _process_document(document_id: UUID) -> None:
         if document is None or document.status != DocumentStatus.READY.value:
             return
 
-    await _refresh_duplicate_fingerprint(document_id)
+        extraction_id = await session.scalar(
+            select(DocumentTextExtraction.id).where(
+                DocumentTextExtraction.document_id == document_id,
+                DocumentTextExtraction.is_current.is_(True),
+                DocumentTextExtraction.status == "succeeded",
+            )
+        )
 
+    await _refresh_duplicate_fingerprint(document_id)
+    await _refresh_notifications(document_id)
+    await _index_document(document_id)
+    if extraction_id is None:
+        await _mark_enrichment_failed(document_id)
+        return
+    if settings.ai_enabled and settings.enrichment_queue_enabled:
+        try:
+            celery_app.send_task(
+                "papervault.documents.enrich_document",
+                args=[str(document_id), str(extraction_id)],
+                queue="papervault-enrichment",
+            )
+        except Exception:
+            await _mark_enrichment_failed(document_id, extraction_id)
+            logger.exception("document_enrichment_queue_failed", document_id=str(document_id))
+        return
+    await _enrich_document(document_id, extraction_id)
+
+
+@celery_app.task(
+    name="papervault.documents.enrich_document",
+    acks_late=True,
+    reject_on_worker_lost=True,
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+    retry_backoff_max=60,
+    retry_jitter=True,
+    max_retries=3,
+)  # type: ignore[untyped-decorator]
+def enrich_document(document_id: str, extraction_id: str) -> str:
+    asyncio.run(_run_enrichment_task(UUID(document_id), UUID(extraction_id)))
+    return document_id
+
+
+async def _run_enrichment_task(document_id: UUID, extraction_id: UUID) -> None:
+    try:
+        await _enrich_document(document_id, extraction_id)
+    finally:
+        await engine.dispose()
+
+
+async def _mark_enrichment_failed(document_id: UUID, extraction_id: UUID | None = None) -> None:
+    async with AsyncSessionFactory() as session:
+        document = await session.get(Document, document_id)
+        if extraction_id is not None:
+            current = await session.scalar(
+                select(DocumentTextExtraction.id).where(
+                    DocumentTextExtraction.document_id == document_id,
+                    DocumentTextExtraction.is_current.is_(True),
+                )
+            )
+            if current != extraction_id:
+                return
+        if document is not None and document.status == DocumentStatus.READY.value:
+            document.review_status = DocumentReviewStatus.PENDING.value
+            document.review_reasons = list(
+                dict.fromkeys(
+                    [
+                        reason
+                        for reason in document.review_reasons
+                        if reason != "analysis_pending:metadata"
+                    ]
+                    + ["analysis_failed:metadata"]
+                )
+            )
+            await session.commit()
+
+
+async def _enrich_document(document_id: UUID, extraction_id: UUID | None = None) -> None:
+    settings = get_settings()
     if settings.ai_enabled:
         try:
             async with AsyncSessionFactory() as session:
@@ -99,27 +177,17 @@ async def _process_document(document_id: UUID) -> None:
                     classification_threshold=settings.ai_classification_threshold,
                     metadata_locale=settings.metadata_locale,
                 )
-                await ai_processing_service.process_document(document_id)
+                processed = await ai_processing_service.process_document(
+                    document_id, expected_extraction_id=extraction_id
+                )
+                if not processed:
+                    return
         except Exception:
             logger.exception(
                 "document_enrichment_failed_text_preserved",
                 document_id=str(document_id),
             )
-            async with AsyncSessionFactory() as session:
-                document = await session.get(Document, document_id)
-                if document is not None and document.status == DocumentStatus.READY.value:
-                    document.review_status = DocumentReviewStatus.PENDING.value
-                    document.review_reasons = list(
-                        dict.fromkeys(
-                            [
-                                reason
-                                for reason in document.review_reasons
-                                if reason != "analysis_pending:metadata"
-                            ]
-                            + ["analysis_failed:metadata"]
-                        )
-                    )
-                    await session.commit()
+            await _mark_enrichment_failed(document_id, extraction_id)
 
     else:
         async with AsyncSessionFactory() as session:
@@ -134,11 +202,16 @@ async def _process_document(document_id: UUID) -> None:
 
     await _sync_smart_tags(document_id)
 
-    async with AsyncSessionFactory() as session:
-        notification_service = NotificationService(session)
-        await notification_service.generate_for_document(document_id)
-
+    await _refresh_notifications(document_id)
     await _index_document(document_id)
+
+
+async def _refresh_notifications(document_id: UUID) -> None:
+    try:
+        async with AsyncSessionFactory() as session:
+            await NotificationService(session).generate_for_document(document_id)
+    except Exception:
+        logger.exception("document_notification_refresh_failed", document_id=str(document_id))
 
 
 async def _index_document(document_id: UUID) -> None:

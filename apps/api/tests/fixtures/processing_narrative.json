@@ -1,0 +1,34 @@
+[
+  {
+    "name": "Contract parties before role definitions and a compensation annexure",
+    "pages": [
+      "EMPLOYMENT AGREEMENT\nThis agreement is made on 03 July 2026 between Northbridge Labs Private Limited (hereinafter referred to as the Employer) and Leela Rao (hereinafter referred to as the Employee).\nThe Employee is appointed as Senior Platform Engineer. Employment will commence on 14 August 2026. This fixed-term contract ends on 13 August 2028.\nThe employee must give 30 days notice before resignation. If the contract is terminated, access must be returned. This clause does not record an actual termination.",
+      "ANNEXURE A - COMPENSATION\nEmployee Name: LEELA RAO\nEmployer: NORTHBRIDGE LABS PRIVATE LIMITED\nAnnual CTC: INR 24 lakh per annum\nMonthly Gross: INR 180000\nOne-time Joining Bonus: INR 50000\nReimbursement Limit: INR 15000\nThe annual CTC includes variable compensation; reimbursements and the one-time joining bonus must not be added to the stated annual CTC."
+    ],
+    "expected_category": "employment_contract",
+    "expected_metadata": {"employer": "Northbridge Labs Private Limited", "employee_name": "Leela Rao", "position": "Senior Platform Engineer", "start_date": "2026-08-14", "end_date": "2028-08-13", "annual_compensation": 2400000},
+    "summary_concepts": [["14 August 2026"], ["24 lakh"], ["30 days notice"]],
+    "forbidden_warnings": ["status_change:reminders", "conflicting_metadata:employer", "conflicting_metadata:employee_name"],
+    "expected_pages": [1, 2],
+    "unhelpful_tags": ["annexure", "employee", "inr", "agreement"]
+  },
+  {
+    "name": "Narrative dates distinguish signing from joining and preserve legal names",
+    "text": "EMPLOYMENT CONTRACT\nSigned on 02 September 2026.\nWillow Systems (India) Limited is the employer under this contract. The employee is Arjun Menon.\nYou are appointed as Data Engineer. Your date of joining is September 21, 2026. The contract expires on 20th September 2027.\nYour annual remuneration is INR 1,800,000 per annum. Travel reimbursement is capped at INR 20000.\nThe client contact is Mira Shah; she is not the employee. Your manager is Dev Kapoor.\nConfidentiality obligations continue after employment."
+    ,"expected_category": "employment_contract",
+    "expected_metadata": {"employer": "Willow Systems (India) Limited", "employee_name": "Arjun Menon", "position": "Data Engineer", "start_date": "2026-09-21", "end_date": "2027-09-20", "annual_compensation": 1800000},
+    "summary_concepts": [["September 21, 2026"], ["1,800,000"]],
+    "forbidden_warnings": ["status_change:reminders"],
+    "unhelpful_tags": ["employee", "inr", "contract"]
+  },
+  {
+    "name": "Monthly-only pay is not invented as annual compensation",
+    "text": "EMPLOYMENT AGREEMENT\nEmployer: Cedar Operations Limited\nEmployee Name: Priya Nair\nDesignation: Support Engineer\nDate of Joining: 01/10/2026\nMonthly Gross: INR 100000\nReimbursement: INR 5000 per month\nThe annual remuneration has not been specified. Do not assume a twelve-month payment term.\nIf the agreement is terminated, the employee shall return equipment. No termination has occurred.",
+    "expected_category": "employment_contract",
+    "expected_metadata": {"employer": "Cedar Operations Limited", "employee_name": "Priya Nair", "position": "Support Engineer", "start_date": "2026-10-01"},
+    "withheld_fields": ["annual_compensation", "end_date"],
+    "forbidden_warnings": ["status_change:reminders"],
+    "expected_pages": [1],
+    "unhelpful_tags": ["employee", "inr", "agreement"]
+  }
+]

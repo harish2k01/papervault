@@ -9,7 +9,7 @@ from papervault_api.documents.domain.document_types import (
     MetadataFieldDefinition,
     MetadataFieldType,
 )
-from papervault_api.documents.infrastructure.ai import FIELD_PATTERNS
+from papervault_api.documents.infrastructure.field_context import contextual_amount, field_aliases
 
 
 @dataclass(frozen=True)
@@ -72,11 +72,30 @@ def referenced_quote(references: object, lines: tuple[SourceLine, ...], source: 
     return source[first.start : last.end]
 
 
-def labelled_value(field: MetadataFieldDefinition, quote: str, suggested: object) -> object:
-    aliases = {field.label, field.key.replace("_", " ")}
-    for patterns in FIELD_PATTERNS.values():
-        aliases.update(patterns.get(field.key, ()))
-    for alias in sorted(aliases, key=len, reverse=True):
+def labelled_value(
+    field: MetadataFieldDefinition,
+    quote: str,
+    suggested: object,
+    fields: dict[str, MetadataFieldDefinition] | None = None,
+) -> object:
+    boundary = "|".join(
+        re.escape(alias)
+        for definition in (fields or {}).values()
+        for alias in field_aliases(definition)
+    )
+    next_label = r"\s+(?:" + boundary + r")\s*[:#\t]" if boundary else None
+    if field.field_type in {MetadataFieldType.CURRENCY, MetadataFieldType.DECIMAL}:
+        amount = contextual_amount(quote, field)
+        return amount if amount is not None else suggested
+    if (
+        field.field_type is MetadataFieldType.STRING
+        and isinstance(suggested, str)
+        and suggested
+        and re.search(r"(?<!\w)" + re.escape(suggested) + r"(?!\w)", quote, flags=re.I)
+        and (next_label is None or re.search(next_label, suggested, re.I) is None)
+    ):
+        return suggested
+    for alias in field_aliases(field):
         match = re.search(r"\b" + re.escape(alias) + r"\b", quote, flags=re.I)
         if not match:
             continue
@@ -84,13 +103,21 @@ def labelled_value(field: MetadataFieldDefinition, quote: str, suggested: object
         if tail.startswith(("- ", "\u2013 ", "\u2014 ")):
             tail = tail[2:]
         first_line = tail.splitlines()[0] if tail else ""
+        if next_label:
+            first_line = re.split(next_label, first_line, maxsplit=1, flags=re.I)[0]
         if field.field_type is MetadataFieldType.STRING:
-            if (
-                isinstance(suggested, str)
-                and suggested
-                and re.search(r"(?<!\w)" + re.escape(suggested) + r"(?!\w)", first_line, flags=re.I)
+            # A role mentioned in legal prose is not a label/value record.
+            if not re.search(r"(?<!\w)" + re.escape(alias) + r"\s*(?::|#|\t|\n)", quote, re.I):
+                continue
+            first_line = re.split(
+                r"\s*\(\s*(?:hereinafter|referred|defined)\b", first_line, maxsplit=1, flags=re.I
+            )[0]
+            if re.match(
+                r"[\s\"']*(?:means|shall mean|includes|the company|the employee)\b",
+                first_line,
+                re.I,
             ):
-                return suggested
+                return None
             return first_line.strip()
         if field.field_type is not MetadataFieldType.OBJECT_LIST:
             return first_line.strip()
@@ -128,22 +155,32 @@ def labelled_candidates(
     for name, field in fields.items():
         if field.field_type is MetadataFieldType.OBJECT_LIST:
             continue
-        aliases = {field.label, name.replace("_", " ")}
-        for patterns in FIELD_PATTERNS.values():
-            aliases.update(patterns.get(name, ()))
-        alternatives = "|".join(
-            re.escape(alias) for alias in sorted(aliases, key=len, reverse=True)
+        alternatives = "|".join(re.escape(alias) for alias in field_aliases(field))
+        pattern = (
+            r"(?=((?<!\w)(?:" + alternatives + r")[ ]*[:#][ \t]*[^\r\n]+|"
+            r"^[ \t]*(?:" + alternatives + r")[ ]*(?:\t| {2,}|\r?\n)[ \t]*[^\r\n]+))"
         )
-        pattern = r"^[ \t]*(?:" + alternatives + r")[ ]*(?::|#|\t| {2,}|\r?\n)[ \t]*[^\r\n]+"
         for match in re.finditer(pattern, source, flags=re.I | re.M):
-            quote = match.group().strip()
-            candidates.append((name, labelled_value(field, quote, None), quote))
+            quote = match.group(1).strip()
+            candidates.append((name, labelled_value(field, quote, None, fields), quote))
+        if name == "position":
+            # An explicit appointment clause binds the title even when a small model
+            # selects its sentence but omits or invents the structured value.
+            appointment = (
+                r"\b(?:you (?:are|will be|have been)|(?:the )?employee (?:is|will be))"
+                r"\s+appointed\s+as\s+([^.;\r\n]{2,120})(?=[.;\r\n]|$)"
+            )
+            for match in re.finditer(appointment, source, re.I):
+                prefix = source[max(0, match.start() - 60) : match.start()]
+                if re.search(r"\b(?:if|unless|when|not)\b[^.\r\n]*$", prefix, re.I):
+                    continue
+                candidates.append((name, match.group(1).strip(), match.group()))
     return candidates
 
 
 def critical_line(text: str) -> bool:
     return bool(action_topics(text)) or bool(
-        re.search(r"\b(?:no evidence of|must not)\b", text, re.I)
+        re.search(r"\b(?:no evidence of|must|shall)\b", text, re.I)
     )
 
 
@@ -167,7 +204,7 @@ def expand_line_payload(
             if quote is None or field is None:
                 withheld.append(str(name))
                 continue
-            value = labelled_value(field, quote, item.get("value"))
+            value = labelled_value(field, quote, item.get("value"), fields)
             if value is None or value == "":
                 withheld.append(str(name))
                 continue

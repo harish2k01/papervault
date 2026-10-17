@@ -1,3 +1,5 @@
+from uuid import uuid4
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from test_grounded_analysis import SourceModel
@@ -123,6 +125,19 @@ async def test_page_evidence_is_persisted_and_reprocessing_keeps_manual_metadata
         for item in detail.current_ai_analysis.field_evidence
     )
     assert detail.current_metadata.confidence_score is None
+
+    class NeverAnalyze:
+        def analyze(self, text: str, current_document_type: str) -> object:
+            raise AssertionError("Duplicate or stale delivery must not invoke the model")
+
+    guarded = DocumentAIProcessingService(
+        session=session,
+        ai_provider=NeverAnalyze(),
+        embedding_provider=HashingEmbeddingProvider(16),
+        classification_threshold=0.55,
+    )
+    assert not await guarded.process_document(document.id, expected_extraction_id=extraction.id)
+    assert not await guarded.process_document(document.id, expected_extraction_id=uuid4())
 
     detail.current_metadata.is_current = False
     manual = DocumentMetadataRecord(
