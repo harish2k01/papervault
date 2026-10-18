@@ -10,6 +10,7 @@ celery_app = Celery(
     backend=settings.redis_url,
     include=[
         "papervault_api.worker.tasks.documents",
+        "papervault_api.worker.tasks.rag",
         "papervault_api.worker.tasks.health",
     ],
 )

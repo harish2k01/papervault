@@ -2,14 +2,61 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-import { askQuestion } from "../../lib/api";
+import { askQuestion, questionCapabilities } from "../../lib/api";
 import { QuestionsWorkspace } from "./QuestionsWorkspace";
 
 vi.mock("../../lib/api", () => ({
   askQuestion: vi.fn(),
+  questionCapabilities: vi
+    .fn()
+    .mockResolvedValue({ structured_retrieval: "disabled" }),
 }));
 
 describe("QuestionsWorkspace", () => {
+  it("opts into semantic retrieval and labels source spans without a certainty percentage", async () => {
+    vi.mocked(questionCapabilities).mockResolvedValue({
+      structured_retrieval: "preview",
+    });
+    vi.mocked(askQuestion).mockResolvedValue({
+      answered: true,
+      answer: "Only after acceptance.",
+      confidence_score: 0,
+      answer_kind: "source_span",
+      citations: [],
+      refusal_reason: null,
+    });
+    const client = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+    render(
+      <QueryClientProvider client={client}>
+        <QuestionsWorkspace onOpenDocument={vi.fn()} />
+      </QueryClientProvider>,
+    );
+    fireEvent.click(
+      await screen.findByLabelText("Try semantic retrieval preview"),
+    );
+    fireEvent.change(
+      screen.getByLabelText("Ask a question about your documents"),
+      { target: { value: "When is payment due?" } },
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Ask question" }));
+    expect(
+      await screen.findByText("Only after acceptance."),
+    ).toBeInTheDocument();
+    expect(askQuestion).toHaveBeenCalledWith(
+      "When is payment due?",
+      "candidate",
+    );
+    expect(
+      screen.getByText("Exact source quote · preview"),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/0% confidence/)).not.toBeInTheDocument();
+  });
+
   it("renders a grounded answer and opens its citation", async () => {
     vi.mocked(askQuestion).mockResolvedValue({
       answered: true,

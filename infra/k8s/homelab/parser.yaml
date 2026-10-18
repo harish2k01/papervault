@@ -1,0 +1,95 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: papervault-parser
+spec:
+  selector:
+    app.kubernetes.io/name: papervault-parser
+  ports:
+  - name: http
+    port: 5001
+    targetPort: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: papervault-parser
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: papervault-parser
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: papervault-parser
+    spec:
+      nodeSelector:
+        kubernetes.io/arch: amd64
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+        runAsGroup: 0
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+      - name: parser
+        image: quay.io/docling-project/docling-serve-cpu@sha256:6eda9c524992147c1b0b06a1a9be4894bd68b1f43c86d92c32f996c4c60d18a3
+        env:
+        - name: DOCLING_SERVE_ENABLE_UI
+          value: 'false'
+        - name: DOCLING_SERVE_ENABLE_REMOTE_SERVICES
+          value: 'false'
+        - name: DOCLING_SERVE_ALLOW_EXTERNAL_PLUGINS
+          value: 'false'
+        - name: DOCLING_SERVE_ENG_LOC_NUM_WORKERS
+          value: '1'
+        - name: DOCLING_SERVE_MAX_SYNC_WAIT
+          value: '1200'
+        - name: DOCLING_SERVE_MAX_DOCUMENT_TIMEOUT
+          value: '1100'
+        - name: DOCLING_SERVE_SCRATCH_PATH
+          value: /tmp/docling
+        - name: DOCLING_SERVE_LOG_LEVEL
+          value: WARNING
+        - name: HF_HUB_DISABLE_TELEMETRY
+          value: '1'
+        - name: DO_NOT_TRACK
+          value: '1'
+        - name: OMP_NUM_THREADS
+          value: '2'
+        ports:
+        - name: http
+          containerPort: 5001
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+        resources:
+          requests:
+            cpu: 250m
+            memory: 1536Mi
+          limits:
+            cpu: '2'
+            memory: 4Gi
+        volumeMounts:
+        - name: tmp
+          mountPath: /tmp
+        startupProbe:
+          httpGet:
+            path: /health
+            port: http
+          periodSeconds: 10
+          failureThreshold: 180
+          timeoutSeconds: 5
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: http
+          periodSeconds: 15
+          timeoutSeconds: 5
+      volumes:
+      - name: tmp
+        emptyDir:
+          sizeLimit: 2Gi

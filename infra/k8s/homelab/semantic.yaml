@@ -1,0 +1,227 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: papervault-embeddings
+spec:
+  selector:
+    app.kubernetes.io/name: papervault-embeddings
+  ports:
+  - name: http
+    port: 80
+    targetPort: http
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: papervault-embeddings
+spec:
+  serviceName: papervault-embeddings
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: papervault-embeddings
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: papervault-embeddings
+    spec:
+      nodeSelector:
+        kubernetes.io/arch: amd64
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+      - name: embeddings
+        image: ghcr.io/huggingface/text-embeddings-inference@sha256:2538ea1c9640d3763b15af668039d24172d063b42337b0c27796fc2be180c78d
+        args:
+        - --model-id
+        - BAAI/bge-small-en-v1.5
+        - --revision
+        - 5c38ec7c405ec4b44b94cc5a9bb96e735b38267a
+        - --port
+        - '8080'
+        - --max-concurrent-requests
+        - '32'
+        - --max-batch-tokens
+        - '4096'
+        - --max-client-batch-size
+        - '16'
+        - --tokenization-workers
+        - '2'
+        env:
+        - name: HF_HOME
+          value: /data
+        - name: HUGGINGFACE_HUB_CACHE
+          value: /data/hub
+        - name: HF_HUB_DISABLE_TELEMETRY
+          value: '1'
+        - name: DO_NOT_TRACK
+          value: '1'
+        - name: RAYON_NUM_THREADS
+          value: '2'
+        - name: OMP_NUM_THREADS
+          value: '2'
+        ports:
+        - name: http
+          containerPort: 8080
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+        resources:
+          requests:
+            cpu: 250m
+            memory: 768Mi
+          limits:
+            cpu: '2'
+            memory: 1536Mi
+        volumeMounts:
+        - name: models
+          mountPath: /data
+        - name: tmp
+          mountPath: /tmp
+        startupProbe:
+          httpGet:
+            path: /health
+            port: http
+          periodSeconds: 10
+          failureThreshold: 180
+          timeoutSeconds: 5
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: http
+          periodSeconds: 15
+          timeoutSeconds: 5
+      volumes:
+      - name: tmp
+        emptyDir: {}
+  volumeClaimTemplates:
+  - metadata:
+      name: models
+    spec:
+      accessModes:
+      - ReadWriteOnce
+      storageClassName: longhorn
+      resources:
+        requests:
+          storage: 4Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: papervault-reranker
+spec:
+  selector:
+    app.kubernetes.io/name: papervault-reranker
+  ports:
+  - name: http
+    port: 80
+    targetPort: http
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: papervault-reranker
+spec:
+  serviceName: papervault-reranker
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: papervault-reranker
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: papervault-reranker
+    spec:
+      nodeSelector:
+        kubernetes.io/arch: amd64
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+      - name: reranker
+        image: ghcr.io/huggingface/text-embeddings-inference@sha256:2538ea1c9640d3763b15af668039d24172d063b42337b0c27796fc2be180c78d
+        args:
+        - --model-id
+        - BAAI/bge-reranker-base
+        - --revision
+        - 2cfc18c9415c912f9d8155881c133215df768a70
+        - --port
+        - '8080'
+        - --max-concurrent-requests
+        - '32'
+        - --max-batch-tokens
+        - '4096'
+        - --max-client-batch-size
+        - '16'
+        - --tokenization-workers
+        - '2'
+        env:
+        - name: HF_HOME
+          value: /data
+        - name: HUGGINGFACE_HUB_CACHE
+          value: /data/hub
+        - name: HF_HUB_DISABLE_TELEMETRY
+          value: '1'
+        - name: DO_NOT_TRACK
+          value: '1'
+        - name: RAYON_NUM_THREADS
+          value: '2'
+        - name: OMP_NUM_THREADS
+          value: '2'
+        ports:
+        - name: http
+          containerPort: 8080
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+        resources:
+          requests:
+            cpu: 250m
+            memory: 1536Mi
+          limits:
+            cpu: '2'
+            memory: 3Gi
+        volumeMounts:
+        - name: models
+          mountPath: /data
+        - name: tmp
+          mountPath: /tmp
+        startupProbe:
+          httpGet:
+            path: /health
+            port: http
+          periodSeconds: 10
+          failureThreshold: 180
+          timeoutSeconds: 5
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: http
+          periodSeconds: 15
+          timeoutSeconds: 5
+      volumes:
+      - name: tmp
+        emptyDir: {}
+  volumeClaimTemplates:
+  - metadata:
+      name: models
+    spec:
+      accessModes:
+      - ReadWriteOnce
+      storageClassName: longhorn
+      resources:
+        requests:
+          storage: 4Gi

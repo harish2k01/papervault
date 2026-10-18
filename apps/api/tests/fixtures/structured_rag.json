@@ -1,0 +1,150 @@
+{
+  "documents": [
+    {
+      "id": "employment",
+      "text": "Employment terms\nVacation entitlement is twenty working days per calendar year.\nUnused leave expires on 31 December and cannot be exchanged for cash.\nPaid leave requires prior written approval from the reporting manager.",
+      "questions": [
+        [
+          "How much paid leave can I take?",
+          "twenty working days"
+        ],
+        [
+          "Can I get money instead of taking unused holidays?",
+          "cannot be exchanged for cash"
+        ]
+      ]
+    },
+    {
+      "id": "invoice",
+      "text": "Invoice payment terms\nThe invoice total is INR 18400, inclusive of tax.\nPayment must arrive within thirty days of the invoice date.\nLate payment incurs interest at one percent per month.",
+      "questions": [
+        [
+          "When do I need to settle the bill?",
+          "thirty days"
+        ],
+        [
+          "What extra charge applies if I pay late?",
+          "one percent per month"
+        ]
+      ]
+    },
+    {
+      "id": "insurance",
+      "text": "Home insurance conditions\nFire and theft are covered up to INR 500000.\nFlood damage is excluded from this insurance policy.\nEach covered claim has a deductible of INR 2500.",
+      "questions": [
+        [
+          "Will my plan pay for water damage from flooding?",
+          "excluded"
+        ],
+        [
+          "How much do I pay myself on a valid claim?",
+          "INR 2500"
+        ]
+      ]
+    },
+    {
+      "id": "equipment",
+      "text": "Equipment operating guide\nThe machine requires an annual safety inspection.\nDisconnect the electrical supply before removing the protective cover.\nOnly a qualified technician may replace the battery.",
+      "questions": [
+        [
+          "How often should equipment be checked?",
+          "annual safety inspection"
+        ],
+        [
+          "Who is allowed to change the power pack?",
+          "qualified technician"
+        ]
+      ]
+    },
+    {
+      "id": "lease",
+      "text": "Residential tenancy agreement\nThe monthly rent is INR 22000, payable on the fifth day of each month.\nThe tenant must give sixty days written notice before vacating.\nThe security deposit is refundable after deducting unpaid utility charges.",
+      "questions": [
+        [
+          "How early must I tell the landlord I am moving out?",
+          "sixty days"
+        ],
+        [
+          "Will I get the entire deposit back if electricity bills are unpaid?",
+          "deducting unpaid utility charges"
+        ]
+      ]
+    },
+    {
+      "id": "warranty",
+      "text": "Product warranty\nManufacturing defects are covered for two years from the purchase date.\nAccidental damage and normal wear are excluded.\nRepair claims require the original purchase receipt.",
+      "questions": [
+        [
+          "How long does protection against factory faults last?",
+          "two years"
+        ],
+        [
+          "What proof do I need to request a free repair?",
+          "original purchase receipt"
+        ]
+      ]
+    },
+    {
+      "id": "medical",
+      "text": "Laboratory report instructions\nCollect the blood sample after fasting for eight hours.\nThe measured haemoglobin is 13.6 g/dL; the reference interval is 12.0 to 15.5 g/dL.\nResults must be interpreted by the treating clinician.",
+      "questions": [
+        [
+          "How long should I avoid food before the test?",
+          "eight hours"
+        ],
+        [
+          "What is the measured haemoglobin value and unit?",
+          "13.6 g/dL"
+        ]
+      ]
+    },
+    {
+      "id": "education",
+      "text": "Course enrolment\nThe application deadline is 15 June 2030.\nAdmission is conditional on verification of the original certificates.\nTuition is refundable only if cancellation is received before classes begin.",
+      "questions": [
+        [
+          "Does getting accepted depend on checking my qualifications?",
+          "conditional on verification"
+        ],
+        [
+          "Can I recover course fees after teaching has started?",
+          "only if cancellation is received before classes begin"
+        ]
+      ]
+    },
+    {
+      "id": "bank",
+      "text": "Account statement\nThe opening balance was INR 12500 and the closing balance was INR 8700.\nAn unauthorised transaction must be reported within seven days.\nThe overdraft facility is not enabled for this account.",
+      "questions": [
+        [
+          "How quickly do I need to flag a payment I did not make?",
+          "seven days"
+        ],
+        [
+          "Am I allowed to spend more than the available account balance?",
+          "not enabled"
+        ]
+      ]
+    },
+    {
+      "id": "travel",
+      "text": "Travel reservation conditions\nPassengers must reach the departure gate forty minutes before takeoff.\nChecked baggage allowance is fifteen kilograms per person.\nTickets are non-refundable after departure.",
+      "questions": [
+        [
+          "What is the maximum weight of luggage I can check in?",
+          "fifteen kilograms"
+        ],
+        [
+          "How early do I need to be at the boarding point?",
+          "forty minutes"
+        ]
+      ]
+    }
+  ],
+  "unanswerable": [
+    "What is my pet's name?",
+    "Which doctor prescribed antibiotics?",
+    "What is my flight booking reference?",
+    "What salary was offered to me?"
+  ]
+}

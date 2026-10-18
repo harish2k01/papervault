@@ -15,6 +15,7 @@ from papervault_api.documents.infrastructure.models import (
 )
 from papervault_api.identity.infrastructure.models import User
 from papervault_api.notifications.infrastructure.models import Notification
+from papervault_api.questions.infrastructure.rag_models import DocumentRagIndex, DocumentRagPassage
 from papervault_api.search.infrastructure.models import RecentSearch, SavedSearch
 from papervault_api.tags.infrastructure.models import DocumentTag, SmartTagRule, Tag
 from papervault_api.timeline.infrastructure.models import TimelineEvent
@@ -27,6 +28,8 @@ __all__ = [
     "DocumentDuplicateFingerprint",
     "DocumentEmbedding",
     "DocumentMetadataRecord",
+    "DocumentRagIndex",
+    "DocumentRagPassage",
     "DocumentTag",
     "DocumentTextBlock",
     "DocumentTextChunk",

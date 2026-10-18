@@ -81,6 +81,18 @@ config:
   answerProvider: local
   embeddingProvider: local
   embeddingDimensions: "64"
+  ragMode: disabled
+  ragChatModel: ""
+  ragChatDigest: ""
+  ragEmbeddingsUrl: http://papervault-embeddings
+  ragRerankerUrl: http://papervault-reranker
+  ragParserUrl: http://papervault-parser:5001
+  ragEmbeddingModel: BAAI/bge-small-en-v1.5
+  ragEmbeddingRevision: 5c38ec7c405ec4b44b94cc5a9bb96e735b38267a
+  ragDimensions: "384"
+  ragRerankerModel: BAAI/bge-reranker-base
+  ragRerankerRevision: 2cfc18c9415c912f9d8155881c133215df768a70
+  ragMinRerankScore: "0.0"
   aiClassificationThreshold: "0.55"
   duplicateContentSimilarityThreshold: "0.88"
   duplicateOcrSimilarityThreshold: "0.84"

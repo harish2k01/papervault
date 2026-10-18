@@ -37,6 +37,9 @@ config:
   ollamaContextTokens: "8192"
   ollamaMaxOutputTokens: "2048"
   modelProviderTimeoutSeconds: "300"
+  ragMode: preview
+  ragChatModel: qwen3:4b
+  ragChatDigest: 359d7dd4bcdab3d86b87d73ac27966f4dbb9f5efdfcc75d34a8764a09474fae7
 
 gateway:
   httpRoute:
@@ -45,8 +48,26 @@ gateway:
     gatewayNamespace: traefik
     sectionName: websecure
     hostnames: [papervault.k8s.harish2k01.xyz]
+    api:
+      timeouts:
+        request: 360s
+        backendRequest: 330s
 
 resources:
+  understanding:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+  index:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
   enrichment:
     requests:
       cpu: 100m

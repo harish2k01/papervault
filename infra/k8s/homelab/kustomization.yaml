@@ -7,3 +7,5 @@ resources:
   - redis.yaml
   - object-storage.yaml
   - model.yaml
+  - semantic.yaml
+  - parser.yaml

@@ -116,6 +116,7 @@ import { cn, humanizeLabel } from "../../lib/utils";
 import { HomeWorkspace } from "./HomeWorkspace";
 import { DocumentCard, type LibraryDocument } from "../documents/DocumentCard";
 import { formatReviewReason } from "./review-utils";
+import { DocumentIntelligence } from "../questions/DocumentIntelligence";
 import {
   compareNotifications,
   formatDateOnly,
@@ -2833,6 +2834,12 @@ function DocumentPanel({
                 </Suspense>
               </section>
 
+              <DocumentIntelligence
+                key={detail.document.id}
+                documentId={detail.document.id}
+                onPage={(pageNumber) => setPageRequest({ pageNumber })}
+              />
+
               <section className="border-t border-border pt-5">
                 <div className="flex flex-wrap items-start justify-between gap-4">
                   <div>
@@ -2856,8 +2863,7 @@ function DocumentPanel({
                   {confidence !== null && confidence !== undefined ? (
                     <div className="flex items-center gap-2">
                       <span className="rounded-full bg-muted px-3 py-1 text-xs text-muted-foreground">
-                        {Math.round(confidence * 100)}% classification
-                        confidence
+                        Check summary against source
                       </span>
                       <Button
                         size="sm"

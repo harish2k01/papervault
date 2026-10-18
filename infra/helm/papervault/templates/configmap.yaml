@@ -15,6 +15,18 @@ data:
   PAPERVAULT_ANSWER_PROVIDER: {{ .Values.config.answerProvider | quote }}
   PAPERVAULT_EMBEDDING_PROVIDER: {{ .Values.config.embeddingProvider | quote }}
   PAPERVAULT_EMBEDDING_DIMENSIONS: {{ .Values.config.embeddingDimensions | quote }}
+  PAPERVAULT_RAG_MODE: {{ .Values.config.ragMode | quote }}
+  PAPERVAULT_RAG_CHAT_MODEL: {{ .Values.config.ragChatModel | quote }}
+  PAPERVAULT_RAG_CHAT_DIGEST: {{ .Values.config.ragChatDigest | quote }}
+  PAPERVAULT_RAG_EMBEDDINGS_URL: {{ .Values.config.ragEmbeddingsUrl | quote }}
+  PAPERVAULT_RAG_RERANKER_URL: {{ .Values.config.ragRerankerUrl | quote }}
+  PAPERVAULT_RAG_PARSER_URL: {{ .Values.config.ragParserUrl | quote }}
+  PAPERVAULT_RAG_EMBEDDING_MODEL: {{ .Values.config.ragEmbeddingModel | quote }}
+  PAPERVAULT_RAG_EMBEDDING_REVISION: {{ .Values.config.ragEmbeddingRevision | quote }}
+  PAPERVAULT_RAG_DIMENSIONS: {{ .Values.config.ragDimensions | quote }}
+  PAPERVAULT_RAG_RERANKER_MODEL: {{ .Values.config.ragRerankerModel | quote }}
+  PAPERVAULT_RAG_RERANKER_REVISION: {{ .Values.config.ragRerankerRevision | quote }}
+  PAPERVAULT_RAG_MIN_RERANK_SCORE: {{ .Values.config.ragMinRerankScore | quote }}
   PAPERVAULT_AI_CLASSIFICATION_THRESHOLD: {{ .Values.config.aiClassificationThreshold | quote }}
   PAPERVAULT_DUPLICATE_CONTENT_SIMILARITY_THRESHOLD: {{ .Values.config.duplicateContentSimilarityThreshold | default "0.88" | quote }}
   PAPERVAULT_DUPLICATE_OCR_SIMILARITY_THRESHOLD: {{ .Values.config.duplicateOcrSimilarityThreshold | default "0.84" | quote }}
