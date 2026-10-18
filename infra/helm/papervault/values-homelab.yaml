@@ -37,6 +37,7 @@ config:
   ollamaContextTokens: "8192"
   ollamaMaxOutputTokens: "2048"
   modelProviderTimeoutSeconds: "300"
+  ragMode: preview
 
 gateway:
   httpRoute:
@@ -47,6 +48,13 @@ gateway:
     hostnames: [papervault.k8s.harish2k01.xyz]
 
 resources:
+  index:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
   enrichment:
     requests:
       cpu: 100m

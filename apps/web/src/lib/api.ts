@@ -102,6 +102,7 @@ export type SearchRequestInput = {
 };
 
 export type QuestionAnswer = {
+  answer_kind?: "legacy" | "source_span";
   answered: boolean;
   answer: string | null;
   confidence_score: number;
@@ -653,11 +654,45 @@ export async function searchDocuments(input: SearchRequestInput) {
   return response.results;
 }
 
-export async function askQuestion(question: string) {
+export async function askQuestion(
+  question: string,
+  retrieval: "standard" | "candidate" = "standard",
+) {
   return apiFetch<QuestionAnswer>("/questions/ask", {
     method: "POST",
-    body: JSON.stringify({ question }),
+    body: JSON.stringify({ question, retrieval }),
   });
+}
+
+export async function questionCapabilities() {
+  return apiFetch<{ structured_retrieval: "disabled" | "preview" | "enabled" }>(
+    "/questions/capabilities",
+  );
+}
+
+export type DocumentIntelligence = {
+  status: string;
+  page_count?: number;
+  covered_pages?: number[];
+  understanding?: {
+    status?: string;
+    covered_passages?: number;
+    rejected_findings?: number;
+    findings?: Array<{
+      kind: string;
+      label: string;
+      value: string;
+      quote: string;
+      page_number: number;
+      ordinal: number;
+    }>;
+  };
+};
+
+export async function documentIntelligence(documentId: string) {
+  return apiFetch<DocumentIntelligence>(
+    `/questions/intelligence/${documentId}`,
+  );
 }
 
 export async function listSavedSearches() {

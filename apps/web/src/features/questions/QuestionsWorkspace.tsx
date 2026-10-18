@@ -1,5 +1,5 @@
 import { FormEvent, useState } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import {
   ArrowUp,
   FileText,
@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 
 import { Button } from "../../components/ui/button";
-import { askQuestion } from "../../lib/api";
+import { askQuestion, questionCapabilities } from "../../lib/api";
 
 const exampleQuestions = [
   "What was the net pay in my latest payslip?",
@@ -24,7 +24,16 @@ export function QuestionsWorkspace({
 }) {
   const [question, setQuestion] = useState("");
   const [submittedQuestion, setSubmittedQuestion] = useState("");
-  const questionMutation = useMutation({ mutationFn: askQuestion });
+  const [candidate, setCandidate] = useState(false);
+  const capabilities = useQuery({
+    queryKey: ["question-capabilities"],
+    queryFn: questionCapabilities,
+    staleTime: 60_000,
+  });
+  const questionMutation = useMutation({
+    mutationFn: (value: string) =>
+      askQuestion(value, candidate ? "candidate" : "standard"),
+  });
 
   function submitQuestion(event?: FormEvent) {
     event?.preventDefault();
@@ -42,6 +51,27 @@ export function QuestionsWorkspace({
           <p className="mt-0.5 text-sm text-muted-foreground">
             Answers are grounded in your documents and include their sources.
           </p>
+          {capabilities.data?.structured_retrieval === "preview" ? (
+            <label className="mt-3 flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={candidate}
+                disabled={questionMutation.isPending}
+                onChange={(event) => {
+                  setCandidate(event.target.checked);
+                  questionMutation.reset();
+                  setSubmittedQuestion("");
+                }}
+              />
+              Try semantic retrieval preview
+            </label>
+          ) : null}
+          {candidate ? (
+            <p className="mt-1 text-xs text-muted-foreground">
+              Experimental local retrieval. Answers quote source text;
+              interpretation and completeness still need review.
+            </p>
+          ) : null}
         </div>
       </header>
 
@@ -105,10 +135,17 @@ export function QuestionsWorkspace({
                       </h2>
                       {questionMutation.data.answered ? (
                         <p className="text-xs text-muted-foreground">
-                          {Math.round(
-                            questionMutation.data.confidence_score * 100,
+                          {questionMutation.data.answer_kind ===
+                          "source_span" ? (
+                            "Exact source quote · preview"
+                          ) : (
+                            <>
+                              {Math.round(
+                                questionMutation.data.confidence_score * 100,
+                              )}
+                              % confidence
+                            </>
                           )}
-                          % confidence
                         </p>
                       ) : null}
                     </div>
@@ -121,7 +158,10 @@ export function QuestionsWorkspace({
                   {questionMutation.data.citations.length ? (
                     <details className="mt-6" open>
                       <summary className="cursor-pointer text-sm font-semibold">
-                        {questionMutation.data.citations.length} supporting
+                        {questionMutation.data.citations.length}{" "}
+                        {questionMutation.data.answered
+                          ? "supporting"
+                          : "retrieved"}
                         {questionMutation.data.citations.length === 1
                           ? " source"
                           : " sources"}

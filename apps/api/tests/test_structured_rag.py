@@ -1,0 +1,418 @@
+import hashlib
+import json
+from pathlib import Path
+from typing import Any
+from uuid import UUID, uuid4
+
+import pytest
+from fastapi import HTTPException
+from pydantic import ValidationError
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from papervault_api.core.config import Settings
+from papervault_api.documents.infrastructure.models import (
+    Document,
+    DocumentTextExtraction,
+    DocumentTextPage,
+)
+from papervault_api.identity.application.current_user import CurrentUser
+from papervault_api.identity.domain.enums import UserRole
+from papervault_api.identity.infrastructure.models import User
+from papervault_api.questions.api.routes import ask_question, candidate_understanding
+from papervault_api.questions.api.schemas import AskQuestionRequest
+from papervault_api.questions.application.evidence_analysis import (
+    SourceSpanAnswerProvider,
+    extract_findings,
+    source_span,
+)
+from papervault_api.questions.application.hybrid import HybridRetriever
+from papervault_api.questions.application.indexing import StructuredIndexingService
+from papervault_api.questions.application.service import RetrievedEvidence
+from papervault_api.questions.application.structure import split_text, structured_passages
+from papervault_api.questions.infrastructure.local_inference import (
+    InferenceUnavailable,
+    SemanticModels,
+)
+from papervault_api.questions.infrastructure.rag_models import DocumentRagIndex, DocumentRagPassage
+
+
+class FakeModels:
+    model, revision, dimensions = "fixture-model", "fixture-revision", 2
+
+    def __init__(self) -> None:
+        self.seen: list[str] = []
+
+    def embed(self, texts: list[str], *, query: bool = False) -> list[list[float]]:
+        return [[1.0, 0.0] for _ in texts]
+
+    def rank(self, question: str, texts: list[str]) -> list[tuple[int, float]]:
+        self.seen.extend(texts)
+        return [
+            (index, 0.95 if "Vacation entitlement" in text else 0.001)
+            for index, text in enumerate(texts)
+        ]
+
+
+class FakeClient:
+    provider, chat_model, embedding_model = "ollama", "fixture", "fixture"
+
+    def __init__(self, output: dict[str, Any]) -> None:
+        self.output = output
+        self.calls: list[dict[str, Any]] = []
+
+    def complete(self, *, system: str, user: str) -> str:
+        self.calls.append(json.loads(user))
+        return json.dumps(self.output)
+
+    def embed(self, text: str) -> tuple[float, ...]:
+        return (1, 0)
+
+    def health(self) -> tuple[bool, str]:
+        return True, "healthy"
+
+
+async def source(session: AsyncSession, owner: UUID) -> tuple[Document, DocumentTextExtraction]:
+    document = Document(
+        owner_id=owner,
+        title="Synthetic",
+        original_filename="synthetic.pdf",
+        content_type="application/pdf",
+        file_size_bytes=9,
+        sha256_hash=hashlib.sha256(b"synthetic").hexdigest(),
+        storage_bucket="documents",
+        storage_key=str(uuid4()),
+        status="ready",
+        document_type="generic_pdf",
+    )
+    session.add(document)
+    await session.flush()
+    extraction = DocumentTextExtraction(
+        document_id=document.id,
+        source="embedded_text",
+        status="succeeded",
+        content_text="Vacation entitlement is twenty days.",
+        page_count=1,
+        is_current=True,
+    )
+    session.add(extraction)
+    await session.flush()
+    session.add(
+        DocumentTextPage(
+            text_extraction_id=extraction.id,
+            page_number=1,
+            content_text=extraction.content_text,
+        )
+    )
+    return document, extraction
+
+
+async def index(
+    session: AsyncSession,
+    document: Document,
+    extraction: DocumentTextExtraction,
+    *,
+    revision: str = "fixture-revision",
+) -> DocumentRagIndex:
+    item = DocumentRagIndex(
+        document_id=document.id,
+        text_extraction_id=extraction.id,
+        pipeline_id="fixture",
+        parser_model="fixture",
+        embedding_model="fixture-model",
+        embedding_revision=revision,
+        dimensions=2,
+        status="ready",
+        page_count=1,
+        covered_pages=[1],
+        warnings=[],
+        understanding={},
+    )
+    session.add(item)
+    await session.flush()
+    return item
+
+
+def passage(index_id: UUID, ordinal: int, text: str, vector: list[float]) -> DocumentRagPassage:
+    return DocumentRagPassage(
+        index_id=index_id,
+        ordinal=ordinal,
+        page_number=1,
+        kind="text",
+        section="",
+        content_text=text,
+        provenance=[{"page_no": 1}],
+        vector=vector,
+    )
+
+
+async def test_hybrid_retrieves_zero_overlap_after_5000_and_never_sends_foreign_or_stale_text(
+    session: AsyncSession,
+) -> None:
+    owner, other = User(email="rag@example.test"), User(email="other@example.test")
+    session.add_all([owner, other])
+    await session.flush()
+    document, extraction = await source(session, owner.id)
+    current = await index(session, document, extraction)
+    session.add_all(
+        [
+            passage(current.id, ordinal, "Unrelated printer maintenance.", [0, 1])
+            for ordinal in range(5001)
+        ]
+    )
+    session.add(passage(current.id, 5001, "Vacation entitlement is twenty days.", [1, 0]))
+    session.add(passage(current.id, 5002, "Subject to manager approval.", [0, 1]))
+    foreign_doc, foreign_source = await source(session, other.id)
+    foreign = await index(session, foreign_doc, foreign_source)
+    session.add(passage(foreign.id, 0, "FOREIGN PRIVATE", [1, 0]))
+    stale_doc, stale_source = await source(session, owner.id)
+    stale_source.is_current = False
+    stale = await index(session, stale_doc, stale_source)
+    session.add(passage(stale.id, 0, "STALE PRIVATE", [1, 0]))
+    incompatible_doc, incompatible_source = await source(session, owner.id)
+    incompatible = await index(session, incompatible_doc, incompatible_source, revision="obsolete")
+    session.add(passage(incompatible.id, 0, "INCOMPATIBLE PRIVATE", [1, 0]))
+    await session.commit()
+    models = FakeModels()
+    result = await HybridRetriever(session, models, "fixture").retrieve(
+        owner.id, "How much paid leave?"
+    )
+    assert len(result) == 1
+    assert result[0].document_id == document.id
+    assert "Vacation entitlement" in result[0].content_text
+    assert "Subject to manager approval." in result[0].content_text
+    assert all("PRIVATE" not in text for text in models.seen)
+
+
+def test_source_spans_reject_fabrication_boolean_indexes_and_missing_qualification() -> None:
+    evidence = (
+        RetrievedEvidence(
+            uuid4(),
+            "Synthetic",
+            "synthetic.pdf",
+            1,
+            "Payment is due only after acceptance.",
+            0.9,
+            0,
+        ),
+    )
+    for output in [
+        {"answered": True, "evidence_index": True, "answer": "Payment", "quote": "Payment"},
+        {
+            "answered": True,
+            "evidence_index": 0,
+            "answer": "Already paid",
+            "quote": evidence[0].content_text,
+        },
+        {
+            "answered": True,
+            "evidence_index": 0,
+            "answer": "Payment",
+            "quote": "Payment is unconditional.",
+        },
+    ]:
+        assert (
+            not SourceSpanAnswerProvider(FakeClient(output))
+            .answer("When is payment due?", evidence)
+            .answered
+        )
+    output = {
+        "answered": True,
+        "evidence_index": 0,
+        "answer": "only after acceptance",
+        "quote": evidence[0].content_text,
+    }
+    answer = SourceSpanAnswerProvider(FakeClient(output)).answer("When is payment due?", evidence)
+    assert answer.answered and answer.citations[0].snippet == evidence[0].content_text
+    assert answer.confidence_score == 0  # No invented certainty percentage.
+
+
+def test_findings_scan_all_passages_without_fixed_document_fields_and_reject_wrong_source() -> None:
+    data = [
+        {
+            "ordinal": i,
+            "page_number": i + 1,
+            "section": "Terms",
+            "text": f"Condition {i}: insurance excludes flooding.",
+        }
+        for i in range(9)
+    ]
+    client = FakeClient(
+        {
+            "findings": [
+                {
+                    "kind": "exclusion",
+                    "label": "Flooding",
+                    "value": "excludes flooding",
+                    "quote": data[8]["text"],
+                    "ordinal": 8,
+                },
+                {
+                    "kind": "amount",
+                    "label": "Invented",
+                    "value": "500",
+                    "quote": "500",
+                    "ordinal": 8,
+                },
+            ]
+        }
+    )
+    result = extract_findings(client, data)
+    assert result["covered_passages"] == 9 and len(client.calls) == 3
+    assert len(result["findings"]) == 1 and result["findings"][0]["page_number"] == 9
+    assert result["rejected_findings"] == 5
+    assert result["status"] == "needs_review"
+
+
+def test_structure_retains_reading_order_table_columns_and_page_provenance() -> None:
+    data = {
+        "body": {
+            "children": [{"$ref": "#/texts/0"}, {"$ref": "#/tables/0"}, {"$ref": "#/texts/1"}]
+        },
+        "texts": [
+            {"label": "section_header", "text": "Compensation", "prov": [{"page_no": 2}]},
+            {
+                "label": "text",
+                "text": "Variable compensation is not guaranteed.",
+                "prov": [{"page_no": 2}],
+            },
+        ],
+        "tables": [
+            {
+                "label": "table",
+                "prov": [{"page_no": 2, "bbox": {"l": 10}}],
+                "data": {
+                    "table_cells": [
+                        {"column_header": True, "text": "Component"},
+                        {"column_header": True, "text": "Annual INR"},
+                        {"start_row_offset_idx": 1, "text": "Base"},
+                        {"start_row_offset_idx": 1, "text": "120000"},
+                    ]
+                },
+            }
+        ],
+    }
+    result = structured_passages(data)
+    assert [item.kind for item in result] == ["section_header", "table", "text"]
+    assert all(item.page == 2 and item.section == "Compensation" for item in result)
+    assert "Annual INR" in result[1].text and "Base | 120000" in result[1].text
+    assert result[1].provenance[0]["bbox"] == {"l": 10}
+    long_text = " ".join(["Unicode résumé and extended clause."] * 90)
+    pieces = split_text(long_text)
+    assert " ".join(pieces) == long_text
+    assert all(len(piece.encode()) <= 700 for piece in pieces)
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "https://example.com",
+        "http://169.254.169.254",
+        "http://papervault-service.evil.example",
+        "http://user:secret@localhost",
+    ],
+)
+def test_private_processing_rejects_public_or_metadata_endpoints(url: str) -> None:
+    with pytest.raises(ValidationError):
+        Settings(rag_parser_url=url)
+
+
+async def test_index_refuses_incomplete_page_coverage_and_does_not_publish(
+    session: AsyncSession,
+) -> None:
+    owner = User(email="coverage@example.test")
+    session.add(owner)
+    await session.flush()
+    document, extraction = await source(session, owner.id)
+    await session.commit()
+
+    class Storage:
+        async def download_to_file(self, *, bucket: str, key: str, destination: Path) -> None:
+            destination.write_bytes(b"synthetic")
+
+    class Parser:
+        identity = "fixture"
+
+        def parse(self, content: bytes, content_type: str) -> dict[str, Any]:
+            return {"pages": {"1": {}}, "body": {"children": []}}
+
+    with pytest.raises(InferenceUnavailable, match="coverage"):
+        await StructuredIndexingService(
+            session, Storage(), Parser(), FakeModels(), "fixture"
+        ).build(document.id, extraction.id)
+    assert await session.scalar(select(DocumentRagIndex.id)) is None
+
+
+def test_embedding_identity_and_nan_are_rejected() -> None:
+    class Transport:
+        def request(self, path: str, payload: Any = None) -> Any:
+            return {"model_id": "wrong", "model_sha": "wrong"}
+
+    model = SemanticModels(
+        Transport(),
+        Transport(),
+        model="expected",
+        revision="pinned",
+        dimensions=2,
+        reranker_model="reranker",
+        reranker_revision="pinned",
+    )
+    with pytest.raises(InferenceUnavailable, match="identity"):
+        model.embed(["synthetic"])
+
+
+def test_whitespace_resolution_preserves_source_without_turning_unpaid_into_paid() -> None:
+    assert (
+        source_span("Payment is\n  due after acceptance.", "Payment is due after acceptance.")
+        == "Payment is\n  due after acceptance."
+    )
+    assert source_span("Status: unpaid.", "paid") is None
+    assert source_span("Total: 1100", "100") is None
+
+
+async def test_candidate_api_checks_owner_and_refuses_incomplete_index(
+    session: AsyncSession,
+) -> None:
+    owner = User(email="api-rag@example.test")
+    session.add(owner)
+    await session.flush()
+    document, _ = await source(session, owner.id)
+    await session.commit()
+    settings = Settings(rag_mode="preview")
+    stranger = CurrentUser(uuid4(), "other@example.test", UserRole.USER)
+    with pytest.raises(HTTPException) as denied:
+        await candidate_understanding(document.id, stranger, session, settings)
+    assert denied.value.status_code == 404
+    current = CurrentUser(owner.id, owner.email, UserRole.USER)
+    with pytest.raises(HTTPException) as incomplete:
+        await ask_question(
+            AskQuestionRequest(question="What are my duties?", retrieval="candidate"),
+            current,
+            session,
+            settings,
+        )
+    assert incomplete.value.status_code == 409
+
+
+def test_embedding_nan_and_reranker_duplicate_indexes_are_rejected() -> None:
+    class Transport:
+        def request(self, path: str, payload: Any = None) -> Any:
+            if path == "/info":
+                return {"model_id": "fixture", "model_sha": "pinned"}
+            if path == "/embed":
+                return [[float("nan"), 0]]
+            return [{"index": 0, "score": 0.8}, {"index": 0, "score": 0.7}]
+
+    model = SemanticModels(
+        Transport(),
+        Transport(),
+        model="fixture",
+        revision="pinned",
+        dimensions=2,
+        reranker_model="fixture",
+        reranker_revision="pinned",
+    )
+    with pytest.raises(InferenceUnavailable, match="values"):
+        model.embed(["synthetic"])
+    with pytest.raises(InferenceUnavailable, match="duplicate"):
+        model.rank("synthetic", ["one", "two"])

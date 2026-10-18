@@ -92,6 +92,7 @@ class RetrievedEvidence:
     score: float
     lexical_score: float
     document_type: str = "generic_pdf"
+    text_extraction_id: UUID | None = None
 
 
 @dataclass(frozen=True, slots=True)

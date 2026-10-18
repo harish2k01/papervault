@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 from urllib.error import HTTPError, URLError
 from urllib.parse import urljoin
-from urllib.request import Request, urlopen
+from urllib.request import HTTPRedirectHandler, ProxyHandler, Request, build_opener, urlopen
 
 if TYPE_CHECKING:
     from papervault_api.core.config import Settings
@@ -13,6 +13,11 @@ if TYPE_CHECKING:
 
 class ModelProviderError(RuntimeError):
     pass
+
+
+class RejectRedirects(HTTPRedirectHandler):
+    def redirect_request(self, *args: Any, **kwargs: Any) -> None:
+        return None
 
 
 class ModelClient(Protocol):
@@ -49,10 +54,12 @@ class JsonHttpClient:
         base_url: str,
         timeout_seconds: float,
         headers: dict[str, str] | None = None,
+        private_only: bool = False,
     ) -> None:
         self._base_url = base_url.rstrip("/") + "/"
         self._timeout_seconds = timeout_seconds
         self._headers = headers or {}
+        self._private_only = private_only
 
     def request(
         self,
@@ -71,19 +78,22 @@ class JsonHttpClient:
             headers=headers,
         )
         try:
-            with urlopen(request, timeout=self._timeout_seconds) as response:
+            opener = (
+                build_opener(ProxyHandler({}), RejectRedirects()).open
+                if self._private_only
+                else urlopen
+            )
+            with opener(request, timeout=self._timeout_seconds) as response:
                 payload = json.loads(response.read().decode("utf-8"))
                 if not isinstance(payload, dict):
                     raise ModelProviderError("Model provider returned a non-object response")
                 return JsonHttpResponse(status_code=response.status, body=payload)
         except HTTPError as exc:
-            detail = exc.read().decode("utf-8", errors="replace")[:1000]
-            raise ModelProviderError(f"Model provider HTTP {exc.code}: {detail}") from exc
-        except (URLError, TimeoutError, OSError) as exc:
-            detail = getattr(exc, "reason", str(exc))
-            raise ModelProviderError(f"Model provider request failed: {detail}") from exc
-        except (json.JSONDecodeError, UnicodeDecodeError) as exc:
-            raise ModelProviderError("Model provider returned invalid JSON") from exc
+            raise ModelProviderError(f"Model provider HTTP {exc.code}") from None
+        except (URLError, TimeoutError, OSError):
+            raise ModelProviderError("Model provider request failed") from None
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            raise ModelProviderError("Model provider returned invalid JSON") from None
 
 
 class OllamaModelClient:

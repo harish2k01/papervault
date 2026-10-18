@@ -98,6 +98,15 @@ async def _process_document(document_id: UUID) -> None:
     if extraction_id is None:
         await _mark_enrichment_failed(document_id)
         return
+    if settings.rag_mode != "disabled":
+        try:
+            celery_app.send_task(
+                "papervault.rag.index",
+                args=[str(document_id), str(extraction_id)],
+                queue="papervault-index",
+            )
+        except Exception:
+            logger.warning("candidate_index_queue_failed")
     if settings.ai_enabled and settings.enrichment_queue_enabled:
         try:
             celery_app.send_task(

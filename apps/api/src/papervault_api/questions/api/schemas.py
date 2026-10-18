@@ -1,3 +1,4 @@
+from typing import Literal
 from uuid import UUID
 
 from pydantic import BaseModel, Field
@@ -5,6 +6,7 @@ from pydantic import BaseModel, Field
 
 class AskQuestionRequest(BaseModel):
     question: str = Field(min_length=3, max_length=1000)
+    retrieval: Literal["standard", "candidate"] = "standard"
 
 
 class QuestionCitationResponse(BaseModel):
@@ -22,3 +24,4 @@ class AskQuestionResponse(BaseModel):
     confidence_score: float
     citations: list[QuestionCitationResponse]
     refusal_reason: str | None
+    answer_kind: Literal["legacy", "source_span"] = "legacy"

@@ -31,6 +31,72 @@ class Settings(BaseSettings):
     answer_provider: str = Field(default="local", alias="PAPERVAULT_ANSWER_PROVIDER")
     embedding_provider: str = Field(default="local", alias="PAPERVAULT_EMBEDDING_PROVIDER")
     embedding_dimensions: int = Field(default=64, alias="PAPERVAULT_EMBEDDING_DIMENSIONS")
+    rag_mode: str = Field(default="disabled", alias="PAPERVAULT_RAG_MODE")
+    rag_chat_model: str | None = Field(default=None, alias="PAPERVAULT_RAG_CHAT_MODEL")
+    rag_chat_digest: str | None = Field(default=None, alias="PAPERVAULT_RAG_CHAT_DIGEST")
+    rag_embeddings_url: str = Field(
+        default="http://localhost:8081", alias="PAPERVAULT_RAG_EMBEDDINGS_URL"
+    )
+    rag_reranker_url: str = Field(
+        default="http://localhost:8082", alias="PAPERVAULT_RAG_RERANKER_URL"
+    )
+    rag_parser_url: str = Field(default="http://localhost:5001", alias="PAPERVAULT_RAG_PARSER_URL")
+    rag_embedding_model: str = Field(
+        default="BAAI/bge-small-en-v1.5", alias="PAPERVAULT_RAG_EMBEDDING_MODEL"
+    )
+    rag_embedding_revision: str = Field(
+        default="5c38ec7c405ec4b44b94cc5a9bb96e735b38267a",
+        alias="PAPERVAULT_RAG_EMBEDDING_REVISION",
+    )
+    rag_dimensions: int = Field(default=384, ge=1, alias="PAPERVAULT_RAG_DIMENSIONS")
+    rag_reranker_model: str = Field(
+        default="BAAI/bge-reranker-base", alias="PAPERVAULT_RAG_RERANKER_MODEL"
+    )
+    rag_reranker_revision: str = Field(
+        default="2cfc18c9415c912f9d8155881c133215df768a70", alias="PAPERVAULT_RAG_RERANKER_REVISION"
+    )
+    # A relevance score is not a probability of truth. Calibrate this gate on held-out cases.
+    rag_min_rerank_score: float = Field(
+        default=0.0, ge=0, le=1, alias="PAPERVAULT_RAG_MIN_RERANK_SCORE"
+    )
+
+    @field_validator("rag_mode")
+    @classmethod
+    def validate_rag_mode(cls, value: str) -> str:
+        if value not in {"disabled", "preview", "enabled"}:
+            raise ValueError("RAG mode must be disabled, preview, or enabled")
+        return value
+
+    @field_validator("rag_embeddings_url", "rag_reranker_url", "rag_parser_url")
+    @classmethod
+    def validate_private_inference_url(cls, value: str) -> str:
+        from ipaddress import ip_address
+        from urllib.parse import urlsplit
+
+        url = urlsplit(value)
+        host = url.hostname or ""
+        allowed = (
+            host == "localhost"
+            or host.endswith((".svc", ".svc.cluster.local"))
+            or (host.startswith("papervault-") and "." not in host)
+        )
+        try:
+            address = ip_address(host)
+            allowed = (address.is_private or address.is_loopback) and not address.is_link_local
+        except ValueError:
+            pass
+        if (
+            not allowed
+            or url.scheme not in {"http", "https"}
+            or url.username
+            or url.password
+            or url.query
+            or url.fragment
+            or url.path not in {"", "/"}
+        ):
+            raise ValueError("Structured processing requires a private inference service URL")
+        return value.rstrip("/")
+
     ai_classification_threshold: float = Field(
         default=0.55,
         alias="PAPERVAULT_AI_CLASSIFICATION_THRESHOLD",
@@ -187,6 +253,8 @@ class Settings(BaseSettings):
         "otel_exporter_otlp_endpoint",
         "openai_compatible_api_key",
         "ollama_expected_digest",
+        "rag_chat_model",
+        "rag_chat_digest",
         "ocr_max_pdf_pages",
         mode="before",
     )
