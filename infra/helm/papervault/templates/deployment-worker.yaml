@@ -1,5 +1,5 @@
 {{- $root := . -}}
-{{- range $role := list "worker" "enrichment" "index" }}
+{{- range $role := list "worker" "enrichment" "index" "understanding" }}
 {{- if or (eq $role "worker") (and $root.Values.worker.separateEnrichment (or (eq $role "enrichment") (ne $root.Values.config.ragMode "disabled"))) }}
 ---
 apiVersion: apps/v1
@@ -49,8 +49,10 @@ spec:
             - --queues=celery
             {{- else if eq $role "index" }}
             - --queues=papervault-index
+            {{- else if eq $role "understanding" }}
+            - --queues=papervault-understanding
             {{- else }}
-            - --queues=papervault-enrichment,papervault-understanding
+            - --queues=papervault-enrichment
             {{- end }}
             {{- else }}
             - --queues=celery,papervault-enrichment,papervault-index,papervault-understanding

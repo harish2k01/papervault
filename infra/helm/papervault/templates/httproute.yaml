@@ -26,6 +26,10 @@ spec:
       backendRefs:
         - name: {{ include "papervault.fullname" . }}-api
           port: {{ .Values.service.api.port }}
+      {{- with .Values.gateway.httpRoute.api.timeouts }}
+      timeouts:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
     - matches:
         - path:
             type: PathPrefix

@@ -107,14 +107,18 @@ infrastructure operation.
 `PAPERVAULT_RAG_MODE` is `disabled`, `preview` or `enabled`. Preview adds an opt-in
 semantic retrieval control in Ask and a document intelligence panel with source
 page links. `enabled` changes the default answer path; it should only be selected
-after quality gates pass. The indexing consumer has its own queue. Candidate fact
-analysis shares the serialized enrichment consumer, so retrieval indexing does
-not wait behind summarization.
+after quality gates pass. Indexing and candidate fact analysis have separate
+consumers, so neither waits behind a complete legacy enrichment job. Ollama still
+has one inference slot and serializes model requests; CPU analysis can take
+considerable time. Ingestion and retrieval indexing do not wait for summarization.
 
 Candidate chat weights can be selected independently using
 `PAPERVAULT_RAG_CHAT_MODEL` and `PAPERVAULT_RAG_CHAT_DIGEST`. They still run in the
 private Ollama service. Changing a candidate model does not change the original
 analysis model. Digest checking is mandatory for an explicit candidate selection.
+The homelab preview uses the pinned `qwen3:4b` candidate while legacy enrichment
+retains its existing model. The API route allows the longer local inference
+request; this changes its request deadline, not the model's quality.
 
 ## Evaluation and cutover
 
@@ -140,6 +144,15 @@ All 15 produced answers preserved their source text, but five selected the wrong
 information. This illustrates why provenance cannot stand in for correctness.
 It also fails the cutover gate. The reports are retained separately so neither
 improved answer availability nor conservative refusal hides the remaining errors.
+
+The 4B source-ID pilot matched 16/20 positive cases, abstained on two, selected the
+wrong information on two, and refused all four unsupported questions. It took
+785 seconds including parsing and all 24 queries on the tested CPU deployment.
+The preview selects this larger model because its measured result is better;
+16/20 still fails the accuracy gate. These scripts measure dense retrieval,
+reranking and source selection as components, not the complete database hybrid
+retriever or representative private-document accuracy. Database authorization,
+freshness and queue routing require their separate integration checks.
 
 Production cutover requires a separate held-out set with human-reviewed expected
 facts and answers, including scans, tables, long documents, amendments, ambiguous

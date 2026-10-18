@@ -19,7 +19,7 @@ spec:
             matchExpressions:
               - key: app.kubernetes.io/component
                 operator: In
-                values: [api, worker, enrichment, index]
+                values: [api, worker, enrichment, index, understanding]
       ports:
         - {protocol: TCP, port: 8080}
         - {protocol: TCP, port: 11434}
