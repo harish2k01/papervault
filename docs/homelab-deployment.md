@@ -20,9 +20,11 @@ verification remain required before treating the vault as the only copy of a fil
 
 The application uses PostgreSQL-backed search for this initial deployment, matching
 the primary exact-content retrieval workflow. OpenSearch indexing is disabled.
-Analysis uses local Qwen3 1.7B with server-validated source references. Embeddings
-and answers remain lexical baselines; this deployment does not provide model-based
-semantic retrieval.
+The default analysis uses local Qwen3 1.7B with server-validated source references.
+An opt-in structured preview adds Docling, learned embeddings, a reranker and
+Qwen3 4B. Its evaluation remains below the production cutover gate; see
+[structured document intelligence](structured-intelligence.md) for measured
+results, current limits and network isolation requirements.
 
 ## Credentials
 

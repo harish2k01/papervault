@@ -4,8 +4,10 @@ Exact quotation proves provenance, not semantic completeness. These results stay
 preview until held-out review demonstrates the extraction and interpretation quality.
 """
 
+import hashlib
 import json
 import re
+from collections.abc import Callable
 from typing import Any
 
 from papervault_api.core.model_clients import ModelClient, StructuredModelClient, parse_json_object
@@ -156,7 +158,13 @@ def retrieved_passages(evidence: tuple[RetrievedEvidence, ...]) -> QuestionAnswe
 FINDINGS_VERSION = "source-findings-v2"
 
 
-def extract_findings(client: ModelClient, passages: list[dict[str, Any]]) -> dict[str, Any]:
+def extract_findings(
+    client: ModelClient,
+    passages: list[dict[str, Any]],
+    *,
+    progress: Callable[[dict[str, Any]], None] | None = None,
+    checkpoint: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     findings: list[dict[str, Any]] = []
     rejected, batches = 0, 0
     all_units = {
@@ -184,7 +192,78 @@ def extract_findings(client: ModelClient, passages: list[dict[str, Any]]) -> dic
         size += cost
     if pending:
         packed.append(pending)
-    for units in packed:
+    plan = hashlib.sha256(
+        json.dumps(
+            [
+                [
+                    [key, item["page_number"], item["section"], text]
+                    for key, (item, text) in units.items()
+                ]
+                for units in packed
+            ],
+            ensure_ascii=False,
+        ).encode()
+    ).hexdigest()
+    completed = 0
+    if checkpoint and checkpoint.get("batch_plan_id") == plan:
+        saved_count = checkpoint.get("completed_batches")
+        saved_findings = checkpoint.get("findings")
+        if (
+            type(saved_count) is int
+            and 0 <= saved_count <= len(packed)
+            and isinstance(saved_findings, list)
+        ):
+            saved_ids = {key for units in packed[:saved_count] for key in units}
+            valid = all(
+                isinstance(finding, dict)
+                and isinstance(finding.get("source_id"), str)
+                and finding.get("source_id") in saved_ids
+                and finding.get("value") == all_units[finding["source_id"]][1]
+                and finding.get("quote") == all_units[finding["source_id"]][0]["text"]
+                and finding.get("page_number") == all_units[finding["source_id"]][0]["page_number"]
+                and finding.get("ordinal") == all_units[finding["source_id"]][0]["ordinal"]
+                and isinstance(finding.get("kind"), str)
+                and finding.get("kind") in FINDING_KINDS
+                and isinstance(finding.get("label"), str)
+                for finding in saved_findings
+            )
+            if valid:
+                completed = saved_count
+                findings = list(saved_findings)
+                saved_rejected = checkpoint.get("rejected_findings", 0)
+                rejected = (
+                    saved_rejected if type(saved_rejected) is int and saved_rejected >= 0 else 0
+                )
+    batches = completed
+    processed = {key for units in packed[:completed] for key in units}
+    passage_ids = {
+        item["ordinal"]: {
+            key
+            for key, (source, _text) in all_units.items()
+            if source["ordinal"] == item["ordinal"]
+        }
+        for item in passages
+    }
+
+    def state(status: str) -> dict[str, Any]:
+        return {
+            "status": status,
+            "findings": list(findings),
+            "rejected_findings": rejected,
+            "covered_passages": sum(ids.issubset(processed) for ids in passage_ids.values()),
+            "total_passages": len(passages),
+            "covered_source_units": len(processed),
+            "batches": batches,
+            "completed_batches": batches,
+            "total_batches": len(packed),
+            "batch_plan_id": plan,
+            "prompt_version": FINDINGS_VERSION,
+            "limitations": [
+                "Original source text preserved; interpretation and completeness require review."
+            ],
+        }
+
+    for units in packed[completed:]:
         schema = {
             "type": "object",
             "properties": {
@@ -261,15 +340,7 @@ def extract_findings(client: ModelClient, passages: list[dict[str, Any]]) -> dic
             }
             if not any(existing["source_id"] == source_id for existing in findings):
                 findings.append(cleaned)
-    return {
-        "status": "needs_review",
-        "findings": findings,
-        "rejected_findings": rejected,
-        "covered_passages": len(passages),
-        "covered_source_units": len(all_units),
-        "batches": batches,
-        "prompt_version": FINDINGS_VERSION,
-        "limitations": [
-            "Original source text preserved; interpretation and completeness require review."
-        ],
-    }
+        processed.update(units)
+        if progress is not None:
+            progress(state("processing"))
+    return state("needs_review")
