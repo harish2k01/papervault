@@ -60,7 +60,8 @@ def structured_passages(document: dict[str, Any]) -> list[Passage]:
         provenance = item.get("prov", [])
         if not isinstance(provenance, list):
             raise ValueError("Invalid page provenance")
-        text = str(item.get("text", "")).strip()
+        raw_text = str(item.get("text", ""))
+        text = raw_text.strip()
         if kind in {"section_header", "title"} and text:
             level = max(1, min(8, int(item.get("level", 1))))
             for old_level in list(headings):
@@ -95,15 +96,44 @@ def structured_passages(document: dict[str, Any]) -> list[Passage]:
         if texts:
             if not provenance:
                 raise ValueError("Structured text has no page provenance")
-            # Multi-page table provenance is retained. Assign rows only when provenance is
-            # unambiguous; otherwise flag conversion for review rather than invent a page.
             pages = {int(prov["page_no"]) for prov in provenance}
-            if len(pages) != 1 or min(pages) < 1:
+            if not pages or min(pages) < 1:
                 raise ValueError("Structured item has ambiguous page provenance")
-            page = next(iter(pages))
-            for block in texts:
-                for piece in split_text(block):
-                    passages.append(Passage(page, kind, section, piece, provenance))
+            if len(pages) > 1:
+                if kind == "table":
+                    raise ValueError("Structured table has ambiguous page provenance")
+                cursor = 0
+                ranges: list[tuple[int, int, dict[str, Any]]] = []
+                segments: list[tuple[int, str, dict[str, Any]]] = []
+                for prov in provenance:
+                    span = prov.get("charspan")
+                    if (
+                        not isinstance(span, list)
+                        or len(span) != 2
+                        or any(type(position) is not int for position in span)
+                    ):
+                        raise ValueError("Structured text has incomplete character provenance")
+                    first, last = span
+                    if not 0 <= first < last <= len(raw_text):
+                        raise ValueError("Structured text has overlapping character provenance")
+                    ranges.append((first, last, prov))
+                for first, last, prov in sorted(ranges, key=lambda value: value[0]):
+                    if first < cursor:
+                        raise ValueError("Structured text has overlapping character provenance")
+                    if raw_text[cursor:first].strip():
+                        raise ValueError("Structured text has incomplete character provenance")
+                    segments.append((int(prov["page_no"]), raw_text[first:last], prov))
+                    cursor = last
+                if raw_text[cursor:].strip():
+                    raise ValueError("Structured text has incomplete character provenance")
+                for page, segment, prov in segments:
+                    for piece in split_text(segment):
+                        passages.append(Passage(page, kind, section, piece, [prov]))
+            else:
+                page = next(iter(pages))
+                for block in texts:
+                    for piece in split_text(block):
+                        passages.append(Passage(page, kind, section, piece, provenance))
         for child in item.get("children", []):
             visit(child)
         for key in ("captions", "footnotes"):

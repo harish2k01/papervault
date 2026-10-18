@@ -141,6 +141,7 @@ def main() -> None:
             )
             answer = answerer.answer(question, evidence)
             row["answered"] = answer.answered
+            row["answer"] = answer.answer
             row["answer_correct"] = (
                 bool(
                     answer.answer
@@ -174,6 +175,7 @@ def main() -> None:
         "reranker_model": models.reranker_model,
         "reranker_revision": models.reranker_revision,
         "answer_model": args.answer_model,
+        "answer_protocol": SourceSpanAnswerProvider.version,
         "answer_digest": args.answer_digest,
         "elapsed_seconds": round(time.monotonic() - started, 2),
         "results": results,

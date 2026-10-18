@@ -23,7 +23,7 @@ def semantic_models(settings: Settings) -> SemanticModels:
 
 def pipeline_id(settings: Settings) -> str:
     identity = (
-        f"structured-v1:{LayoutParser.identity}:{settings.rag_embedding_model}:"
+        f"structured-v2:{LayoutParser.identity}:{settings.rag_embedding_model}:"
         f"{settings.rag_embedding_revision}:{settings.rag_dimensions}"
     )
     return hashlib.sha256(identity.encode()).hexdigest()
@@ -31,6 +31,8 @@ def pipeline_id(settings: Settings) -> str:
 
 def analysis_client(settings: Settings) -> ModelClient:
     settings.validate_private_inference_url(settings.ollama_base_url)
+    if settings.ollama_context_tokens < 8192:
+        raise ValueError("Document intelligence requires at least an 8192-token context")
     if settings.rag_chat_model:
         if not settings.rag_chat_digest:
             raise ValueError("Candidate analysis requires a pinned model digest")

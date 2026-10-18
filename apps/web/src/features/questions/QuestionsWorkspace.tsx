@@ -130,7 +130,9 @@ export function QuestionsWorkspace({
                     <div>
                       <h2 className="text-sm font-semibold">
                         {questionMutation.data.answered
-                          ? "Grounded answer"
+                          ? questionMutation.data.answer_kind === "source_span"
+                            ? "Selected source text"
+                            : "Grounded answer"
                           : "No supported answer"}
                       </h2>
                       {questionMutation.data.answered ? (
@@ -167,31 +169,35 @@ export function QuestionsWorkspace({
                           : " sources"}
                       </summary>
                       <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                        {questionMutation.data.citations.map((citation) => (
-                          <button
-                            aria-label={`${citation.document_title} - Page ${citation.page_number}`}
-                            className="flex min-w-0 gap-3 rounded-lg border border-border bg-card p-3 text-left transition-colors hover:border-primary/40 hover:bg-muted/40"
-                            key={`${citation.document_id}-${citation.page_number}`}
-                            type="button"
-                            onClick={() => onOpenDocument(citation.document_id)}
-                          >
-                            <FileText
-                              className="mt-0.5 h-4 w-4 shrink-0 text-primary"
-                              aria-hidden="true"
-                            />
-                            <span className="min-w-0">
-                              <span className="block truncate text-sm font-medium">
-                                {citation.document_title}
+                        {questionMutation.data.citations.map(
+                          (citation, index) => (
+                            <button
+                              aria-label={`${citation.document_title} - Page ${citation.page_number}`}
+                              className="flex min-w-0 gap-3 rounded-lg border border-border bg-card p-3 text-left transition-colors hover:border-primary/40 hover:bg-muted/40"
+                              key={`${citation.document_id}-${citation.page_number}-${index}`}
+                              type="button"
+                              onClick={() =>
+                                onOpenDocument(citation.document_id)
+                              }
+                            >
+                              <FileText
+                                className="mt-0.5 h-4 w-4 shrink-0 text-primary"
+                                aria-hidden="true"
+                              />
+                              <span className="min-w-0">
+                                <span className="block truncate text-sm font-medium">
+                                  {citation.document_title}
+                                </span>
+                                <span className="block text-xs text-muted-foreground">
+                                  Page {citation.page_number}
+                                </span>
+                                <span className="mt-1 line-clamp-2 text-xs leading-5 text-muted-foreground">
+                                  {citation.snippet}
+                                </span>
                               </span>
-                              <span className="block text-xs text-muted-foreground">
-                                Page {citation.page_number}
-                              </span>
-                              <span className="mt-1 line-clamp-2 text-xs leading-5 text-muted-foreground">
-                                {citation.snippet}
-                              </span>
-                            </span>
-                          </button>
-                        ))}
+                            </button>
+                          ),
+                        )}
                       </div>
                     </details>
                   ) : null}

@@ -24,7 +24,7 @@ from papervault_api.questions.api.schemas import AskQuestionRequest
 from papervault_api.questions.application.evidence_analysis import (
     SourceSpanAnswerProvider,
     extract_findings,
-    source_span,
+    source_units,
 )
 from papervault_api.questions.application.hybrid import HybridRetriever
 from papervault_api.questions.application.indexing import StructuredIndexingService
@@ -177,54 +177,34 @@ async def test_hybrid_retrieves_zero_overlap_after_5000_and_never_sends_foreign_
     result = await HybridRetriever(session, models, "fixture").retrieve(
         owner.id, "How much paid leave?"
     )
-    assert len(result) == 1
+    assert result
     assert result[0].document_id == document.id
     assert "Vacation entitlement" in result[0].content_text
     assert "Subject to manager approval." in result[0].content_text
     assert all("PRIVATE" not in text for text in models.seen)
 
 
-def test_source_spans_reject_fabrication_boolean_indexes_and_missing_qualification() -> None:
-    evidence = (
-        RetrievedEvidence(
-            uuid4(),
-            "Synthetic",
-            "synthetic.pdf",
-            1,
-            "Payment is due only after acceptance.",
-            0.9,
-            0,
-        ),
-    )
+def test_source_selection_rejects_invented_ids_and_preserves_number_words_and_conditions() -> None:
+    text = "Vacation entitlement is twenty working days. Approval is required."
+    evidence = (RetrievedEvidence(uuid4(), "Synthetic", "synthetic.pdf", 1, text, 0.9, 0),)
     for output in [
-        {"answered": True, "evidence_index": True, "answer": "Payment", "quote": "Payment"},
-        {
-            "answered": True,
-            "evidence_index": 0,
-            "answer": "Already paid",
-            "quote": evidence[0].content_text,
-        },
-        {
-            "answered": True,
-            "evidence_index": 0,
-            "answer": "Payment",
-            "quote": "Payment is unconditional.",
-        },
+        {"source_ids": [True]},
+        {"source_ids": ["E99S0"]},
+        {"source_ids": "E0S0"},
+        {"source_ids": []},
     ]:
         assert (
             not SourceSpanAnswerProvider(FakeClient(output))
-            .answer("When is payment due?", evidence)
+            .answer("How much paid leave?", evidence)
             .answered
         )
-    output = {
-        "answered": True,
-        "evidence_index": 0,
-        "answer": "only after acceptance",
-        "quote": evidence[0].content_text,
-    }
-    answer = SourceSpanAnswerProvider(FakeClient(output)).answer("When is payment due?", evidence)
-    assert answer.answered and answer.citations[0].snippet == evidence[0].content_text
-    assert answer.confidence_score == 0  # No invented certainty percentage.
+    answer = SourceSpanAnswerProvider(FakeClient({"source_ids": ["E0S0", "E0S1", "E0S0"]})).answer(
+        "How much paid leave?", evidence
+    )
+    assert answer.answered
+    assert answer.answer == "Vacation entitlement is twenty working days.\nApproval is required."
+    assert answer.citations[0].snippet == text and len(answer.citations) == 1
+    assert answer.confidence_score == 0
 
 
 def test_findings_scan_all_passages_without_fixed_document_fields_and_reject_wrong_source() -> None:
@@ -243,24 +223,23 @@ def test_findings_scan_all_passages_without_fixed_document_fields_and_reject_wro
                 {
                     "kind": "exclusion",
                     "label": "Flooding",
-                    "value": "excludes flooding",
-                    "quote": data[8]["text"],
-                    "ordinal": 8,
+                    "source_id": "P8S0",
                 },
                 {
                     "kind": "amount",
                     "label": "Invented",
-                    "value": "500",
-                    "quote": "500",
-                    "ordinal": 8,
+                    "source_id": "P999S0",
                 },
             ]
         }
     )
     result = extract_findings(client, data)
-    assert result["covered_passages"] == 9 and len(client.calls) == 3
+    assert result["covered_passages"] == 9
+    assert {sentence["id"] for call in client.calls for sentence in call["sentences"]} == {
+        f"P{i}S0" for i in range(9)
+    }
     assert len(result["findings"]) == 1 and result["findings"][0]["page_number"] == 9
-    assert result["rejected_findings"] == 5
+    assert result["rejected_findings"] == 2 * len(client.calls) - 1
     assert result["status"] == "needs_review"
 
 
@@ -301,6 +280,31 @@ def test_structure_retains_reading_order_table_columns_and_page_provenance() -> 
     pieces = split_text(long_text)
     assert " ".join(pieces) == long_text
     assert all(len(piece.encode()) <= 700 for piece in pieces)
+
+
+def test_cross_page_paragraph_uses_character_provenance_and_rejects_overlap() -> None:
+    text = "Payment is conditional on " + "verification of the supplied records."
+    split = len("Payment is conditional on ")
+    data = {
+        "body": {"children": [{"$ref": "#/texts/0"}]},
+        "texts": [
+            {
+                "label": "text",
+                "text": text,
+                "prov": [
+                    {"page_no": 1, "charspan": [0, split]},
+                    {"page_no": 2, "charspan": [split, len(text)]},
+                ],
+            }
+        ],
+    }
+    result = structured_passages(data)
+    assert [item.page for item in result] == [1, 2]
+    assert result[0].text == "Payment is conditional on"
+    assert result[1].text == "verification of the supplied records."
+    data["texts"][0]["prov"][1]["charspan"] = [0, len(text)]
+    with pytest.raises(ValueError, match="overlapping"):
+        structured_passages(data)
 
 
 @pytest.mark.parametrize(
@@ -361,13 +365,13 @@ def test_embedding_identity_and_nan_are_rejected() -> None:
         model.embed(["synthetic"])
 
 
-def test_whitespace_resolution_preserves_source_without_turning_unpaid_into_paid() -> None:
-    assert (
-        source_span("Payment is\n  due after acceptance.", "Payment is due after acceptance.")
-        == "Payment is\n  due after acceptance."
-    )
-    assert source_span("Status: unpaid.", "paid") is None
-    assert source_span("Total: 1100", "100") is None
+def test_source_units_preserve_negation_decimals_and_original_number_words() -> None:
+    text = "Status: unpaid. Measured value is 13.6 g/dL. Entitlement is twenty days."
+    assert source_units(text) == [
+        "Status: unpaid.",
+        "Measured value is 13.6 g/dL.",
+        "Entitlement is twenty days.",
+    ]
 
 
 async def test_candidate_api_checks_owner_and_refuses_incomplete_index(

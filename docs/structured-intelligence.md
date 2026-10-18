@@ -34,6 +34,12 @@ original-file hash. Model mismatches, partial page conversion and ambiguous page
 provenance fail explicitly. Failed indexing preserves original access and text
 search. Redelivery does not replace a completed index.
 
+Paragraphs continuing across pages are split using Docling character spans. Each
+piece retains its actual page, and retrieval can include adjacent pages as separate
+citations. Overlapping or incomplete character provenance is rejected. Ambiguous
+multi-page table provenance and headers exceeding the current passage budget
+remain explicit preview limitations.
+
 Retrieval streams the complete eligible owner corpus, maintaining bounded
 candidate heaps for BM25 and cosine similarity. Reciprocal rank fusion feeds the
 reranker; there is no lexical-overlap requirement or first-5,000-passage cutoff.
@@ -48,11 +54,19 @@ version checks. A vector database alone does not supply those checks.
 
 ## Findings and answers
 
-All passages enter bounded local model batches. Findings can describe identities,
+All passages enter local model batches packed by serialized input size. Small table
+rows share a batch rather than wasting a model call per fixed handful of rows.
+Findings can describe identities,
 dates, amounts, obligations, conditions, exclusions and other terms without a
 document-specific list of five fields. Values must occur in the supplied quote,
 and the quote must occur in the referenced passage. Invalid findings are rejected
 and counted. Page and passage coverage are reported separately from fact accuracy.
+
+The model selects source sentence IDs rather than copying or rewriting values.
+The application resolves those IDs to the original text, preserving number words,
+units and qualifications. Selected source units become the answer or finding;
+unsupported IDs are rejected. This prevents a copied quote from silently changing
+"twenty" into "20" or normalizing a date into an unsupported interpretation.
 
 Exact quotation proves provenance, **not entailment or completeness**. A model can
 still choose the wrong fact, omit an exception or supply a misleading heading.
@@ -119,6 +133,13 @@ failed answer-quality gate, not successful grounding. Its `source_verified` flag
 on refusals are vacuous checks because no answer was produced. Later answer
 format changes require a new report; this baseline must not be presented as
 validation of those changes. The default production answer path remains unchanged.
+
+The later source-ID pilot with the 1.7B model answered 15/20 positive questions,
+matched the expected span for 10/20, and refused all four unsupported questions.
+All 15 produced answers preserved their source text, but five selected the wrong
+information. This illustrates why provenance cannot stand in for correctness.
+It also fails the cutover gate. The reports are retained separately so neither
+improved answer availability nor conservative refusal hides the remaining errors.
 
 Production cutover requires a separate held-out set with human-reviewed expected
 facts and answers, including scans, tables, long documents, amendments, ambiguous

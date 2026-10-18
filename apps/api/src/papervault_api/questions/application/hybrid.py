@@ -138,12 +138,12 @@ class HybridRetriever:
             candidate = shortlist[index]
             passage, document = candidate.passage, candidate.document
             # Recheck ownership/current source while expanding adjacent context. A
-            # neighbour can never come from a different user, source version or page.
+            # neighbour can never come from a different user or source version. Each
+            # page retains its own citation, including clauses continuing across pages.
             neighbors = await self.session.execute(
                 self.query(owner_id)
                 .where(
                     DocumentRagPassage.index_id == passage.index_id,
-                    DocumentRagPassage.page_number == passage.page_number,
                     DocumentRagPassage.ordinal.between(passage.ordinal - 1, passage.ordinal + 1),
                 )
                 .order_by(DocumentRagPassage.ordinal)
@@ -152,25 +152,43 @@ class HybridRetriever:
             context = [row[0] for row in neighbors]
             if not any(item.id == passage.id for item in context):
                 continue
-            evidence.append(
-                RetrievedEvidence(
-                    document_id=document.id,
-                    title=document.title,
-                    original_filename=document.original_filename,
-                    page_number=passage.page_number,
-                    content_text="\n".join(
-                        item.section + "\n" + item.content_text for item in context
-                    ),
-                    score=score,
-                    lexical_score=0,
-                    document_type=document.document_type,
-                    text_extraction_id=await self.session.scalar(
-                        select(DocumentRagIndex.text_extraction_id).where(
-                            DocumentRagIndex.id == passage.index_id
-                        )
-                    ),
+            source_id = await self.session.scalar(
+                select(DocumentRagIndex.text_extraction_id).where(
+                    DocumentRagIndex.id == passage.index_id
                 )
             )
+            page_numbers = sorted(
+                {item.page_number for item in context},
+                key=lambda page: (page != passage.page_number, page),
+            )
+            for page in page_numbers:
+                page_context = "\n".join(
+                    "\n".join(part for part in (item.section, item.content_text) if part)
+                    for item in context
+                    if item.page_number == page
+                )
+                if any(
+                    item.document_id == document.id
+                    and item.page_number == page
+                    and item.content_text == page_context
+                    for item in evidence
+                ):
+                    continue
+                evidence.append(
+                    RetrievedEvidence(
+                        document_id=document.id,
+                        title=document.title,
+                        original_filename=document.original_filename,
+                        page_number=page,
+                        content_text=page_context,
+                        score=score,
+                        lexical_score=0,
+                        document_type=document.document_type,
+                        text_extraction_id=source_id,
+                    )
+                )
+                if len(evidence) == 3:
+                    break
             if len(evidence) == 3:
                 break
         return tuple(evidence)

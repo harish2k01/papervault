@@ -127,7 +127,7 @@ class SemanticModels:
 
 
 class LayoutParser:
-    identity = "docling-serve1.37.0/docling2.138.0/core2.101.1-structured-v1"
+    identity = "docling-serve1.37.0/docling2.138.0/core2.101.1-structured-v2"
 
     def __init__(self, client: PrivateInference) -> None:
         self.client = client

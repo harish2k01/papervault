@@ -8,7 +8,10 @@ from papervault_api.core.config import get_settings
 from papervault_api.db.session import AsyncSessionFactory, engine
 from papervault_api.documents.infrastructure.models import Document, DocumentTextExtraction
 from papervault_api.documents.infrastructure.storage import S3ObjectStorage
-from papervault_api.questions.application.evidence_analysis import extract_findings
+from papervault_api.questions.application.evidence_analysis import (
+    FINDINGS_VERSION,
+    extract_findings,
+)
 from papervault_api.questions.application.indexing import StructuredIndexingService
 from papervault_api.questions.infrastructure.local_inference import LayoutParser, PrivateInference
 from papervault_api.questions.infrastructure.rag_factory import (
@@ -158,6 +161,7 @@ async def _understand(index_id: UUID) -> None:
                 index.understanding.get("status") == "needs_review"
                 and index.understanding.get("model") == model
                 and index.understanding.get("model_digest") == digest
+                and index.understanding.get("prompt_version") == FINDINGS_VERSION
             ):
                 return
             index.understanding = {"status": "processing", "model": model, "model_digest": digest}
@@ -187,7 +191,7 @@ async def _understand(index_id: UUID) -> None:
                 ],
             )
             result.update(
-                {"model": model, "model_digest": digest, "prompt_version": "source-findings-v1"}
+                {"model": model, "model_digest": digest, "prompt_version": FINDINGS_VERSION}
             )
             current = await session.scalar(
                 select(DocumentTextExtraction.id).where(
