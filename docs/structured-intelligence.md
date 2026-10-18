@@ -62,6 +62,18 @@ document-specific list of five fields. Values must occur in the supplied quote,
 and the quote must occur in the referenced passage. Invalid findings are rejected
 and counted. Page and passage coverage are reported separately from fact accuracy.
 
+Each completed analysis batch is committed independently and becomes visible in
+the preview, including while later batches are running or have failed. Retries
+resume verified checkpoints only when the source batch plan, model digest and
+prompt version match. A changed source or model starts fresh; a superseded run
+cannot overwrite a newer run. Database transactions stay short and are not held
+open during model inference. The background consumer allows up to 900 seconds
+per CPU model request independently of the interactive question timeout.
+
+The owner-only `POST /questions/intelligence/{document_id}/retry` endpoint queues
+failed indexing or resumes fact analysis for an existing ready index. The document
+preview exposes the same action and retains already verified source findings.
+
 The model selects source sentence IDs rather than copying or rewriting values.
 The application resolves those IDs to the original text, preserving number words,
 units and qualifications. Selected source units become the answer or finding;

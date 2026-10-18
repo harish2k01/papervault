@@ -32,6 +32,7 @@ from papervault_api.questions.infrastructure.rag_factory import (
     semantic_models,
 )
 from papervault_api.questions.infrastructure.rag_models import DocumentRagIndex
+from papervault_api.worker.celery_app import celery_app
 
 router = APIRouter(prefix="/questions", tags=["questions"])
 
@@ -81,6 +82,53 @@ async def candidate_understanding(
         "pipeline_id": index.pipeline_id,
         "embedding_model": index.embedding_model,
     }
+
+
+@router.post("/intelligence/{document_id}/retry", status_code=202)
+async def retry_candidate_understanding(
+    document_id: UUID,
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    session: Annotated[AsyncSession, Depends(get_session)],
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> dict[str, str]:
+    document = await session.scalar(
+        select(Document).where(Document.id == document_id, Document.owner_id == current_user.id)
+    )
+    if document is None:
+        raise HTTPException(404, "Document not found")
+    if settings.rag_mode == "disabled":
+        raise HTTPException(409, "Document intelligence preview is disabled")
+    source = await session.scalar(
+        select(DocumentTextExtraction).where(
+            DocumentTextExtraction.document_id == document_id,
+            DocumentTextExtraction.is_current.is_(True),
+            DocumentTextExtraction.status == "succeeded",
+        )
+    )
+    if source is None or document.status != "ready" or document.archived_at is not None:
+        raise HTTPException(409, "Complete text extraction before retrying document intelligence")
+    index = await session.scalar(
+        select(DocumentRagIndex).where(
+            DocumentRagIndex.text_extraction_id == source.id,
+            DocumentRagIndex.pipeline_id == pipeline_id(settings),
+        )
+    )
+    if index is not None and (
+        index.status == "building" or index.understanding.get("status") == "processing"
+    ):
+        raise HTTPException(409, "Document intelligence is already running")
+    task, args, queue = (
+        "papervault.rag.index",
+        [str(document.id), str(source.id)],
+        "papervault-index",
+    )
+    if index is not None and index.status == "ready":
+        task, args, queue = "papervault.rag.understand", [str(index.id)], "papervault-understanding"
+    try:
+        await asyncio.to_thread(celery_app.send_task, task, args=args, queue=queue)
+    except Exception:
+        raise HTTPException(503, "The analysis queue is unavailable. Please try again.") from None
+    return {"status": "queued"}
 
 
 @router.post("/ask", response_model=AskQuestionResponse)

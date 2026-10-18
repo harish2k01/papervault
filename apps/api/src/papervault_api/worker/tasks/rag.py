@@ -8,18 +8,15 @@ from papervault_api.core.config import get_settings
 from papervault_api.db.session import AsyncSessionFactory, engine
 from papervault_api.documents.infrastructure.models import Document, DocumentTextExtraction
 from papervault_api.documents.infrastructure.storage import S3ObjectStorage
-from papervault_api.questions.application.evidence_analysis import (
-    FINDINGS_VERSION,
-    extract_findings,
-)
 from papervault_api.questions.application.indexing import StructuredIndexingService
+from papervault_api.questions.application.understanding import DocumentUnderstandingService
 from papervault_api.questions.infrastructure.local_inference import LayoutParser, PrivateInference
 from papervault_api.questions.infrastructure.rag_factory import (
     analysis_client,
     pipeline_id,
     semantic_models,
 )
-from papervault_api.questions.infrastructure.rag_models import DocumentRagIndex, DocumentRagPassage
+from papervault_api.questions.infrastructure.rag_models import DocumentRagIndex
 from papervault_api.worker.celery_app import celery_app
 
 logger = structlog.get_logger(__name__)
@@ -137,79 +134,16 @@ async def _understand(index_id: UUID) -> None:
     settings = get_settings()
     if settings.rag_mode == "disabled":
         return
-    settings.validate_private_inference_url(settings.ollama_base_url)
     try:
-        async with AsyncSessionFactory() as session:
-            index = await session.scalar(
-                select(DocumentRagIndex)
-                .join(
-                    DocumentTextExtraction,
-                    DocumentTextExtraction.id == DocumentRagIndex.text_extraction_id,
-                )
-                .join(Document, Document.id == DocumentRagIndex.document_id)
-                .where(
-                    DocumentRagIndex.id == index_id,
-                    DocumentRagIndex.pipeline_id == pipeline_id(settings),
-                    DocumentRagIndex.status == "ready",
-                    DocumentTextExtraction.is_current.is_(True),
-                    Document.status == "ready",
-                )
-            )
-            model = settings.rag_chat_model or settings.ollama_chat_model
-            digest = settings.rag_chat_digest or settings.ollama_expected_digest
-            if index is None or (
-                index.understanding.get("status") == "needs_review"
-                and index.understanding.get("model") == model
-                and index.understanding.get("model_digest") == digest
-                and index.understanding.get("prompt_version") == FINDINGS_VERSION
-            ):
-                return
-            index.understanding = {"status": "processing", "model": model, "model_digest": digest}
-            await session.commit()
-            passages = list(
-                (
-                    await session.scalars(
-                        select(DocumentRagPassage)
-                        .where(
-                            DocumentRagPassage.index_id == index_id,
-                        )
-                        .order_by(DocumentRagPassage.ordinal)
-                    )
-                ).all()
-            )
-            result = await asyncio.to_thread(
-                extract_findings,
-                analysis_client(settings),
-                [
-                    {
-                        "ordinal": passage.ordinal,
-                        "page_number": passage.page_number,
-                        "section": passage.section,
-                        "text": passage.content_text,
-                    }
-                    for passage in passages
-                ],
-            )
-            result.update(
-                {"model": model, "model_digest": digest, "prompt_version": FINDINGS_VERSION}
-            )
-            current = await session.scalar(
-                select(DocumentTextExtraction.id).where(
-                    DocumentTextExtraction.id == index.text_extraction_id,
-                    DocumentTextExtraction.is_current.is_(True),
-                )
-            )
-            fresh = await session.get(DocumentRagIndex, index_id, populate_existing=True)
-            if current is not None and fresh is not None:
-                fresh.understanding = result
-                await session.commit()
+        await DocumentUnderstandingService(
+            # Background batches can outlast the interactive request timeout on CPU.
+            AsyncSessionFactory,
+            analysis_client(settings, timeout_seconds=900),
+            pipeline_id(settings),
+            settings.rag_chat_digest or settings.ollama_expected_digest,
+        ).process(index_id)
     except Exception as exc:
         logger.warning("candidate_understanding_failed", error_type=type(exc).__name__)
-        async with AsyncSessionFactory() as session:
-            failed = await session.get(DocumentRagIndex, index_id)
-            if failed is not None and failed.understanding.get("status") == "processing":
-                failed.understanding = {"status": "failed", "error": "local_analysis_failed"}
-                await session.commit()
         raise RuntimeError("Candidate understanding could not be completed") from None
     finally:
         await engine.dispose()

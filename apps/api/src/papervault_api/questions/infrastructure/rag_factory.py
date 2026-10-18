@@ -29,7 +29,7 @@ def pipeline_id(settings: Settings) -> str:
     return hashlib.sha256(identity.encode()).hexdigest()
 
 
-def analysis_client(settings: Settings) -> ModelClient:
+def analysis_client(settings: Settings, *, timeout_seconds: float | None = None) -> ModelClient:
     settings.validate_private_inference_url(settings.ollama_base_url)
     if settings.ollama_context_tokens < 8192:
         raise ValueError("Document intelligence requires at least an 8192-token context")
@@ -42,17 +42,18 @@ def analysis_client(settings: Settings) -> ModelClient:
                 "ollama_expected_digest": settings.rag_chat_digest,
             }
         )
+    timeout = timeout_seconds or settings.model_provider_timeout_seconds
     return OllamaModelClient(
         base_url=settings.ollama_base_url,
         chat_model=settings.ollama_chat_model,
         embedding_model=settings.ollama_embedding_model,
-        timeout_seconds=settings.model_provider_timeout_seconds,
+        timeout_seconds=timeout,
         context_tokens=settings.ollama_context_tokens,
         max_output_tokens=settings.ollama_max_output_tokens,
         expected_digest=settings.ollama_expected_digest,
         http_client=JsonHttpClient(
             base_url=settings.ollama_base_url,
-            timeout_seconds=settings.model_provider_timeout_seconds,
+            timeout_seconds=timeout,
             private_only=True,
         ),
     )

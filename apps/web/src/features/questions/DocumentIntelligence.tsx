@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { documentIntelligence } from "../../lib/api";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { documentIntelligence, retryDocumentIntelligence } from "../../lib/api";
 
 export function DocumentIntelligence({
   documentId,
@@ -10,6 +10,14 @@ export function DocumentIntelligence({
   onPage: (page: number) => void;
 }) {
   const [open, setOpen] = useState(false);
+  const cache = useQueryClient();
+  const retry = useMutation({
+    mutationFn: () => retryDocumentIntelligence(documentId),
+    onSuccess: () =>
+      cache.invalidateQueries({
+        queryKey: ["document-intelligence", documentId],
+      }),
+  });
   const query = useQuery({
     queryKey: ["document-intelligence", documentId],
     queryFn: () => documentIntelligence(documentId),
@@ -51,18 +59,44 @@ export function DocumentIntelligence({
               {data.covered_pages?.length ?? 0} of {data.page_count} pages
               contain indexed text.{" "}
               {data.understanding?.status
-                ? `${data.understanding.covered_passages ?? 0} passages analysed.`
+                ? `${data.understanding.covered_passages ?? 0}${data.understanding.total_passages === undefined ? "" : ` of ${data.understanding.total_passages}`} passages analysed.`
                 : "Fact analysis is queued or running."}
             </p>
           ) : null}
-          {data?.understanding?.status && !findings.length ? (
-            <p>
-              {data.understanding.status === "processing"
-                ? "Analysing the document's facts and conditions…"
-                : data.understanding.status === "failed"
-                  ? "Local fact analysis failed. Regenerate the document to retry."
-                  : "No verified facts were returned. Review the source document."}
+          {data?.understanding?.status === "processing" ? (
+            <p role="status">
+              Reading the remaining passages. Completed findings appear below.
             </p>
+          ) : null}
+          {data?.understanding?.status === "failed" ? (
+            <p role="alert">
+              Analysis stopped. Completed work is saved; retry resumes it.
+            </p>
+          ) : null}
+          {data?.understanding?.status === "needs_review" &&
+          !findings.length ? (
+            <p>No verified facts were returned. Review the source document.</p>
+          ) : null}
+          {data?.status === "failed" ||
+          data?.status === "not_indexed" ||
+          data?.understanding?.status === "failed" ? (
+            <button
+              className="rounded-md border border-border px-3 py-2 font-medium text-primary disabled:opacity-50"
+              disabled={retry.isPending}
+              type="button"
+              onClick={() => retry.mutate()}
+            >
+              {retry.isPending ? "Queuing retry…" : "Retry document analysis"}
+            </button>
+          ) : null}
+          {retry.isSuccess &&
+          (data?.status === "failed" ||
+            data?.status === "not_indexed" ||
+            data?.understanding?.status === "failed") ? (
+            <p role="status">Retry queued. Saved work will resume.</p>
+          ) : null}
+          {retry.isError ? (
+            <p role="alert">Retry could not be queued. Please try again.</p>
           ) : null}
           {findings.map((finding, index) => (
             <article
@@ -98,8 +132,8 @@ export function DocumentIntelligence({
       ) : null}
       {data?.status === "failed" ? (
         <p role="alert">
-          Structured indexing failed. Regenerate this document to retry; its
-          original and text search remain available.
+          Structured indexing failed. Retry the analysis; its original and text
+          search remain available.
         </p>
       ) : null}
     </details>

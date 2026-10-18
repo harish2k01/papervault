@@ -8,7 +8,7 @@ import pytest
 from fastapi import HTTPException
 from pydantic import ValidationError
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from papervault_api.core.config import Settings
 from papervault_api.documents.infrastructure.models import (
@@ -19,7 +19,11 @@ from papervault_api.documents.infrastructure.models import (
 from papervault_api.identity.application.current_user import CurrentUser
 from papervault_api.identity.domain.enums import UserRole
 from papervault_api.identity.infrastructure.models import User
-from papervault_api.questions.api.routes import ask_question, candidate_understanding
+from papervault_api.questions.api.routes import (
+    ask_question,
+    candidate_understanding,
+    retry_candidate_understanding,
+)
 from papervault_api.questions.api.schemas import AskQuestionRequest
 from papervault_api.questions.application.evidence_analysis import (
     SourceSpanAnswerProvider,
@@ -30,6 +34,7 @@ from papervault_api.questions.application.hybrid import HybridRetriever
 from papervault_api.questions.application.indexing import StructuredIndexingService
 from papervault_api.questions.application.service import RetrievedEvidence
 from papervault_api.questions.application.structure import split_text, structured_passages
+from papervault_api.questions.application.understanding import DocumentUnderstandingService
 from papervault_api.questions.infrastructure.local_inference import (
     InferenceUnavailable,
     SemanticModels,
@@ -420,3 +425,135 @@ def test_embedding_nan_and_reranker_duplicate_indexes_are_rejected() -> None:
         model.embed(["synthetic"])
     with pytest.raises(InferenceUnavailable, match="duplicate"):
         model.rank("synthetic", ["one", "two"])
+
+
+class BatchClient(FakeClient):
+    def __init__(self, fail_at: int = 0) -> None:
+        super().__init__({})
+        self.fail_at = fail_at
+
+    def complete(self, *, system: str, user: str) -> str:
+        payload = json.loads(user)
+        self.calls.append(payload)
+        if len(self.calls) == self.fail_at:
+            raise RuntimeError("Synthetic interrupted request")
+        return json.dumps(
+            {
+                "findings": [
+                    {"kind": "term", "label": "Synthetic term", "source_id": row["id"]}
+                    for row in payload["sentences"]
+                ]
+            }
+        )
+
+
+def batch_passages() -> list[dict[str, Any]]:
+    return [
+        {
+            "ordinal": ordinal,
+            "page_number": 1,
+            "section": "Synthetic",
+            "text": f"Synthetic clause {ordinal}: " + "word " * 300 + ".",
+        }
+        for ordinal in range(4)
+    ]
+
+
+def test_findings_resume_only_verified_completed_batches() -> None:
+    saved: list[dict[str, Any]] = []
+    with pytest.raises(RuntimeError, match="interrupted"):
+        extract_findings(BatchClient(fail_at=2), batch_passages(), progress=saved.append)
+    assert len(saved) == 1
+    client = BatchClient()
+    result = extract_findings(client, batch_passages(), checkpoint=saved[0])
+    assert result["completed_batches"] == result["total_batches"]
+    assert result["covered_passages"] == 4
+    assert len(client.calls) == result["total_batches"] - 1
+    assert len({finding["source_id"] for finding in result["findings"]}) == 4
+    corrupt = {**saved[0], "findings": [{"source_id": []}]}
+    fresh = BatchClient()
+    extract_findings(fresh, batch_passages(), checkpoint=corrupt)
+    assert len(fresh.calls) == result["total_batches"]
+    changed = batch_passages()
+    changed[0]["text"] = "A replaced source clause."
+    replaced = BatchClient()
+    updated = extract_findings(replaced, changed, checkpoint=saved[0])
+    assert len(replaced.calls) == updated["total_batches"]
+    assert updated["batch_plan_id"] != saved[0]["batch_plan_id"]
+
+
+async def test_understanding_persists_failure_resumes_and_rejects_stale_publications(
+    session: AsyncSession,
+) -> None:
+    owner = User(email="checkpoint@example.test")
+    session.add(owner)
+    await session.flush()
+    document, extraction = await source(session, owner.id)
+    item = await index(session, document, extraction)
+    session.add_all(
+        [passage(item.id, row["ordinal"], row["text"], [1, 0]) for row in batch_passages()]
+    )
+    await session.commit()
+    factory = async_sessionmaker(session.bind, expire_on_commit=False)
+    failed = DocumentUnderstandingService(factory, BatchClient(fail_at=2), "fixture", "digest")
+    with pytest.raises(RuntimeError):
+        await failed.process(item.id)
+    await session.refresh(item)
+    assert item.understanding["status"] == "failed"
+    assert item.understanding["completed_batches"] == 1
+    assert item.understanding["findings"]
+    old_run = item.understanding["run_id"]
+    resumed_client = BatchClient()
+    resumed = DocumentUnderstandingService(factory, resumed_client, "fixture", "digest")
+    assert await resumed.process(item.id)
+    await session.refresh(item)
+    assert item.understanding["status"] == "needs_review"
+    assert item.understanding["covered_passages"] == 4
+    assert len(resumed_client.calls) == item.understanding["total_batches"] - 1
+    assert not await resumed.publish(item.id, old_run, {"status": "failed"})
+    assert not await resumed.process(item.id)
+    new_model = BatchClient()
+    assert await DocumentUnderstandingService(factory, new_model, "fixture", "new-digest").process(
+        item.id
+    )
+    assert len(new_model.calls) == item.understanding["total_batches"]
+    extraction.is_current = False
+    await session.commit()
+    assert not await resumed.publish(item.id, item.understanding["run_id"], {"status": "failed"})
+
+
+async def test_retry_is_owner_guarded_and_routes_ready_index_to_analysis(
+    session: AsyncSession,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from papervault_api.questions.api import routes
+
+    owner = User(email="retry@example.test")
+    session.add(owner)
+    await session.flush()
+    document, extraction = await source(session, owner.id)
+    item = await index(session, document, extraction)
+    settings = Settings(rag_mode="preview")
+    monkeypatch.setattr(routes, "pipeline_id", lambda settings: "fixture")
+    sent: list[tuple[str, list[str], str]] = []
+    monkeypatch.setattr(
+        routes.celery_app,
+        "send_task",
+        lambda task, *, args, queue: sent.append((task, args, queue)),
+    )
+    await session.commit()
+    stranger = CurrentUser(uuid4(), "other@example.test", UserRole.USER)
+    with pytest.raises(HTTPException) as denied:
+        await retry_candidate_understanding(document.id, stranger, session, settings)
+    assert denied.value.status_code == 404
+    current = CurrentUser(owner.id, owner.email, UserRole.USER)
+    assert await retry_candidate_understanding(document.id, current, session, settings) == {
+        "status": "queued"
+    }
+    assert sent == [("papervault.rag.understand", [str(item.id)], "papervault-understanding")]
+    item.understanding = {"status": "processing"}
+    await session.commit()
+    with pytest.raises(HTTPException) as busy:
+        await retry_candidate_understanding(document.id, current, session, settings)
+    assert busy.value.status_code == 409
+    assert len(sent) == 1

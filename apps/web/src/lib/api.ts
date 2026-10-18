@@ -677,6 +677,9 @@ export type DocumentIntelligence = {
   understanding?: {
     status?: string;
     covered_passages?: number;
+    total_passages?: number;
+    completed_batches?: number;
+    total_batches?: number;
     rejected_findings?: number;
     findings?: Array<{
       kind: string;
@@ -692,6 +695,13 @@ export type DocumentIntelligence = {
 export async function documentIntelligence(documentId: string) {
   return apiFetch<DocumentIntelligence>(
     `/questions/intelligence/${documentId}`,
+  );
+}
+
+export async function retryDocumentIntelligence(documentId: string) {
+  return apiFetch<{ status: "queued" }>(
+    `/questions/intelligence/${documentId}/retry`,
+    { method: "POST" },
   );
 }
 
