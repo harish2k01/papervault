@@ -12,6 +12,14 @@ permissions:
   contents: read
   packages: write
 
+env:
+  # Homelab runners pull Docker Hub images through zot and npm packages through Verdaccio.
+  BUILDKIT_MIRROR_CONFIG: |
+    [registry."docker.io"]
+      mirrors = ["zot.zot.svc.cluster.local:5000"]
+    [registry."zot.zot.svc.cluster.local:5000"]
+      http = true
+  HOMELAB_NPM_REGISTRY: http://verdaccio.verdaccio.svc.cluster.local:4873/
 jobs:
   build-and-push:
     name: Build and push ${{ matrix.component }}
@@ -43,6 +51,7 @@ jobs:
 
       - uses: docker/setup-buildx-action@v3
         with:
+          buildkitd-config-inline: ${{ runner.environment == 'self-hosted' && env.BUILDKIT_MIRROR_CONFIG || '' }}
           driver-opts: network=host
 
       - uses: docker/login-action@v3
@@ -73,3 +82,4 @@ jobs:
           cache-to: type=gha,mode=max,scope=${{ matrix.component }}
           build-args: |
             VITE_API_BASE_URL=${{ vars.VITE_API_BASE_URL || '/api' }}
+            NPM_CONFIG_REGISTRY=${{ runner.environment == 'self-hosted' && env.HOMELAB_NPM_REGISTRY || 'https://registry.npmjs.org/' }}

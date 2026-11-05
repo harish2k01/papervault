@@ -5,6 +5,8 @@ ARG VITE_API_BASE_URL=/api
 ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
 
 COPY apps/web/package*.json ./
+# npm registry for this build only (homelab CI passes Verdaccio); not kept in the final image.
+ARG NPM_CONFIG_REGISTRY=https://registry.npmjs.org/
 RUN npm ci
 
 COPY apps/web ./
